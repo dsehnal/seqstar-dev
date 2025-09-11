@@ -21,7 +21,7 @@ interface SectionInfo {
     string,
     {
       views: Map<Feature, FeatureTableView>
-      general: Map<Feature, Record<string, any>>
+      general: Map<Feature, Record<string, unknown>>
     }
   >
 }
@@ -36,6 +36,10 @@ export class SectionModel extends ReactiveModel {
     public name: SectionName,
   ) {
     super()
+
+    this.context = context;
+    this.name = name;
+    this.canvas = new CanvasModel(this);
 
     this.subscribe(this.context.state.spec, () => {
       this.checkTrackOffset()
@@ -58,7 +62,7 @@ export class SectionModel extends ReactiveModel {
     trackIds: new Set(),
     trackCache: new Map(),
   }
-  canvas = new CanvasModel(this)
+  canvas: CanvasModel //  = new CanvasModel(this)
 
   get view() {
     return this.context.layout.getSpec(this.name)?.horizontalView

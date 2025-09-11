@@ -1,40 +1,25 @@
-import {
-  ArrowRotateClockwise_16,
-  BulletList_16,
-  ChevronDownSmall_16,
-  ChevronRightSmall_16,
-  CircleMinus_16,
-  CirclePlus_16,
-  Cmd_16,
-  DotGrid2x3_16,
-  Filter2_16,
-  Import_16,
-  MagnifyingGlass_16,
-  PencilLine_16,
-  PlusSmall_16,
-  SparklesSoft_16,
-  TrashCanSimple_16,
-} from "@cradlebio/new-icons"
-import type { Context } from "@cradlebio/sequence-viewer/src/context"
-import type { Data, Feature, Track } from "@cradlebio/sequence-viewer/src/data"
-import type { Spec } from "@cradlebio/sequence-viewer/src/data/specification"
-import type { SectionModel } from "@cradlebio/sequence-viewer/src/model/section"
-import { Canvas, Cell, Layout, TrackRows } from "@cradlebio/sequence-viewer/src/react"
+import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import type { Context } from "@/sequence-viewer/context"
+import type { Data, Feature, Track } from "@/sequence-viewer/data"
+import type { Spec } from "@/sequence-viewer/data/specification"
+import type { SectionModel } from "@/sequence-viewer/model/section"
+import { Canvas, Cell, Layout, TrackRows } from "@/sequence-viewer/react"
 import {
   useBehavior,
   useCreateSequenceContext,
   useIsTrackHighlighted,
   useSequenceContext,
-} from "@cradlebio/sequence-viewer/src/react/hooks"
-import { uuid22 } from "@cradlebio/sequence-viewer/src/utils/object"
+} from "@/sequence-viewer/react/hooks"
+import { uuid22 } from "@/sequence-viewer/utils/object"
 import {
   isEmptyRanges,
   subtractRanges,
   unionRanges,
-} from "@cradlebio/sequence-viewer/src/utils/range"
-import { Button, cn } from "@cradlebio/ui-library"
+} from "@/sequence-viewer/utils/range"
+import { ChevronDownIcon, ChevronRightIcon, CircleMinusIcon, CirclePlusIcon, FilterIcon, ImportIcon, ListIcon, MousePointerClickIcon, MoveIcon, PencilIcon, PlusIcon, RefreshCwIcon, SparklesIcon, TelescopeIcon, TrashIcon } from "lucide-react"
 import { useState } from "react"
-import { ImportFeaturesDialog } from "../ui/ImportFeaturesDialog"
+import { ImportFeaturesDialog } from "./ImportFeaturesDialog"
 
 interface LayoutState {
   annotations: boolean
@@ -202,11 +187,11 @@ export function AnnotatedMSAView({
         >
           Annotations
           <div className="ms-1" />
-          <Button variant="link" size="xs" onClick={addAnnotation}>
-            <PlusSmall_16 />
+          <Button variant="link" size="sm" onClick={addAnnotation}>
+            <PlusIcon />
           </Button>
-          <Button variant="link" size="xs" onClick={() => setImportFeaturesOpen(true)}>
-            <Import_16 />
+          <Button variant="link" size="sm" onClick={() => setImportFeaturesOpen(true)}>
+            <ImportIcon />
           </Button>
         </Cell>
 
@@ -229,7 +214,7 @@ export function AnnotatedMSAView({
           <Button
             title="Toggle residue coloring"
             variant={data.custom?.msaSparkles ? "default" : "link"}
-            size="xs"
+            size="sm"
             onClick={() =>
               setData({
                 ...data,
@@ -237,15 +222,15 @@ export function AnnotatedMSAView({
               })
             }
           >
-            <SparklesSoft_16 />
+            <SparklesIcon />
           </Button>
           <Button
             title="Toggle data"
             variant={layoutState.msaZoom ? "default" : "link"}
-            size="xs"
+            size="sm"
             onClick={() => setLayoutState({ ...layoutState, msaZoom: !layoutState.msaZoom })}
           >
-            <MagnifyingGlass_16 />
+            <TelescopeIcon />
           </Button>
         </Cell>
         <Cell section="separator-3" className="border-t border-b bg-gray-50" />
@@ -332,7 +317,7 @@ function GlobalConsensusHeader({
           <Button
             key={threshold}
             variant={track.data?.threshold === threshold ? "default" : "secondary"}
-            size="xs"
+            size="sm"
             className="ms-1"
             onClick={() => updateConsensus(context, threshold, setData)}
           >
@@ -381,7 +366,7 @@ function AnnotationHeader({
       {hasChildren && (
         <Button
           variant="link"
-          size="xs"
+          size="sm"
           title="Union"
           className="w-4 rounded-none rounded-l px-0"
           onClick={() =>
@@ -392,7 +377,7 @@ function AnnotationHeader({
             )
           }
         >
-          {isExpanded ? <ChevronDownSmall_16 /> : <ChevronRightSmall_16 />}
+          {isExpanded ? <ChevronDownIcon /> : <ChevronRightIcon />}
         </Button>
       )}
       {!hasChildren && <div className="w-4" />}
@@ -402,42 +387,42 @@ function AnnotationHeader({
           {!hasChildren && (
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               title="Union"
               className="rounded-none rounded-l"
               onClick={() => modifyTrackRanges(context, track, "union", setData)}
             >
-              <CirclePlus_16 />
+              <CirclePlusIcon />
             </Button>
           )}
           {!hasChildren && (
             <Button
               variant="secondary"
-              size="xs"
+              size="sm"
               title="Subtract"
               className="rounded-none border-r-0 border-l-0"
               onClick={() => modifyTrackRanges(context, track, "subtract", setData)}
             >
-              <CircleMinus_16 />
+              <CircleMinusIcon />
             </Button>
           )}
           <Button
             variant="secondary"
-            size="xs"
+            size="sm"
             title="Filter View"
             className={cn("rounded-none border-r-0", hasChildren ? "rounded-l" : undefined)}
             onClick={() => context.viewport.focusTrack(track.id)}
           >
-            <Filter2_16 />
+            <FilterIcon />
           </Button>
           <Button
             variant="destructive"
-            size="xs"
+            size="sm"
             title="Remove"
             className="rounded-none rounded-r"
             onClick={() => context.track.remove(track.id, setData)}
           >
-            <TrashCanSimple_16 />
+            <TrashIcon />
           </Button>
         </div>
       )}
@@ -492,40 +477,40 @@ function Controls({
     >
       <Button
         variant={mode === "default" ? "default" : "link"}
-        size="xs"
+        size="sm"
         onClick={() => context.state.interactionMode.next("default")}
       >
-        <Cmd_16 />
+        <MousePointerClickIcon />
       </Button>
       <Button
         title="(Space)"
         variant={mode === "pan" ? "default" : "link"}
-        size="xs"
+        size="sm"
         onClick={() => context.state.interactionMode.next("pan")}
       >
-        <DotGrid2x3_16 />
+        <MoveIcon />
       </Button>
 
-      <Button variant="link" size="xs" onClick={resetView} title="Reset View" className="ms-2">
-        <ArrowRotateClockwise_16 />
+      <Button variant="link" size="sm" onClick={resetView} title="Reset View" className="ms-2">
+        <RefreshCwIcon />
       </Button>
       <div className="m-auto" />
       <Button
         title="Toggle annotations"
         variant={layoutState.annotations ? "default" : "link"}
-        size="xs"
+        size="sm"
         onClick={() => setLayoutState({ ...layoutState, annotations: !layoutState.annotations })}
       >
-        <PencilLine_16 />
+        <PencilIcon />
       </Button>
       <Button
         title="Toggle data"
         variant={layoutState.data ? "default" : "link"}
-        size="xs"
+        size="sm"
         className="ms-1"
         onClick={() => setLayoutState({ ...layoutState, data: !layoutState.data })}
       >
-        <BulletList_16 />
+        <ListIcon />
       </Button>
     </div>
   )

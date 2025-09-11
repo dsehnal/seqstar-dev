@@ -49,7 +49,7 @@ export function createSwatchRenderer(getters: {
       getColorKey,
     )
     if (getColor) {
-      params.getColor = getColor
+      params.getColor = getColor as any
     } else {
       params.getColor = getters.color?.(options)
       options.section.featureCache.set(options.track, options.feature, getColorKey, params.getColor)

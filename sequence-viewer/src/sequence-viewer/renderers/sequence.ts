@@ -26,7 +26,6 @@ export function renderSequence(options: RenderFeatureOptions, params: Params) {
     height,
     viewport,
     segment,
-    data,
   } = options
   if (!segment.polymerName) return
 
@@ -125,7 +124,7 @@ export function createSequenceRenderer(getters: {
     )
 
     if (getSequence) {
-      params.getSequence = getSequence
+      params.getSequence = getSequence as any
     } else {
       params.getSequence = getters.sequence?.(options)
       options.section.featureCache.set(
@@ -141,7 +140,7 @@ export function createSequenceRenderer(getters: {
       getColorKey,
     )
     if (getColor) {
-      params.getColor = getColor
+      params.getColor = getColor as any
     } else {
       params.getColor = getters.color?.(options)
       options.section.featureCache.set(options.track, options.feature, getColorKey, params.getColor)

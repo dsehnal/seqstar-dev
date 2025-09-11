@@ -1,17 +1,15 @@
-// import { action } from "@storybook/addon-actions"
-
-import { Data, Feature, Track } from "@cradlebio/sequence-viewer/src/data"
-import { CoordinateSystem } from "@cradlebio/sequence-viewer/src/data/coordinates"
-import { DefaultTheme, Spec } from "@cradlebio/sequence-viewer/src/data/specification"
-import { createBarsRenderer } from "@cradlebio/sequence-viewer/src/renderers/bars"
-import { createBlockRenderer } from "@cradlebio/sequence-viewer/src/renderers/block"
-import { createNavigationRenderer } from "@cradlebio/sequence-viewer/src/renderers/navigation"
-import { createSequenceRenderer } from "@cradlebio/sequence-viewer/src/renderers/sequence"
-import { createSwatchRenderer } from "@cradlebio/sequence-viewer/src/renderers/swatch"
-import { fullCoordinateSystemRanges } from "@cradlebio/sequence-viewer/src/utils/coordinates"
-import { uuid22 } from "@cradlebio/sequence-viewer/src/utils/object"
-import { navigationTrack } from "@cradlebio/sequence-viewer/src/utils/track"
-import { Meta, StoryObj } from "@storybook/react"
+/* eslint-disable @typescript-eslint/no-unused-vars */
+import type { Data, Feature, Track } from "@/sequence-viewer/data"
+import type { CoordinateSystem } from "@/sequence-viewer/data/coordinates"
+import { DefaultTheme, type Spec } from "@/sequence-viewer/data/specification"
+import { createBarsRenderer } from "@/sequence-viewer/renderers/bars"
+import { createBlockRenderer } from "@/sequence-viewer/renderers/block"
+import { createNavigationRenderer } from "@/sequence-viewer/renderers/navigation"
+import { createSequenceRenderer } from "@/sequence-viewer/renderers/sequence"
+import { createSwatchRenderer } from "@/sequence-viewer/renderers/swatch"
+import { fullCoordinateSystemRanges } from "@/sequence-viewer/utils/coordinates"
+import { uuid22 } from "@/sequence-viewer/utils/object"
+import { navigationTrack } from "@/sequence-viewer/utils/track"
 import { useState } from "react"
 import { AnnotatedMSAView } from "./annotated-msa"
 
@@ -321,7 +319,7 @@ const DefaultSpec: Spec = {
   },
 }
 
-function StoryRenderer() {
+export function AnnotatedMSAExample() {
   const [data, setData] = useState(BaseData)
 
   return (
@@ -329,23 +327,4 @@ function StoryRenderer() {
       <AnnotatedMSAView data={data} defaultSpec={DefaultSpec} setData={setData} />
     </div>
   )
-}
-
-const meta = {
-  title: "Components/Sequence Canvas/Annotated MSA",
-  render: StoryRenderer,
-  // Do not use <AnnotatedMSAView /> as it's not intended to be modified here
-  // and we want to skip Storybook serializing the large amount of data
-  // the example uses
-  component: StoryRenderer,
-  parameters: {
-    layout: "fullscreen",
-  },
-} satisfies Meta<typeof StoryRenderer>
-
-export default meta
-
-type Story = StoryObj<typeof meta>
-export const Default: Story = {
-  args: {},
 }

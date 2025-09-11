@@ -1,16 +1,11 @@
-import type { Feature, Track } from "@cradlebio/sequence-viewer/src/data"
-import type { Ranges } from "@cradlebio/sequence-viewer/src/data/types"
-import { uuid22 } from "@cradlebio/sequence-viewer/src/utils/object"
-import { normalizeRange } from "@cradlebio/sequence-viewer/src/utils/range"
-import {
-  Button,
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogTitle,
-  Textarea,
-} from "@cradlebio/ui-library"
+/* eslint-disable @typescript-eslint/no-explicit-any */
+import { Button } from "@/components/ui/button"
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/components/ui/dialog"
+import { Textarea } from "@/components/ui/textarea"
+import type { Feature, Track } from "@/sequence-viewer/data"
+import type { Ranges } from "@/sequence-viewer/data/types"
+import { uuid22 } from "@/sequence-viewer/utils/object"
+import { normalizeRange } from "@/sequence-viewer/utils/range"
 import _ from "lodash"
 import { type ParseResult, parse as parseCSV } from "papaparse"
 import { useState } from "react"
@@ -36,7 +31,7 @@ function parseRanges(data: Record<string, string>[]): Ranges {
   const ranges = Object.entries(_.groupBy(data, "Polymer")).map(([polymer, records]) => [
     polymer,
     normalizeRange(
-      records.map((r) => ({
+      (records as any).map((r: any) => ({
         start: +r.Start,
         end: +r.End,
       })),
@@ -62,7 +57,7 @@ function parseRecords(data: Record<string, string>[]) {
       const feature: Feature = {
         id: uuid22(),
         kind: "block",
-        ranges: parseRanges(ranges),
+        ranges: parseRanges(ranges as any),
         data: { label: name },
       }
       groupFeatures.push(feature)
