@@ -1,5 +1,6 @@
 import { combineLatest, distinctUntilKeyChanged, filter } from "rxjs"
 import type { RenderFeatureOptions } from "../data/specification"
+import type { Range } from "../data/types"
 import { setupCanvasInteractions } from "../interactions"
 import { DefaultFeatureRenderer, DefaultGapRenderer } from "../renderers/defaults"
 import { getSegmentIndex, getSegmentIndexRange } from "../utils/coordinates"
@@ -13,8 +14,10 @@ const CANVAS_PADDING = 8
 const MIN_HORIZONTAL_SCROLL_HEIGHT = 36
 
 export class CanvasModel extends ReactiveModel {
-  constructor(public section: SectionModel) {
+  constructor(section: SectionModel) {
     super()
+
+    this.section = section
 
     const { theme } = section.context.spec
 
@@ -81,6 +84,7 @@ export class CanvasModel extends ReactiveModel {
     this.root.appendChild(this.slider.extendViewRight)
   }
 
+  readonly section: SectionModel
   readonly root = document.createElement("div")
   readonly trackCanvasParent = document.createElement("div")
   readonly canvas = {
@@ -272,11 +276,23 @@ export class CanvasModel extends ReactiveModel {
     const dpr = window.devicePixelRatio || 1
     const { trackOffset } = this.section.state.value
     const { tracks } = this.section.info
-    const { columnWidth, viewRange, baseTrackHeight, spec, verticalPadding } = this.section
-    const { canvasHeight: height } = this
+    const {
+      columnWidth,
+      viewRange: fractionalViewRange,
+      baseTrackHeight,
+      spec,
+      verticalPadding,
+    } = this.section
+    const { canvasHeight: height, isFull } = this
     const { current: currentView } = this.context.base.dataView
     const { theme } = this.context.spec
     const { range: viewportRange } = this.context.viewport.current
+
+    const viewRange: Range = {
+      start: Math.floor(fractionalViewRange.start),
+      end: Math.ceil(fractionalViewRange.end),
+    }
+    const offsetX = -(fractionalViewRange.start - viewRange.start) * columnWidth
 
     // Render vertical selection rectangles
     const selectionSegment: [number, number] = [0, 0]
@@ -296,21 +312,24 @@ export class CanvasModel extends ReactiveModel {
 
         const [start, end] = selectionSegment
 
+        if (!isFull && (end <= viewportRange.start || start >= viewportRange.end)) {
+          continue
+        }
+
         ctx.fillStyle = theme.selectColumnColor
         ctx.strokeStyle = theme.selectColumnBorderColor
         ctx.lineWidth = 0.25 * dpr
-        ctx.fillRect(
-          dpr * (CANVAS_PADDING + (start - viewRange.start) * columnWidth - 0.25),
-          0,
-          dpr * (columnWidth * (end - start) + 0.5),
-          canvas.height,
-        )
-        ctx.strokeRect(
-          dpr * (CANVAS_PADDING + (start - viewRange.start) * columnWidth - 0.25),
-          -2 * dpr,
-          dpr * (columnWidth * (end - start) + 0.5),
-          canvas.height + dpr * 4,
-        )
+
+        let left = CANVAS_PADDING + offsetX + (start - viewRange.start) * columnWidth - 0.25
+        let width = columnWidth * (end - start) + 0.5
+
+        if (left < CANVAS_PADDING) {
+          width -= CANVAS_PADDING - left
+          left = CANVAS_PADDING
+        }
+
+        ctx.fillRect(dpr * left, 0, dpr * width, canvas.height)
+        ctx.strokeRect(dpr * left, -2 * dpr, dpr * width, canvas.height + dpr * 4)
       }
     }
 
@@ -323,12 +342,14 @@ export class CanvasModel extends ReactiveModel {
       const segmentIndex = getSegmentIndex(currentView.segments, highlight.column)
       if (currentView.segments.polymerName[segmentIndex]) {
         ctx.fillStyle = theme.highlightColumnColor
-        ctx.fillRect(
-          dpr * (CANVAS_PADDING + (highlight.column - viewRange.start) * columnWidth + 0.5),
-          0,
-          columnWidth * dpr,
-          canvas.height,
-        )
+        let left =
+          CANVAS_PADDING + offsetX + (highlight.column - viewRange.start) * columnWidth + 0.5
+        let width = columnWidth
+        if (left < CANVAS_PADDING) {
+          width -= CANVAS_PADDING - left
+          left = CANVAS_PADDING
+        }
+        ctx.fillRect(dpr * left, 0, dpr * width, canvas.height)
       }
     }
 
@@ -336,8 +357,8 @@ export class CanvasModel extends ReactiveModel {
 
     // Render currently highlighted row
     ctx.fillStyle = theme.highlightRowColor
-    let offsetY = this.section.verticalPadding
-    for (let i = trackOffset; i < tracks.length; i++) {
+    let offsetY = this.section.verticalPadding + this.section.baseRowOffset
+    for (let i = Math.floor(trackOffset); i < tracks.length; i++) {
       const track = tracks[i]
 
       const h = (track.heightFactor ?? 1) * baseTrackHeight
@@ -470,7 +491,7 @@ export class CanvasModel extends ReactiveModel {
     const { context, totalHeight: height } = this
     const { trackOffset } = this.section.state.value
     const { tracks } = this.section.info
-    const { columnWidth, viewRange, baseTrackHeight, spec } = this.section
+    const { columnWidth, viewRange: fractionalViewRange, baseTrackHeight, spec } = this.section
     const { theme, defaultRenderer, gapRenderer } = this.context.spec
     const { segments: viewSegments } = this.context.dataView.current
     const { isUpdating: isViewportUpdating } = this.context.viewport
@@ -483,6 +504,12 @@ export class CanvasModel extends ReactiveModel {
 
     this.context.theme.setFont(ctx, 1, "monospace")
 
+    const viewRange: Range = {
+      start: Math.floor(fractionalViewRange.start),
+      end: Math.ceil(fractionalViewRange.end),
+    }
+    const offsetX = -(fractionalViewRange.start - viewRange.start) * columnWidth
+
     // Set up the feature render options
     const renderOptions: RenderFeatureOptions = {
       section: this.section,
@@ -491,6 +518,7 @@ export class CanvasModel extends ReactiveModel {
       data: this.context.base.data,
       ctx2d: ctx,
       columnWidth,
+      offsetX,
       offsetY: 0,
       height: 0,
       dpr,
@@ -512,11 +540,13 @@ export class CanvasModel extends ReactiveModel {
     let startTime = performance.now()
     const maxRenderTime = isViewportUpdating ? 1000 / 90 : 1000 / 15
 
-    let offsetY = 0
+    let offsetY = this.section.baseRowOffset
     this.visibleOffsets.length = 0
 
+    const baseTrackIndex = Math.floor(trackOffset)
+
     // Identify all tracks that need to be rendered
-    for (let i = trackOffset; i < tracks.length; i++) {
+    for (let i = baseTrackIndex; i < tracks.length; i++) {
       const track = tracks[i]
       const h = (track.heightFactor ?? 1) * baseTrackHeight
       this.visibleOffsets.push(offsetY)
@@ -549,7 +579,7 @@ export class CanvasModel extends ReactiveModel {
         this.renderMask[i] = 1
         nRendered++
 
-        const trackIndex = i + trackOffset
+        const trackIndex = i + baseTrackIndex
         if (trackIndex >= tracks.length) break
 
         const track = tracks[trackIndex]

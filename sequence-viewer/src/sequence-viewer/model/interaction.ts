@@ -2,7 +2,11 @@ import type { Context } from "../context"
 import { getTableViewSequenceLocation } from "../utils/coordinates"
 
 export class InteractionModel {
-  constructor(private context: Context) {}
+  constructor(context: Context) {
+    this.context = context
+  }
+
+  readonly context: Context
 
   get highlightedSequenceLocation() {
     const highlight = this.context.state.highlight.value

@@ -1,6 +1,7 @@
 import { MIN_VIEWPORT_COLUMNS } from "../data/specification"
 import type { CanvasModel } from "../model/canvas"
-import { dragWrapper } from "../utils/interactions"
+import type { SectionModel } from "../model/section"
+import { dragWrapper, normalizeWheel } from "../utils/interactions"
 
 export function setupCanvasNavigation(canvas: CanvasModel, parent: HTMLElement) {
   canvas.event(parent, "wheel", canvas.section.wheelScroll)
@@ -16,7 +17,10 @@ export function setupCanvasNavigation(canvas: CanvasModel, parent: HTMLElement) 
       return { startX, startViewport: canvas.context.viewport.current }
     },
     onMove: (x, _, { startX, startViewport }) => {
-      const delta = Math.round((x - startX) / canvas.section.columnWidth)
+      let delta = (x - startX) / canvas.section.columnWidth
+      if (!canvas.context.spec.smoothScroll?.x) {
+        delta = Math.round(delta)
+      }
       canvas.context.viewport.pan(delta, startViewport)
     },
     onFirstMove: (_, y) => {
@@ -49,13 +53,46 @@ export function setupCanvasNavigation(canvas: CanvasModel, parent: HTMLElement) 
       }
     },
     onMove: (x, y, { startX, startY, speedX, startOffset, startViewport }) => {
-      const colDelta = Math.round((speedX * (startX - x)) / canvas.section.columnWidth)
+      // TODO: Progressive X speed depending on distance from start?
+      let colDelta = (speedX * (startX - x)) / canvas.section.columnWidth
+      if (!canvas.context.spec.smoothScroll?.x) {
+        colDelta = Math.round(colDelta)
+      }
       canvas.context.viewport.pan(colDelta, startViewport)
 
       const { baseTrackHeight, info } = canvas.section
       const h = baseTrackHeight * info.averageRelativeTrackHeight
-      const rowDelta = Math.round((4 * (startY - y)) / h)
+      let rowDelta = (4 * (startY - y)) / h
+      if (!canvas.context.spec.smoothScroll?.y) {
+        rowDelta = Math.round(rowDelta)
+      }
       canvas.section.updateState({ trackOffset: startOffset + rowDelta })
+    },
+    onEnd: (x, y) => {
+      canvas.context.viewport.state.isUpdating.next(false)
+      canvas.section.highlight(x, y)
+    },
+  })
+
+  dragWrapper(canvas, canvas.slider.rowOffset, {
+    cursor: "grabbing",
+    project: canvas.getInteractionXY,
+    onStart: (_, startY) => {
+      canvas.context.updateHighlight(undefined)
+      canvas.context.viewport.state.isUpdating.next(true)
+      return {
+        startY,
+        startOffset: canvas.section.state.value.trackOffset,
+        info: canvas.getVerticalScrollControlInfo(),
+      }
+    },
+    onMove: (_, y, { startY, startOffset, info }) => {
+      const f = info.maxTrackOffset / (info.height - info.ctrlHeight)
+      let delta = (y - startY) * f
+      if (!canvas.context.spec.smoothScroll?.y) {
+        delta = Math.round(delta)
+      }
+      canvas.section.updateState({ trackOffset: startOffset + delta })
     },
     onEnd: (x, y) => {
       canvas.context.viewport.state.isUpdating.next(false)
@@ -115,4 +152,64 @@ export function setupCanvasNavigation(canvas: CanvasModel, parent: HTMLElement) 
       canvas.context.viewport.updateRange({ start: 0, end: max })
     }
   })
+}
+
+export function createSectionWheelEventHandler(section: SectionModel) {
+  return (e: {
+    shiftKey: boolean
+    preventDefault: () => void
+    clientX: number
+    clientY: number
+  }) => {
+    if (e.shiftKey) {
+      return
+    }
+
+    e.preventDefault()
+
+    const { baseTrackHeight } = section
+
+    const baseHeight = section.info.averageRelativeTrackHeight * baseTrackHeight
+    const { dy } = normalizeWheel(e, {
+      lineHeight: baseHeight,
+      pageHeight: section.info.averageRelativeTrackHeight * section.info.tracks.length,
+    })
+
+    const { dx } = normalizeWheel(e, {
+      lineHeight: section.columnWidth,
+      pageHeight: section.canvas.width,
+    })
+
+    if (dy && Math.abs(dy) > 2 * Math.abs(dx)) {
+      if (section.getMaxTrackOffset() === 0) return
+
+      let deltaY: number
+      if (!section.context.spec.smoothScroll?.y) {
+        deltaY = Math.ceil(Math.abs(dy)) * Math.sign(dy)
+      } else {
+        deltaY = ((Math.abs(dy) || baseHeight) / baseHeight) * Math.sign(dy)
+      }
+      section.updateState({
+        trackOffset: Math.min(
+          section.getMaxTrackOffset(),
+          Math.max(0, section.state.value.trackOffset + deltaY),
+        ),
+      })
+    } else if (dx && Math.abs(dx) > 2 * Math.abs(dy)) {
+      let deltaX: number
+      if (!section.context.spec.smoothScroll?.x) {
+        deltaX = Math.ceil(Math.abs(dx)) * Math.sign(dx)
+      } else {
+        deltaX = ((Math.abs(dx) || section.columnWidth) / section.columnWidth) * Math.sign(dx)
+      }
+      section.context.viewport.pan(deltaX)
+    } else {
+      return
+    }
+
+    section.highlight(
+      section.canvas.getInteractionX(e.clientX),
+      section.canvas.getInteractionY(e.clientY),
+    )
+  }
 }

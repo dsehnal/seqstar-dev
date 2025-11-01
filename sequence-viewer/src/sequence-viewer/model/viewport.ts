@@ -8,7 +8,11 @@ import { shallowEqual } from "../utils/object"
 import { unionRanges } from "../utils/range"
 
 export class ViewportModel {
-  constructor(private context: Context) {}
+  constructor(context: Context) {
+    this.context = context
+  }
+
+  readonly context: Context
 
   state = {
     isUpdating: new BehaviorSubject<boolean>(false),
@@ -73,6 +77,12 @@ export class ViewportModel {
     const newRange = { ...currentRange, ...update }
 
     const { maxWidth } = this
+
+    if (!this.context.spec.smoothScroll?.x) {
+      newRange.start = Math.round(newRange.start)
+      newRange.end = Math.round(newRange.end)
+    }
+
     if (newRange.end > maxWidth) newRange.end = maxWidth
     if (newRange.start < 0) newRange.start = 0
 

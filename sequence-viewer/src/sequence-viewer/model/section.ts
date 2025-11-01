@@ -1,12 +1,11 @@
-import type { WheelEvent as ReactWheelEvent } from "react"
 import { BehaviorSubject, Subject } from "rxjs"
 import type { Context } from "../context"
 import type { Feature, Track } from "../data"
 import type { FeatureTableView } from "../data/coordinates"
 import type { LayoutSection } from "../data/specification"
 import type { SectionName, TrackId } from "../data/types"
+import { createSectionWheelEventHandler } from "../interactions/navigation"
 import { assignStacking, getFeatureTableView } from "../utils/coordinates"
-import { normalizeWheel } from "../utils/interactions"
 import { memoizeLatest, shallowEqual } from "../utils/object"
 import { ReactiveModel } from "../utils/reactive-model"
 import { CanvasModel } from "./canvas"
@@ -21,7 +20,7 @@ interface SectionInfo {
     string,
     {
       views: Map<Feature, FeatureTableView>
-      general: Map<Feature, Record<string, unknown>>
+      general: Map<Feature, Record<string, any>>
     }
   >
 }
@@ -31,20 +30,21 @@ interface SectionModelState {
 }
 
 export class SectionModel extends ReactiveModel {
-  constructor(
-    public context: Context,
-    public name: SectionName,
-  ) {
+  constructor(context: Context, name: SectionName) {
     super()
 
-    this.context = context;
-    this.name = name;
-    this.canvas = new CanvasModel(this);
+    this.context = context
+    this.name = name
+    this.canvas = new CanvasModel(this)
 
     this.subscribe(this.context.state.spec, () => {
       this.checkTrackOffset()
     })
   }
+
+  readonly context: Context
+  readonly name: SectionName
+  readonly canvas: CanvasModel
 
   state = new BehaviorSubject<SectionModelState>({
     trackOffset: 0,
@@ -62,7 +62,6 @@ export class SectionModel extends ReactiveModel {
     trackIds: new Set(),
     trackCache: new Map(),
   }
-  canvas: CanvasModel //  = new CanvasModel(this)
 
   get view() {
     return this.context.layout.getSpec(this.name)?.horizontalView
@@ -91,7 +90,7 @@ export class SectionModel extends ReactiveModel {
     let columnCount: number
     if (this.view !== "full") {
       const wp = this.context.viewport.current
-      columnCount = wp.range.end - wp.range.start
+      columnCount = Math.ceil(Math.round(100 * (wp.range.end - wp.range.start)) / 100)
     } else {
       columnCount = this.context.viewport.maxWidth
     }
@@ -108,8 +107,26 @@ export class SectionModel extends ReactiveModel {
       : this.context.viewport.current.range
   }
 
+  get baseColumnOffset() {
+    if (this.view === "full" || !this.context.spec.smoothScroll?.x) return 0
+    return -((this.viewRange.start - Math.floor(this.viewRange.start)) * this.columnWidth)
+  }
+
+  get baseRowOffset() {
+    if (!this.context.spec.smoothScroll?.y) return 0
+    const { trackOffset } = this.state.value
+    const rowIndex = Math.floor(this.state.value.trackOffset)
+    if (rowIndex < 0 || rowIndex >= this.info.tracks.length) return 0
+    const f = this.info.tracks[rowIndex] ?? 0
+    const height = this.baseTrackHeight * (f.heightFactor ?? 1)
+    return -(trackOffset - rowIndex) * height
+  }
+
   updateState(update: Partial<SectionModelState>) {
     const next = { ...this.state.value, ...update }
+    if (!this.context.spec.smoothScroll?.y) {
+      next.trackOffset = Math.round(next.trackOffset)
+    }
     next.trackOffset = Math.min(this.getMaxTrackOffset(), Math.max(0, next.trackOffset))
     if (!shallowEqual(this.state.value, next)) {
       this.state.next(next)
@@ -287,40 +304,7 @@ export class SectionModel extends ReactiveModel {
     },
   }
 
-  wheelScroll = (e: WheelEvent | ReactWheelEvent) => {
-    if (e.shiftKey) {
-      return
-    }
-
-    e.preventDefault()
-
-    const { baseTrackHeight } = this
-
-    const { dy } = normalizeWheel(e, {
-      lineHeight: this.info.averageRelativeTrackHeight * baseTrackHeight,
-      pageHeight: this.canvas.totalHeight,
-    })
-
-    const { dx } = normalizeWheel(e, {
-      lineHeight: this.columnWidth,
-      pageHeight: this.canvas.width,
-    })
-
-    if (dy && Math.abs(dy) > Math.abs(dx) && this.getMaxTrackOffset() > 0) {
-      const deltaY = Math.ceil(Math.abs(dy)) * Math.sign(dy)
-      this.updateState({
-        trackOffset: Math.min(
-          this.getMaxTrackOffset(),
-          Math.max(0, this.state.value.trackOffset + deltaY),
-        ),
-      })
-    } else if (dx) {
-      const deltaX = Math.ceil(Math.abs(dx)) * Math.sign(dx)
-      this.context.viewport.pan(deltaX)
-    }
-
-    this.highlight(this.canvas.getInteractionX(e.clientX), this.canvas.getInteractionY(e.clientY))
-  }
+  wheelScroll = createSectionWheelEventHandler(this)
 
   private _getVisibleTracks = memoizeLatest(
     (
@@ -328,13 +312,14 @@ export class SectionModel extends ReactiveModel {
       tracks: Track[],
       height: number,
       baseTrackHeight: number,
+      baseRowOffset: number,
       spec: LayoutSection | undefined,
     ) => {
       const visibleTracks: Track[] = []
       const offsets: number[] = []
 
-      let offsetY = spec?.verticalPadding ?? 0
-      for (let i = trackOffset; i < tracks.length; i++) {
+      let offsetY = baseRowOffset + (spec?.verticalPadding ?? 0)
+      for (let i = Math.floor(trackOffset); i < tracks.length; i++) {
         const track = tracks[i]
         visibleTracks.push(track)
         offsets.push(offsetY)
@@ -352,6 +337,7 @@ export class SectionModel extends ReactiveModel {
       this.info.tracks,
       this.canvas.canvasHeight,
       this.baseTrackHeight,
+      this.baseRowOffset,
       this.spec,
     )
   }
@@ -361,14 +347,15 @@ export class SectionModel extends ReactiveModel {
   }
 
   getTrackIdFromY(localY: number) {
-    if (localY < 0) return
+    const { baseRowOffset } = this
+    if (localY < baseRowOffset) return
 
     const { trackOffset } = this.state.value
     const { tracks } = this.info
     const { baseTrackHeight } = this
 
-    let offsetY = 0
-    for (let i = trackOffset; i < tracks.length; i++) {
+    let offsetY = baseRowOffset
+    for (let i = Math.floor(trackOffset); i < tracks.length; i++) {
       const h = baseTrackHeight * (tracks[i].heightFactor ?? 1)
       const start = offsetY
       const end = offsetY + h
@@ -380,19 +367,20 @@ export class SectionModel extends ReactiveModel {
   }
 
   highlight(localX: number, localY: number) {
-    const { columnWidth } = this
-    let column: number | undefined = Math.floor(localX / columnWidth)
+    const { columnWidth, viewRange, baseColumnOffset: offsetX } = this
+    const start = Math.floor(viewRange.start)
+
+    let column: number | undefined = Math.floor((localX - offsetX) / columnWidth)
 
     const { maxWidth } = this.context.viewport
     if (column < 0 || column >= maxWidth) {
       column = undefined
     } else {
-      column += this.viewRange.start
+      column += start
     }
 
     if (typeof column === "number" && this.view !== "full") {
-      const range = this.viewRange
-      if (column < range.start || column >= range.end) {
+      if (column < start || column >= viewRange.end) {
         column = undefined
       }
     }

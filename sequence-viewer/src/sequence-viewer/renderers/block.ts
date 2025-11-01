@@ -17,6 +17,7 @@ export function renderBlock(options: RenderFeatureOptions, params: Params) {
     dpr,
     ctx2d,
     columnWidth,
+    offsetX,
     offsetY,
     height,
     viewport,
@@ -31,15 +32,16 @@ export function renderBlock(options: RenderFeatureOptions, params: Params) {
   const nGaps = maxStackDepth + 2
   const blockHeight = (maxStackDepth + 1) * h
   const gapSize = ((maxStackDepth + 1) * height - blockHeight) / nGaps
-  const left = (start - viewport.range.start + params.heightFactor / 2) * columnWidth + 0.5
+  const left =
+    offsetX + (start - viewport.range.start + params.heightFactor / 2) * columnWidth + 0.5
   const width = (end - start - params.heightFactor) * columnWidth - 1
 
   let top: number
   if (stackDepth === 0) {
     top = gapSize
   } else {
-    const offsetY = (stackDepth + 1) * gapSize + stackDepth * h
-    top = offsetY - stackDepth * height
+    const localOffsetY = (stackDepth + 1) * gapSize + stackDepth * h
+    top = localOffsetY - stackDepth * height
   }
 
   if (params.backgroundColor) {
@@ -76,7 +78,7 @@ export function renderBlock(options: RenderFeatureOptions, params: Params) {
   ctx2d.textBaseline = "middle"
   ctx2d.fillText(
     params.label,
-    dpr * (start + (end - start) / 2 - viewport.range.start) * columnWidth,
+    dpr * (offsetX + (start + (end - start) / 2 - viewport.range.start) * columnWidth),
     dpr * (offsetY + top + h / 2 + 0.5),
   )
 }

@@ -22,6 +22,7 @@ export function renderSequence(options: RenderFeatureOptions, params: Params) {
     dpr,
     ctx2d,
     columnWidth,
+    offsetX,
     offsetY,
     height,
     viewport,
@@ -48,7 +49,7 @@ export function renderSequence(options: RenderFeatureOptions, params: Params) {
         params.color
 
       ctx2d.fillRect(
-        dpr * ((i - viewportStart + 0.5) * columnWidth - glyphSize / 2),
+        dpr * (offsetX + (i - viewportStart + 0.5) * columnWidth - glyphSize / 2),
         dpr * (offsetY + height / 2 - glyphSize / 2),
         dpr * glyphSize,
         dpr * glyphSize,
@@ -86,7 +87,7 @@ export function renderSequence(options: RenderFeatureOptions, params: Params) {
 
     ctx2d.fillText(
       char,
-      dpr * ((i - viewportStart + 0.5) * columnWidth),
+      dpr * (offsetX + (i - viewportStart + 0.5) * columnWidth),
       dpr * (offsetY + height / 2 + 0.5),
     )
   }
@@ -124,7 +125,7 @@ export function createSequenceRenderer(getters: {
     )
 
     if (getSequence) {
-      params.getSequence = getSequence as any
+      params.getSequence = getSequence
     } else {
       params.getSequence = getters.sequence?.(options)
       options.section.featureCache.set(
@@ -140,7 +141,7 @@ export function createSequenceRenderer(getters: {
       getColorKey,
     )
     if (getColor) {
-      params.getColor = getColor as any
+      params.getColor = getColor
     } else {
       params.getColor = getters.color?.(options)
       options.section.featureCache.set(options.track, options.feature, getColorKey, params.getColor)

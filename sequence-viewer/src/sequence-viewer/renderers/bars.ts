@@ -15,7 +15,7 @@ type Params = {
 }
 
 export function renderBars(options: RenderFeatureOptions, params: Params) {
-  const { dpr, ctx2d, columnWidth, offsetY, height, viewport, segment } = options
+  const { dpr, ctx2d, columnWidth, offsetX, offsetY, height, viewport, segment } = options
   if (!segment.polymerName) return
 
   const w = params.widthFactor * columnWidth
@@ -43,7 +43,7 @@ export function renderBars(options: RenderFeatureOptions, params: Params) {
     const h = (baseHeight * (value - min)) / (max - min)
 
     ctx2d.fillRect(
-      dpr * ((i - viewport.range.start + 0.5) * columnWidth - w / 2),
+      dpr * (offsetX + (i - viewport.range.start + 0.5) * columnWidth - w / 2),
       dpr * (offsetY + height - h - heightOffset),
       dpr * (w + 1),
       dpr * h,
@@ -81,7 +81,7 @@ export function createBarsRenderer(getters: {
       getValueKey,
     )
     if (getValue) {
-      params.getValue = getValue as any
+      params.getValue = getValue
     } else {
       params.getValue = getters.value(options)
       options.section.featureCache.set(options.track, options.feature, getValueKey, params.getValue)
@@ -93,7 +93,7 @@ export function createBarsRenderer(getters: {
       getColorKey,
     )
     if (getColor) {
-      params.getColor = getColor as any
+      params.getColor = getColor
     } else {
       params.getColor = getters.color?.(options)
       options.section.featureCache.set(options.track, options.feature, getColorKey, params.getColor)

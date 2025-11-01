@@ -10,6 +10,7 @@ export function drawGap(
     dpr,
     columnWidth,
     height,
+    offsetX,
     offsetY,
     segment,
     viewport,
@@ -20,7 +21,7 @@ export function drawGap(
   const { start, end } = segment
   ctx2d.fillStyle = color
   ctx2d.fillRect(
-    dpr * ((start - viewport.range.start + 1 / 3) * columnWidth + 0.5),
+    dpr * (offsetX + (start - viewport.range.start + 1 / 3) * columnWidth + 0.5),
     dpr * (offsetY + height / 2 - gapHeight / 2),
     dpr * ((end - start - 2 / 3) * columnWidth - 1),
     dpr * gapHeight,

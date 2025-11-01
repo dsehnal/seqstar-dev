@@ -27,7 +27,7 @@ export class ReactiveModel {
     this.disposeActions.push(action)
   }
 
-  mount(...args: any[]) {}
+  mount(..._args: any[]) {}
 
   dispose() {
     for (const ev of this.disposeActions) ev()

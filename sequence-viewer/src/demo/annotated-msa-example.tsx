@@ -247,6 +247,7 @@ const DefaultSpec: Spec = {
     uiFontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
     monospaceFontFamily: "JetBrains Mono, ui-monospace, monospace",
   },
+  smoothScroll: { x: true, y: true },
   layout: {
     baseTrackHeight: 36,
     columns: [],

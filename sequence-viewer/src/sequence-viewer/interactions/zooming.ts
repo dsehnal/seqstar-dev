@@ -13,7 +13,10 @@ export function setupCanvasZooming(canvas: CanvasModel) {
       return { startX, startViewport: canvas.context.viewport.current }
     },
     onMove: (x, _, { startX, startViewport }) => {
-      const delta = Math.round((x - startX) / canvas.section.columnWidth)
+      let delta = (x - startX) / canvas.section.columnWidth
+      if (!canvas.context.spec.smoothScroll?.x) {
+        delta = Math.round(delta)
+      }
       let end = startViewport.range.end + delta
       const size = end - startViewport.range.start
       if (size < MIN_VIEWPORT_COLUMNS) {
@@ -38,7 +41,10 @@ export function setupCanvasZooming(canvas: CanvasModel) {
       return { startX, startViewport: canvas.context.viewport.current }
     },
     onMove: (x, _, { startX, startViewport }) => {
-      const delta = Math.round((x - startX) / canvas.section.columnWidth)
+      let delta = (x - startX) / canvas.section.columnWidth
+      if (!canvas.context.spec.smoothScroll?.x) {
+        delta = Math.round(delta)
+      }
       let start = startViewport.range.start + delta
       const size = startViewport.range.end - start
       if (size < MIN_VIEWPORT_COLUMNS) {
@@ -53,29 +59,6 @@ export function setupCanvasZooming(canvas: CanvasModel) {
     },
   })
 
-  dragWrapper(canvas, canvas.slider.rowOffset, {
-    cursor: "grabbing",
-    project: canvas.getInteractionXY,
-    onStart: (_, startY) => {
-      canvas.context.updateHighlight(undefined)
-      canvas.context.viewport.state.isUpdating.next(true)
-      return {
-        startY,
-        startOffset: canvas.section.state.value.trackOffset,
-        info: canvas.getVerticalScrollControlInfo(),
-      }
-    },
-    onMove: (_, y, { startY, startOffset, info }) => {
-      const f = info.maxTrackOffset / (info.height - info.ctrlHeight)
-      const delta = Math.round((y - startY) * f)
-      canvas.section.updateState({ trackOffset: startOffset + delta })
-    },
-    onEnd: (x, y) => {
-      canvas.context.viewport.state.isUpdating.next(false)
-      canvas.section.highlight(x, y)
-    },
-  })
-
   canvas.event(canvas.root, "wheel", (e) => {
     e.preventDefault()
     if (!e.shiftKey || !canvas.isFull) return
@@ -84,7 +67,10 @@ export function setupCanvasZooming(canvas: CanvasModel) {
     const zoomCenter = Math.floor(canvas.getInteractionX(e.clientX) / zoomColumnWidth)
     const f = e.deltaY > 0 ? 1.1 : 0.9
     const { start, end } = canvas.context.viewport.current.range
-    const w = Math.round(f * (end - start))
+    let w = f * (end - start)
+    if (!canvas.context.spec.smoothScroll?.x) {
+      w = Math.round(w)
+    }
     canvas.context.viewport.focusAt(zoomCenter, w)
   })
 }

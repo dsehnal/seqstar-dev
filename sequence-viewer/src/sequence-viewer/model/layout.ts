@@ -7,6 +7,13 @@ import { ReactiveModel } from "../utils/reactive-model"
 import { formatStyleValue } from "../utils/styles"
 
 export class LayoutModel extends ReactiveModel {
+  constructor(context: Context) {
+    super()
+    this.context = context
+  }
+
+  readonly context: Context
+
   events = {
     updated: new Subject<number>(),
   }
@@ -156,9 +163,5 @@ export class LayoutModel extends ReactiveModel {
 
   getSpec(section: SectionName): LayoutSection | undefined {
     return this.sections[section]
-  }
-
-  constructor(private context: Context) {
-    super()
   }
 }

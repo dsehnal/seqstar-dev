@@ -7,6 +7,11 @@
 /** biome-ignore-all lint/style/noNonNullAssertion: ... */
 /** biome-ignore-all lint/suspicious/noExplicitAny: ... */
 
+declare const global: any
+declare const process: any
+declare const setImmediate: any
+declare const clearImmediate: any
+
 declare const WorkerGlobalScope: any
 function createImmediateActions() {
   const thisGlobal: any = (() => {
@@ -33,7 +38,7 @@ function createImmediateActions() {
     let cb = callback
     // Callback can either be a function or a string
     if (typeof callback !== "function") {
-      cb = new Function("" + callback) as Callback
+      cb = new Function(`${callback}`) as Callback
     }
     // Store and register the task
     const task = { callback: cb, args: args }
@@ -100,7 +105,7 @@ function createImmediateActions() {
     // * https://developer.mozilla.org/en/DOM/window.postMessage
     // * http://www.whatwg.org/specs/web-apps/current-work/multipage/comms.html#crossDocumentMessages
 
-    const messagePrefix = "setImmediate$" + Math.random() + "$"
+    const messagePrefix = `setImmediate$${Math.random()}$`
     const onGlobalMessage = (event: any) => {
       if (
         event.source === thisGlobal &&

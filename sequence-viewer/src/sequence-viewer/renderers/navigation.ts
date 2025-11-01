@@ -11,7 +11,7 @@ type Params = {
 }
 
 export function renderNavigation(options: RenderFeatureOptions, params: Params) {
-  const { section, dpr, ctx2d, columnWidth, offsetY, height, viewport, segment } = options
+  const { section, dpr, ctx2d, columnWidth, offsetX, offsetY, height, viewport, segment } = options
   if (!segment.polymerName) return
 
   const { start, end, rangeStart } = segment
@@ -57,8 +57,14 @@ export function renderNavigation(options: RenderFeatureOptions, params: Params) 
     if (isFirst || isLast || position % frequency === 0 || position % halfFrequency === 0) {
       // Ticks
       ctx2d.beginPath()
-      ctx2d.moveTo(dpr * ((i - viewportStart + 0.5) * columnWidth), dpr * (offsetY + height - 4))
-      ctx2d.lineTo(dpr * ((i - viewportStart + 0.5) * columnWidth), dpr * (offsetY + height))
+      ctx2d.moveTo(
+        dpr * (offsetX + (i - viewportStart + 0.5) * columnWidth),
+        dpr * (offsetY + height - 4),
+      )
+      ctx2d.lineTo(
+        dpr * (offsetX + (i - viewportStart + 0.5) * columnWidth),
+        dpr * (offsetY + height),
+      )
       ctx2d.stroke()
     }
 
@@ -89,7 +95,7 @@ export function renderNavigation(options: RenderFeatureOptions, params: Params) 
 
     ctx2d.fillText(
       `${position + 1}`,
-      dpr * ((i - viewportStart + labelOffset) * columnWidth),
+      dpr * (offsetX + (i - viewportStart + labelOffset) * columnWidth),
       dpr * (offsetY + (2 * height) / 3),
     )
   }

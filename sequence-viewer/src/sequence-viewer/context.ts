@@ -123,6 +123,16 @@ export class Context extends ReactiveModel {
     })
   }
 
+  updateSpec(updates: Partial<Spec>) {
+    const next: Spec = {
+      ...this.state.spec.value,
+      ...updates,
+    }
+    if (!shallowEqual(this.state.spec.value, next)) {
+      this.state.spec.next(next)
+    }
+  }
+
   setData(data: Data) {
     const currentSections = this.base.sections
     const sections: SectionModel[] = []

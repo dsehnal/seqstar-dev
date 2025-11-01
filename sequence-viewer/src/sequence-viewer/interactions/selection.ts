@@ -25,9 +25,10 @@ export function setupCanvasSelection(canvas: CanvasModel, parent: HTMLElement) {
     isEnabled: () => !canvas.isFull && canvas.context.interactionMode === "default",
     project: canvas.getInteractionXY,
     onStart: (startX, _, e) => {
+      const offsetX = canvas.section.baseColumnOffset
       const startColumn =
-        canvas.context.viewport.current.range.start +
-        Math.floor(startX / canvas.section.columnWidth)
+        Math.floor(canvas.context.viewport.current.range.start) +
+        Math.floor((startX - offsetX) / canvas.section.columnWidth)
       const baseSelection = canvas.context.state.selection.value
       const action = !e.shiftKey
         ? ("set" as const)
@@ -38,15 +39,19 @@ export function setupCanvasSelection(canvas: CanvasModel, parent: HTMLElement) {
       return { startColumn, action, baseSelection }
     },
     onMove: (x, _, { startColumn, action, baseSelection }) => {
+      const offsetX = canvas.section.baseColumnOffset
       const endColumn =
-        canvas.context.viewport.current.range.start + Math.floor(x / canvas.section.columnWidth)
+        Math.floor(canvas.context.viewport.current.range.start) +
+        Math.floor((x - offsetX) / canvas.section.columnWidth)
       applySelectionAction(canvas, action, baseSelection, startColumn, endColumn)
     },
     onEnd: (x, _, { startColumn, action, baseSelection }) => {
       if (action !== "set") return
 
+      const offsetX = canvas.section.baseColumnOffset
       const endColumn =
-        canvas.context.viewport.current.range.start + Math.floor(x / canvas.section.columnWidth)
+        Math.floor(canvas.context.viewport.current.range.start) +
+        Math.floor((x - offsetX) / canvas.section.columnWidth)
       applySelectionAction(
         canvas,
         endColumn - startColumn ? "set" : "toggle",

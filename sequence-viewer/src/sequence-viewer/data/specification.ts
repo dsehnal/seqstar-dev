@@ -30,6 +30,7 @@ export interface RenderFeatureOptions {
   ctx2d: CanvasRenderingContext2D
 
   columnWidth: number
+  offsetX: number
   offsetY: number
   height: number
   /** device pixel ratio */
@@ -87,4 +88,5 @@ export interface Spec {
   defaultRenderer?: RenderFeatureFn
   featureRenderers: Record<FeatureKind, RenderFeatureFn[]>
   layout: Layout
+  smoothScroll?: { x?: boolean; y?: boolean }
 }
