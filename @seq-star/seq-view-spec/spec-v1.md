@@ -34,7 +34,7 @@ SVS is builder-first: the primary authoring interface is a fluent TypeScript API
 | **View** | A rendering context with a coordinate system, sections, tracks, and features. A single SVS state can contain multiple views. |
 | **Section** | A layout region within a view that groups tracks. Controls scrolling, collapsing, and display behavior. |
 | **Track** | A horizontal lane within a section. Contains features layered in declaration order. Tracks can contain child tracks for hierarchical grouping (e.g. a "CDR" parent track with "CDR1", "CDR2", "CDR3" children). |
-| **Feature** | A leaf rendering primitive on a track. Has a `type` (from the core vocabulary or custom) and references an assembly or carries inline data. |
+| **Feature** | A leaf rendering primitive on a track. Has a `type` (from the core vocabulary or custom), references an assembly or carries inline data, and can reference a tooltip annotation for hover content. |
 | **Coordinate system** | The horizontal axis of a view, defined by an ordered list of polymer ranges with optional gaps between them. Derived from assemblies or explicitly specified. |
 | **Coordinate space** | One of three systems for addressing positions: *alignment* (column index including gaps), *sequence* (gap-free position), or *reference* (position in an external numbering system). |
 | **Gap symbols** | Characters in polymer sequences that represent alignment gaps (default: `["-"]`). Used by the runtime to derive alignment ↔ sequence mapping. |
@@ -397,6 +397,7 @@ Features are the leaf rendering primitives. A feature can reference an assembly 
 | `type`       | `string`                       | Feature kind — determines renderer.                 |
 | `assembly`   | `string`                       | Assembly reference.                                  |
 | `annotation` | `string`                       | Named annotation on the assembly.                   |
+| `tooltip`    | `string`                       | Named annotation on the assembly to use as tooltip content on hover. |
 | `ranges`     | `Record<string, Range[]>`      | Explicit ranges. Defaults to full coordinate system. |
 | `data`       | `any`                          | Inline data and/or renderer configuration.          |
 
@@ -415,38 +416,47 @@ Conforming renderers must recognize these types and either render them or degrad
 
 Unknown types are passed through — renderers should ignore them or render a fallback.
 
-### 4.7 Batch Expansion (Provisional)
+### 4.7 Batch Expansion
 
-For MSA-scale data, assemblies and tracks can be defined via templates. This area of the spec is the least mature — the templating model is sketched but not validated against real workflows. Anything beyond simple string interpolation should happen in the builder layer before serialization, not in the template language.
+For MSA-scale data, assemblies can be expanded from a single source. Batch expansion is a lens — it describes how entries in a source map to assemblies, without templating or string interpolation.
 
 ```typescript
 builder.assemblies("msa-entries", {
   source: "msa",
   each: "entry",
-  template: {
-    assembly_name: "{entry.name}",
-    polymers: {
-      light: { selector: { kind: "fasta-field", name: "{entry.name}_VL" } },
-      heavy: { selector: { kind: "fasta-field", name: "{entry.name}_VH" } },
-    }
-  }
-})
-
-msaSection.tracks("msa-entries", {
-  each: "assembly",
-  template: {
-    id: "{assembly.name}",
-    header: "{assembly.name}",
-    options: { draw_gaps: true },
-    features: [
-      { type: "swatch", assembly: "{assembly.ref}", annotation: "colors" },
-      { type: "sequence", assembly: "{assembly.ref}" },
-    ]
+  polymers: {
+    // Each FASTA entry becomes a single-polymer assembly
+    sequence: { selector: { kind: "fasta-field" } }
   }
 })
 ```
 
-The `{variable.path}` interpolation is deliberately minimal — no expressions, no conditionals, no logic. If you need computed values, filtering, or conditional tracks, do that in code and emit static SVS. The template is a convenience for the common case, not a programming language.
+For paired entries (e.g. VL/VH), the source data must be structured so that each logical entry contains both polymers. The expansion maps source structure to assembly structure:
+
+```typescript
+builder.assemblies("msa-entries", {
+  source: "paired-msa",
+  each: "entry",
+  polymers: {
+    light: { selector: { kind: "json-field", path: ["vl_sequence"] } },
+    heavy: { selector: { kind: "json-field", path: ["vh_sequence"] } },
+  }
+})
+```
+
+Tracks for batch-expanded assemblies are created by referencing the batch:
+
+```typescript
+msaSection.tracks("msa-entries", {
+  each: "assembly",
+  features: [
+    { type: "swatch", annotation: "colors" },
+    { type: "sequence" },
+  ]
+})
+```
+
+This area of the spec is less mature than other sections. The lens-based approach avoids the complexity of a template language — there are no expressions, no conditionals, no string interpolation. If more complex mapping is needed, it should happen in the builder layer before serialization.
 
 ### 4.8 Custom Fields
 
@@ -776,9 +786,9 @@ The core spec stays geometric — `kind` describes shape, `data` carries payload
 [each assembly individually defined ‖ batch expansion from single source]
 ```
 
-The templating approach with string interpolation is explicitly provisional — the least mature part of the spec. The boundary is firm: templates handle simple variable substitution only. Conditional logic, computed values, and filtering belong in the builder layer before serialization, not in the template language.
+The lens-based approach maps source entries to assemblies without templating. The boundary is firm: batch expansion describes data mapping, not computation. Complex logic belongs in the builder layer.
 
-**Constraint**: simple cases must be trivial. If the template language shows pressure to grow, that pressure should be redirected to the builder API.
+**Constraint**: simple cases (one source, one polymer per assembly) must be trivial. If the lens approach shows pressure to grow into a template language, that pressure should be redirected to the builder API.
 
 ### R3: Selector Simplicity vs Data Reality
 
