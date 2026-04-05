@@ -30,7 +30,8 @@ SVS is builder-first: the primary authoring interface is a fluent TypeScript API
 | **Reference** | A parallel numbering system on a polymer (Kabat, IMGT, PDB auth). Answers "how else can positions be addressed." Unlike identity, references are coordinate overlays, not provenance. |
 | **Annotation** | Named data attached to an assembly. Has an explicit `kind`: `range` (regions), `per-residue` (dense per-position values), or `pairwise` (residue-residue relationships). |
 | **Source** | A data origin — a URL or inline string with a format hint. Sources are global and referenced by name. |
-| **Selector** | A pure lens into parsed source data. Navigates to a location (mmCIF field, FASTA entry, JSON path) without filtering or transforming. |
+| **Selector** | A declarative pointer into parsed source data. Navigates to a location (mmCIF field, FASTA entry, JSON path) without filtering or transforming. |
+| **Lens** | Informal design principle: describe where data lives, not how to process it. Selectors and batch expansion both follow this principle. |
 | **View** | A rendering context with a coordinate system, sections, tracks, and features. A single SVS state can contain multiple views. |
 | **Section** | A layout region within a view that groups tracks. Controls scrolling, collapsing, and display behavior. |
 | **Track** | A horizontal lane within a section. Contains features layered in declaration order. Tracks can contain child tracks for hierarchical grouping (e.g. a "CDR" parent track with "CDR1", "CDR2", "CDR3" children). |
@@ -372,7 +373,7 @@ In the serialized SVS state, child tracks appear as a `children` array on the pa
 }
 ```
 
-Nesting depth is not limited by the spec, but viewers may impose practical limits. A parent track can have both its own features and child tracks — features on the parent render as an overview, children provide the detail.
+Nesting depth is not limited by the spec, but viewers may impose practical limits. A parent track can have both its own features and child tracks — features on the parent render as an overview, children provide the detail. Child tracks inherit `horizontal_view` and `options` from their parent unless explicitly overridden. `values` are not inherited — they are per-track metadata.
 
 ### 4.6 Features
 
@@ -397,9 +398,20 @@ Features are the leaf rendering primitives. A feature can reference an assembly 
 | `type`       | `string`                       | Feature kind — determines renderer.                 |
 | `assembly`   | `string`                       | Assembly reference.                                  |
 | `annotation` | `string`                       | Named annotation on the assembly.                   |
-| `tooltip`    | `string`                       | Named annotation on the assembly to use as tooltip content on hover. |
+| `tooltip`    | `string`                       | Named annotation on the assembly for hover content. |
 | `ranges`     | `Record<string, Range[]>`      | Explicit ranges. Defaults to full coordinate system. |
 | `data`       | `any`                          | Inline data and/or renderer configuration.          |
+
+#### Tooltip Behavior
+
+The `tooltip` field references an annotation on the assembly by name. The renderer resolves content based on the hovered position:
+
+- **Range tooltip annotation**: content shown when hovering within a matching range.
+- **Per-residue tooltip annotation**: the value at the hovered position is used.
+- **Mixed shapes** (e.g. feature displays a range, tooltip is per-residue): renderer uses best-effort lookup at the hovered position.
+- **Overlapping tooltip ranges**: resolved by the renderer (e.g. most specific wins).
+
+Tooltip content in annotation `data` fields may contain markdown. Renderers that do not support markdown should render it as plain text.
 
 #### Core Feature Vocabulary
 
@@ -642,7 +654,7 @@ SVS can be implemented incrementally. A reasonable progression:
 
 **Add reference resolution.** Implement `identity`-based coordinate mapping and `references` for parallel numbering systems. This enables cross-view coordination, reference numbering on rulers, and rich event payloads.
 
-**Add batch expansion.** Implement the `.assemblies` / `.tracks` templating for MSA-scale data. The `{variable.path}` interpolation is deliberately minimal — no expressions, no conditionals.
+**Add batch expansion.** Implement `.assemblies` / `.tracks` lens-based expansion for MSA-scale data. The expansion maps source entries to assembly structure — no templating, no expressions, no string interpolation.
 
 **Add lazy loading.** Sources marked `lazy: true` are fetched only when a referencing feature becomes visible.
 
