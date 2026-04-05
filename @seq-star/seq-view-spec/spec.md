@@ -28,7 +28,7 @@ SVS is builder-first: the primary authoring interface is a fluent TypeScript API
 | **Polymer** | A single named sequence — a protein chain, nucleic acid strand, or engineered construct. Represented as a string or array of residue codes. |
 | **Identity** | Provenance metadata on a polymer — where it comes from (UniProt accession, PDB entity, composite origins). Answers "what is this polymer." |
 | **Reference** | A parallel numbering system on a polymer (Kabat, IMGT, PDB auth). Answers "how else can positions be addressed." Unlike identity, references are coordinate overlays, not provenance. |
-| **Annotation** | Named data attached to an assembly. Has an explicit `kind`: `range` (regions), `per-residue` (dense per-position values), or `pairwise` (residue-residue relationships). |
+| **Annotation** | Named data attached to an assembly. Has an explicit `kind`: `range` (regions), `per-residue` (per-position values, dense or sparse), or `pairwise` (residue-residue relationships). |
 | **Source** | A data origin — a URL or inline string with a format hint. Sources are global and referenced by name. |
 | **Selector** | A declarative pointer into parsed source data. Navigates to a location (mmCIF field, FASTA entry, JSON path) without filtering or transforming. |
 | **Lens** | Informal design principle: describe where data lives, not how to process it. Selectors and batch expansion both follow this principle. |
@@ -223,14 +223,23 @@ cdrs: {
 
 When `group_by` is omitted, each annotation is independent. The value references a field on the annotation objects — `"name"` is the common case, but any field (e.g. `"group_id"`) can be used. If an annotation object is missing the `group_by` field, it is treated as an independent (ungrouped) annotation.
 
-**Per-residue annotations** (`kind: "per-residue"`) — dense per-position values, polymer-keyed:
+**Per-residue annotations** (`kind: "per-residue"`) — per-position values, polymer-keyed. Values can be numeric, string (categorical), or null. Supports both dense (array) and sparse (object) representations:
 
 ```typescript
+// Dense — array indexed by position
 conservation: {
   kind: "per-residue",
-  data: { light: [0.9, 0.85, 0.3], heavy: [0.4, 0.72, 0.15] }
+  data: { light: [0.9, 0.85, 0.3, null, null, 0.1], heavy: [0.4, 0.72, null, 0.88] }
+}
+
+// Sparse — only non-null positions, keyed by index
+highlights: {
+  kind: "per-residue",
+  data: { light: { 3: 0.9, 42: "hotspot", 187: 0.1 }, heavy: { 6: 0.85 } }
 }
 ```
+
+The runtime infers the representation: arrays are dense, objects are sparse. Missing positions in sparse format are implicitly `null`.
 
 **Pairwise annotations** (`kind: "pairwise"`) — residue-residue relationships:
 
