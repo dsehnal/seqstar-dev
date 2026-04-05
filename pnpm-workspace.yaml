@@ -1,3 +1,3 @@
 packages:
   - '@seq-star/sequence-viewer'
-  # - '@seq-star/seq-view-spec'
+  - '@seq-star/seq-view-spec'
