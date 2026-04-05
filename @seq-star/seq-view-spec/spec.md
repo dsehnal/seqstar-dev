@@ -1,4 +1,4 @@
-# SeqViewSpec (SVS) — Draft v0.5
+# SeqViewSpec (SVS) — Draft v0.6
 
 A declarative specification for multi-track sequence views of multi-polymer assemblies. Inspired by [MolViewSpec](https://molstar.org/mol-view-spec).
 
@@ -14,7 +14,7 @@ SVS is builder-first: the primary authoring interface is a fluent TypeScript API
 - **View-only**: No domain computation. Lightweight derivations (coordinate mapping from gap symbols, identity, and references) are expected of runtimes.
 - **Assembly-centric**: The assembly is the standardized data model bridging raw data and views.
 - **Identity-aware**: Polymers carry optional provenance and reference metadata enabling cross-view coordination.
-- **Renderer-agnostic**: Any conforming viewer can consume an SVS document.
+- **Renderer-agnostic**: Any conforming viewer can consume an SVS state.
 - **Reactive runtime**: Runtimes reconcile state and re-render only what changed.
 - **Builder-first**: The builder API is the primary authoring interface. The SVS state (JSON) is the serialization target.
 - **Extensible**: Every node supports `custom: any` for renderer/runtime-specific extensions.
@@ -24,7 +24,7 @@ SVS is builder-first: the primary authoring interface is a fluent TypeScript API
 | Term | Definition |
 |------|-----------|
 | **SVS state** | A serialized JSON object describing assemblies and views. The output of the builder, the input to a viewer. |
-| **Assembly** | A named collection of polymer sequences, annotations, identity, and references. The standardized data model that features reference. |
+| **Assembly** | A named collection of polymer sequences, annotations, identity, references, and values. The standardized data model that tracks and features reference. |
 | **Polymer** | A single named sequence — a protein chain, nucleic acid strand, or engineered construct. Represented as a string or array of residue codes. |
 | **Identity** | Provenance metadata on a polymer — where it comes from (UniProt accession, PDB entity, composite origins). Answers "what is this polymer." |
 | **Reference** | A parallel numbering system on a polymer (Kabat, IMGT, PDB auth). Answers "how else can positions be addressed." Unlike identity, references are coordinate overlays, not provenance. |
@@ -32,10 +32,10 @@ SVS is builder-first: the primary authoring interface is a fluent TypeScript API
 | **Source** | A data origin — a URL or inline string with a format hint. Sources are global and referenced by name. |
 | **Selector** | A declarative pointer into parsed source data. Navigates to a location (mmCIF field, FASTA entry, JSON path) without filtering or transforming. |
 | **Lens** | Informal design principle: describe where data lives, not how to process it. Selectors and batch expansion both follow this principle. |
-| **View** | A rendering context with a coordinate system, sections, tracks, and features. A single SVS state can contain multiple views. |
+| **View** | A rendering context with a coordinate system, layout, sections, tracks, and features. A single SVS state can contain multiple views. |
 | **Section** | A layout region within a view that groups tracks. Controls scrolling, collapsing, and display behavior. |
-| **Track** | A horizontal lane within a section. Contains features layered in declaration order. Tracks can contain child tracks for hierarchical grouping (e.g. a "CDR" parent track with "CDR1", "CDR2", "CDR3" children). |
-| **Feature** | A leaf rendering primitive on a track. Has a `type` (from the core vocabulary or custom), references an assembly or carries inline data, and can reference a tooltip annotation for hover content. |
+| **Track** | A horizontal lane within a section. References an assembly, contains features layered in declaration order, and can contain child tracks for hierarchical grouping. |
+| **Feature** | A leaf rendering primitive on a track. Has a `type` (from the core vocabulary or custom), inherits or references an assembly, and can reference a tooltip annotation for hover content. |
 | **Coordinate system** | The horizontal axis of a view, defined by an ordered list of polymer ranges with optional gaps between them. Derived from assemblies or explicitly specified. |
 | **Coordinate space** | One of three systems for addressing positions: *alignment* (column index including gaps), *sequence* (gap-free position), or *reference* (position in an external numbering system). |
 | **Gap symbols** | Characters in polymer sequences that represent alignment gaps (default: `["-"]`). Used by the runtime to derive alignment ↔ sequence mapping. |
@@ -44,8 +44,8 @@ SVS is builder-first: the primary authoring interface is a fluent TypeScript API
 
 ```
 sources     →  where to get raw data (optional)
-assemblies  →  polymers + annotations + identity + references (the data)
-views       →  coordinate systems, sections, tracks, features (the presentation)
+assemblies  →  polymers + annotations + identity + references + values (the data)
+views       →  coordinate systems, layouts, sections, tracks, features (the presentation)
 ```
 
 All three sections are part of the same spec. Sources are optional — assemblies can be provided with fully resolved inline data, constructed from sources, or a mix of both. The serialized JSON is referred to as an **SVS state**.
@@ -77,7 +77,7 @@ builder.source("large-msa", { url: "https://example.com/large-msa.fasta", format
 
 ### 4.2 Assemblies
 
-An assembly is a named collection of **polymers** and **annotations**. Polymers and annotations can be provided inline or constructed from sources via selectors.
+An assembly is a named collection of **polymers**, **annotations**, and **values**. Polymers and annotations can be provided inline or constructed from sources via selectors.
 
 ```typescript
 builder.assembly("antibody", {
@@ -85,7 +85,6 @@ builder.assembly("antibody", {
 
   polymers: {
     light: {
-      // Inline sequence
       sequence: "CTVPQQTYLRDTGSASD...",
       identity: { kind: "uniprot", id: "P01234", start: 21, end: 220 },
       references: {
@@ -93,12 +92,10 @@ builder.assembly("antibody", {
       }
     },
     heavy: {
-      // From source
       source: "structure",
       selector: { kind: "cif-field", category: "entity_poly", field: "pdbx_seq_one_letter_code_can", row: 1 },
       identity: { kind: "pdb", entity_id: "2", auth_asym_id: "H", resolve: "sifts" },
       references: {
-        // Reference numbering from source data — avoids duplicating large arrays
         auth: { source: "structure", selector: { kind: "cif-field", category: "atom_site", field: "auth_seq_id" } },
         imgt: { source: "features", selector: { kind: "json-field", path: ["imgt_numbering"] } },
       }
@@ -129,6 +126,12 @@ builder.assembly("antibody", {
         { polymer_a: "light", position_a: 23, polymer_b: "heavy", position_b: 105 },
       ],
     },
+  },
+
+  // Assembly-level values — available to layout columns for any track referencing this assembly
+  values: {
+    organism: "H. sapiens",
+    expression_yield: 0.85,
   }
 })
 ```
@@ -138,17 +141,13 @@ builder.assembly("antibody", {
 Strings (one character per position) or arrays (for non-standard residues, ligands):
 
 ```typescript
-// Standard amino acids
 light: { sequence: "CTVPQQTYLRDT..." }
-
-// Non-standard residues, ligands
 chain: { sequence: ["ALA", "CYS", "MSE", "LYS", "NAG", "FUC"] }
 ```
 
 Sequences can be inline or from a source:
 
 ```typescript
-// From source
 chain: { source: "structure", selector: { kind: "cif-field", category: "entity_poly", field: "pdbx_seq_one_letter_code_can", row: 0 } }
 ```
 
@@ -177,32 +176,32 @@ type CompositeSegment = {
 
 #### Polymer References
 
-Optional. Describes **parallel numbering systems** — how positions on this polymer can be addressed in external coordinate systems. Unlike `identity` (segmented provenance), references are concurrent coordinate overlays on the same positions.
+Optional. Describes **parallel numbering systems** — concurrent coordinate overlays on the same positions. Unlike `identity` (segmented provenance), references address how positions map to external systems.
 
 ```typescript
 type PolymerReferences = Record<string, ReferenceSystem>
 
 type ReferenceSystem =
-  // Inline per-position mapping
   | { kind: "numbering-scheme"; scheme: string; mapping: (number | string | null)[] }
-  // Simple linear offset
   | { kind: "offset"; start: number }
-  // From a source — avoids duplicating large mapping arrays
   | { source: string; selector: Selector }
-  // Arbitrary
   | { kind: "custom"; data: any }
 ```
 
-References can be inline or sourced. For large numbering arrays (1000+ residues), sourcing from the original data file avoids bloating the SVS document. Source-selected reference data must resolve to the expected shape for that reference type (e.g. an array of `number | string | null` for `numbering-scheme`). Runtimes should fail clearly on shape mismatches. If a reference mapping array length differs from the polymer sequence length, runtimes should pad missing positions with `null`, truncate excess entries, and emit a warning.
+References can be inline or sourced. For large numbering arrays (1000+ residues), sourcing from the original data file avoids bloating the SVS state. Source-selected reference data must resolve to the expected shape for that reference type (e.g. an array of `number | string | null` for `numbering-scheme`). Runtimes should fail clearly on shape mismatches. If a reference mapping array length differs from the polymer sequence length, runtimes should pad missing positions with `null`, truncate excess entries, and emit a warning.
 
 ```typescript
 references: {
-  // Small inline mapping
   kabat: { kind: "numbering-scheme", scheme: "kabat", mapping: [1, 2, 3, "27A", "27B", 28] },
-  // Large mapping from source
   auth: { source: "structure", selector: { kind: "cif-field", category: "atom_site", field: "auth_seq_id" } },
 }
 ```
+
+Identity and references serve different purposes:
+- `identity` answers **"what is this polymer"** — provenance, source, segmented origins.
+- `references` answers **"how else can positions be numbered"** — parallel coordinate overlays.
+
+Both are optional. When absent, coordination uses assembly name + polymer name.
 
 #### Annotation Data
 
@@ -266,13 +265,21 @@ domains: { kind: "range", source: "features", selector: { kind: "json-field", pa
 
 Supported spaces: `"sequence"` (default), `"alignment"`, `"reference"`. When `"reference"` is used, the `reference_system` field specifies which: `{ coordinate_space: "reference", reference_system: "kabat" }`.
 
+#### Assembly Values
+
+Optional key-value metadata on the assembly, available to layout columns:
+
+```typescript
+values: { organism: "H. sapiens", expression_yield: 0.85 }
+```
+
 #### Gap Symbols
 
 `gap_symbols` (default `["-"]`) declares which elements in polymer sequences represent alignment gaps. The runtime uses this to derive the alignment ↔ sequence coordinate mapping.
 
 #### Selectors
 
-Selectors are pure lenses — they navigate into parsed data, they don't transform or filter.
+Selectors navigate into parsed data — they don't transform or filter.
 
 ```typescript
 { kind: "cif-field", category: string, field: string, row?: number }
@@ -297,12 +304,39 @@ const view = builder.view({
   },
   layout: {
     base_track_height: 36,
-    columns: [{ name: "header", width: 120 }]
+    columns: [
+      { kind: "header", width: 120 },
+      { kind: "canvas" },
+      { kind: "value", name: "x", width: 60, label: "X" },
+      { kind: "value", name: "y", width: 60, label: "Y" },
+    ]
   }
 })
 ```
 
-When derived: polymer order follows the first assembly referenced by an assembly-backed feature in document order within the view (inline-only features do not participate in derivation). Ranges span full sequence length, `polymer_gap` defaults to `0`. When specified: used as-is, no merging.
+When derived: polymer order follows the first assembly referenced by an assembly-backed feature in the view (inline-only features do not participate in derivation). Ranges span full sequence length, `polymer_gap` defaults to `0`. When specified: used as-is, no merging.
+
+#### Layout
+
+| Param              | Type              | Description                              |
+|--------------------|-------------------|------------------------------------------|
+| `base_track_height`| `number`          | Default track height in pixels.          |
+| `columns`          | `LayoutColumn[]`  | Column definitions controlling the horizontal structure of the view. |
+
+#### Layout Columns
+
+Columns define the horizontal structure of the entire view — header, canvas, and data columns. Column order in the array defines visual order left to right.
+
+```typescript
+type LayoutColumn =
+  | { kind: "header"; width: number | string; is_hidden?: boolean }
+  | { kind: "canvas" }
+  | { kind: "value"; name: string; width: number | string; label?: string; is_hidden?: boolean }
+```
+
+- **`header`** — displays `track.header`.
+- **`canvas`** — the main sequence/feature rendering area. Takes remaining space. Exactly one per layout.
+- **`value`** — displays a named value. Resolved via lookup chain: `track.values[name]` → `assembly.values[name]`. `label` is the column header text (defaults to `name`).
 
 ### 4.4 Sections
 
@@ -328,73 +362,73 @@ const consensus   = view.section("consensus",  { height: "min-content" })
 
 ### 4.5 Tracks
 
-A horizontal lane containing features layered in declaration order.
+A horizontal lane containing features layered in declaration order. A track references an assembly, which features inherit unless they specify their own.
 
 ```typescript
 msaSection
-  .track({ id: "msa-1", header: "Track 1", options: { draw_gaps: true } })
-  .feature({ type: "swatch", assembly: "msa-entry-1", annotation: "colors" })
-  .feature({ type: "sequence", assembly: "msa-entry-1" })
+  .track({ id: "msa-1", header: "Track 1", assembly: "msa-entry-1", options: { draw_gaps: true } })
+  .feature({ type: "swatch", annotation: "colors" })   // inherits assembly from track
+  .feature({ type: "sequence" })                        // inherits assembly from track
 ```
 
 | Param             | Type                    | Description                                          |
 |-------------------|-------------------------|------------------------------------------------------|
 | `id`              | `string`                | Unique track identifier.                             |
 | `header`          | `string`                | Display label.                                       |
+| `assembly`        | `string`                | Assembly reference. Features inherit this unless they override. |
 | `height_factor`   | `number`                | Multiplier on base track height (default `1.0`).     |
 | `horizontal_view` | `"zoomed"` \| `"full"`  | Overrides section-level setting.                      |
-| `values`          | `Record<string, any>`   | Arbitrary per-track metadata.                         |
+| `values`          | `Record<string, any>`   | Per-track metadata, available to layout columns.      |
 | `options`         | `TrackOptions`          | Behavior options.                                    |
 
 **TrackOptions**: `draw_gaps` (boolean), `stack_features` (boolean).
 
 #### Child Tracks
 
-Tracks can contain child tracks for hierarchical grouping. Child tracks inherit the parent's section context but are independently collapsible and identifiable.
+Tracks can contain child tracks for hierarchical grouping. Child tracks inherit `assembly`, `horizontal_view`, and `options` from their parent unless explicitly overridden. `values` are not inherited — they are per-track metadata.
 
 ```typescript
-const cdrTrack = annotSect.track({ id: "cdr", header: "CDR" })
+const cdrTrack = annotSect.track({ id: "cdr", header: "CDR", assembly: "antibody" })
 
 cdrTrack
-  .track({ id: "cdr1", header: "CDR1" })
-  .feature({ type: "block", assembly: "antibody", annotation: "cdr1-regions" })
+  .track({ id: "cdr1", header: "CDR1" })   // inherits assembly from parent
+  .feature({ type: "block", annotation: "cdr1-regions" })
 
 cdrTrack
   .track({ id: "cdr2", header: "CDR2" })
-  .feature({ type: "block", assembly: "antibody", annotation: "cdr2-regions" })
-
-cdrTrack
-  .track({ id: "cdr3", header: "CDR3" })
-  .feature({ type: "block", assembly: "antibody", annotation: "cdr3-regions" })
+  .feature({ type: "block", annotation: "cdr2-regions" })
 ```
 
-In the serialized SVS state, child tracks appear as a `children` array on the parent track:
+In the serialized SVS state, child tracks appear as a `children` array:
 
 ```jsonc
 {
   "id": "cdr",
   "header": "CDR",
+  "assembly": "antibody",
   "children": [
-    { "id": "cdr1", "header": "CDR1", "features": [{ "type": "block", "assembly": "antibody", "annotation": "cdr1-regions" }] },
-    { "id": "cdr2", "header": "CDR2", "features": [{ "type": "block", "assembly": "antibody", "annotation": "cdr2-regions" }] },
-    { "id": "cdr3", "header": "CDR3", "features": [{ "type": "block", "assembly": "antibody", "annotation": "cdr3-regions" }] }
+    { "id": "cdr1", "header": "CDR1", "features": [{ "type": "block", "annotation": "cdr1-regions" }] },
+    { "id": "cdr2", "header": "CDR2", "features": [{ "type": "block", "annotation": "cdr2-regions" }] }
   ]
 }
 ```
 
-Nesting depth is not limited by the spec, but viewers may impose practical limits. A parent track can have both its own features and child tracks — features on the parent render as an overview, children provide the detail. Child tracks inherit `horizontal_view` and `options` from their parent unless explicitly overridden. `values` are not inherited — they are per-track metadata.
+Nesting depth is not limited by the spec, but viewers may impose practical limits. A parent track can have both its own features and child tracks — features on the parent render as an overview, children provide the detail.
 
 ### 4.6 Features
 
-Features are the leaf rendering primitives. A feature can reference an assembly or carry inline data.
+Features are the leaf rendering primitives. A feature inherits `assembly` from its parent track, or can override it.
 
 ```typescript
-// Assembly-backed
-.feature({ type: "sequence", assembly: "antibody" })
-.feature({ type: "block", assembly: "antibody", annotation: "cdrs" })
-.feature({ type: "bars", assembly: "antibody", annotation: "conservation", data: { threshold: 90, range: [0, 1] } })
+// Assembly inherited from track
+.feature({ type: "sequence" })
+.feature({ type: "block", annotation: "cdrs" })
+.feature({ type: "bars", annotation: "conservation", data: { threshold: 90, range: [0, 1] } })
 
-// Inline
+// Assembly overridden on feature
+.feature({ type: "sequence", assembly: "different-assembly" })
+
+// Inline — no assembly reference
 .feature({
   type: "block",
   ranges: { light: [{ start: 10, end: 50 }] },
@@ -405,7 +439,7 @@ Features are the leaf rendering primitives. A feature can reference an assembly 
 | Param        | Type                           | Description                                         |
 |--------------|--------------------------------|-----------------------------------------------------|
 | `type`       | `string`                       | Feature kind — determines renderer.                 |
-| `assembly`   | `string`                       | Assembly reference.                                  |
+| `assembly`   | `string`                       | Assembly reference. Inherited from track if omitted. |
 | `annotation` | `string`                       | Named annotation on the assembly.                   |
 | `tooltip`    | `string`                       | Named annotation on the assembly for hover content. |
 | `ranges`     | `Record<string, Range[]>`      | Explicit ranges. Defaults to full coordinate system. |
@@ -424,7 +458,7 @@ Tooltip content in annotation `data` fields may contain markdown. Renderers that
 
 #### Core Feature Vocabulary
 
-Conforming renderers must recognize these types and either render them or degrade gracefully for unsupported data combinations.
+Conforming renderers must recognize these types and either render them faithfully for compatible data or degrade gracefully for unsupported combinations.
 
 | Type        | Description                                    | Typical data                          |
 |-------------|------------------------------------------------|---------------------------------------|
@@ -439,20 +473,19 @@ Unknown types are passed through — renderers should ignore them or render a fa
 
 ### 4.7 Batch Expansion
 
-For MSA-scale data, assemblies can be expanded from a single source. Batch expansion is a lens — it describes how entries in a source map to assemblies, without templating or string interpolation.
+For MSA-scale data, assemblies can be expanded from a single source. Batch expansion describes how entries in a source map to assemblies — no templating, no string interpolation.
 
 ```typescript
 builder.assemblies("msa-entries", {
   source: "msa",
   each: "entry",
   polymers: {
-    // Each FASTA entry becomes a single-polymer assembly
     sequence: { selector: { kind: "fasta-field" } }
   }
 })
 ```
 
-For paired entries (e.g. VL/VH), the source data must be structured so that each logical entry contains both polymers. The expansion maps source structure to assembly structure:
+For paired entries (e.g. VL/VH), the source data must be structured so that each logical entry contains both polymers:
 
 ```typescript
 builder.assemblies("msa-entries", {
@@ -465,7 +498,7 @@ builder.assemblies("msa-entries", {
 })
 ```
 
-Tracks for batch-expanded assemblies are created by referencing the batch:
+Tracks for batch-expanded assemblies reference the batch:
 
 ```typescript
 msaSection.tracks("msa-entries", {
@@ -477,7 +510,7 @@ msaSection.tracks("msa-entries", {
 })
 ```
 
-This area of the spec is less mature than other sections. The lens-based approach avoids the complexity of a template language — there are no expressions, no conditionals, no string interpolation. If more complex mapping is needed, it should happen in the builder layer before serialization.
+This area of the spec is less mature than other sections. The approach avoids the complexity of a template language — there are no expressions, no conditionals, no string interpolation. If more complex mapping is needed, it should happen in the builder layer before serialization.
 
 ### 4.8 Custom Fields
 
@@ -486,7 +519,7 @@ Every builder call accepts `custom` for renderer-specific extensions:
 ```typescript
 builder.assembly("ab", { polymers: { ... }, custom: { source_organism: "Homo sapiens" } })
 view.track({ id: "seq", header: "Sequence", custom: { highlight_on_hover: true } })
-.feature({ type: "sequence", assembly: "ab", custom: { color_scheme: "clustal" } })
+.feature({ type: "sequence", custom: { color_scheme: "clustal" } })
 ```
 
 ## 5. Coordinate Spaces
@@ -544,7 +577,7 @@ Event kinds are viewer-defined — the spec does not enumerate them.
 
 ## 7. Multiple Views
 
-The `views` array supports multiple views in a single document. Each view is a self-contained rendering context.
+The `views` array supports multiple views in a single SVS state. Each view is a self-contained rendering context.
 
 ```typescript
 const overview = builder.view({ name: "overview", description: "Full sequence with annotations" })
@@ -605,6 +638,9 @@ SVS can optionally integrate with [MolViewSpec](https://molstar.org/mol-view-spe
             "heavy": [0.4, 0.72, 0.15, 0.88]
           }
         }
+      },
+      "values": {
+        "organism": "H. sapiens"
       }
     }
   },
@@ -613,7 +649,12 @@ SVS can optionally integrate with [MolViewSpec](https://molstar.org/mol-view-spe
     "name": "main",
     "layout": {
       "base_track_height": 36,
-      "columns": [{ "name": "header", "width": 120 }]
+      "columns": [
+        { "kind": "header", "width": 120 },
+        { "kind": "canvas" },
+        { "kind": "value", "name": "x", "width": 60, "label": "X" },
+        { "kind": "value", "name": "y", "width": 60, "label": "Y" }
+      ]
     },
     "sections": [
       {
@@ -622,7 +663,8 @@ SVS can optionally integrate with [MolViewSpec](https://molstar.org/mol-view-spe
         "tracks": [{
           "id": "seq",
           "header": "Sequence",
-          "features": [{ "type": "sequence", "assembly": "antibody" }]
+          "assembly": "antibody",
+          "features": [{ "type": "sequence" }]
         }]
       },
       {
@@ -630,7 +672,8 @@ SVS can optionally integrate with [MolViewSpec](https://molstar.org/mol-view-spe
         "tracks": [{
           "id": "cdr",
           "header": "CDR",
-          "features": [{ "type": "block", "assembly": "antibody", "annotation": "cdrs" }]
+          "assembly": "antibody",
+          "features": [{ "type": "block", "annotation": "cdrs" }]
         }]
       },
       {
@@ -639,10 +682,10 @@ SVS can optionally integrate with [MolViewSpec](https://molstar.org/mol-view-spe
         "tracks": [{
           "id": "cons",
           "header": "Conservation",
+          "assembly": "antibody",
           "horizontal_view": "full",
           "features": [{
             "type": "bars",
-            "assembly": "antibody",
             "annotation": "conservation",
             "data": { "threshold": 90, "range": [0, 1] }
           }]
@@ -659,7 +702,7 @@ SVS can be implemented incrementally. A reasonable progression:
 
 **Start with inline assemblies and views.** Handle SVS states with inline sequence and annotation data. Implement the core feature vocabulary (`sequence`, `block`, `bars`, `heatmap`, `swatch`, `pairwise`). Derive coordinate systems from assemblies. This alone is sufficient for many use cases.
 
-**Add source pipeline.** Implement `download`, `parse`, and selector-based construction. This enables self-contained SVS states that fetch their own data. Selectors are pure lenses — they navigate, they don't transform. Data must conform to expected shapes, or the runtime provides format-specific adapters.
+**Add source pipeline.** Implement `download`, `parse`, and selector-based construction. This enables self-contained SVS states that fetch their own data. Selectors navigate — they don't transform. Data must conform to expected shapes, or the runtime provides format-specific adapters.
 
 **Add reference resolution.** Implement `identity`-based coordinate mapping and `references` for parallel numbering systems. This enables cross-view coordination, reference numbering on rulers, and rich event payloads.
 
@@ -671,7 +714,7 @@ Each capability is independently useful. A minimal conforming viewer handles inl
 
 **Versioning and forward compatibility.** The `svs_version` field follows semver. When a viewer encounters an SVS state with a newer minor version, it should process what it understands and ignore unknown fields outside of `custom`. Unknown annotation `kind` values, unknown feature `type` values, and unrecognized top-level fields should be ignored gracefully — not cause failures. A newer major version may require explicit handling. Viewers should surface a warning when encountering unknown fields, not fail silently.
 
-**Companion adapter libraries.** The spec intentionally keeps selectors minimal (pure lenses, no transforms). In practice, common data sources (mmCIF, UniProt API, FASTA) have well-known shapes that need mapping to SVS's annotation and polymer models. Companion adapter libraries — shipped alongside but outside the spec — should handle these transformations for common formats.
+**Companion adapter libraries.** The spec intentionally keeps selectors minimal (no transforms). In practice, common data sources (mmCIF, UniProt API, FASTA) have well-known shapes that need mapping to SVS's annotation and polymer models. Companion adapter libraries — shipped alongside but outside the spec — should handle these transformations for common formats.
 
 ## Appendix A — Design Constraints
 
@@ -679,7 +722,7 @@ Why the spec looks the way it does. Each constraint captures a decision, the rea
 
 ### C1: Assembly as the central abstraction
 
-**Decision**: All sequence and annotation data flows through a named "assembly" before reaching the view layer.
+**Decision**: All sequence, annotation, and value data flows through a named "assembly" before reaching the view layer.
 
 **Why not data directly on features?** Supported as a convenience (inline features), but as the primary pattern it leads to duplicated data and no single source of truth.
 
@@ -715,7 +758,7 @@ Why the spec looks the way it does. Each constraint captures a decision, the rea
 
 **Why?** The common case is obvious — polymer lengths in order. Requiring it would be boilerplate.
 
-**What would change this**: If the derivation rule (first assembly-backed feature in document order) proves ambiguous for complex multi-assembly views.
+**What would change this**: If the derivation rule (first assembly-backed feature in the view) proves ambiguous for complex multi-assembly views.
 
 ### C5: Explicit annotation `kind` discriminators
 
@@ -735,19 +778,19 @@ Why the spec looks the way it does. Each constraint captures a decision, the rea
 
 **What would change this**: If renderers need richer group metadata.
 
-### C7: Builder-first, JSON as serialization target
+### C7: Builder-first, SVS state as serialization target
 
-**Decision**: TypeScript builder for authoring, JSON for interchange.
+**Decision**: TypeScript builder for authoring, JSON SVS state for interchange.
 
 **Why?** JSON is verbose for authoring. Builder provides type safety, loops, composability. Same approach as MolViewSpec.
 
 **What would change this**: Nothing for JSON as interchange. Builder API will evolve.
 
-### C8: Selectors are pure lenses
+### C8: Selectors are declarative pointers
 
 **Decision**: Selectors navigate into parsed data. They don't filter, transform, or query.
 
-**Why?** Filtering/transformation requires a query language (scope creep) or rigid matchers (too limited). The spec defines target shapes; getting there is the user's problem.
+**Why?** Filtering/transformation requires a query language (scope creep) or rigid matchers (too limited). The spec defines target shapes; getting there is the user's or adapter's problem.
 
 **What would change this**: If adoption friction proves too high. The answer would be a companion adapter library, not spec complexity.
 
@@ -789,6 +832,26 @@ Why the spec looks the way it does. Each constraint captures a decision, the rea
 
 **What would change this**: The vocabulary may grow as the spec matures. It should remain small and boring.
 
+### C13: Track-level assembly reference with feature inheritance
+
+**Decision**: Tracks carry an `assembly` reference. Features inherit it unless they override.
+
+**Why?** In the MSA case, every feature on a track references the same assembly. Repeating `assembly: "msa-entry-42"` on every feature is boilerplate. Putting it on the track and letting features inherit reduces noise.
+
+**Why allow feature-level override?** A track might display data from multiple assemblies — e.g. a comparison track with features from two different constructs.
+
+**What would change this**: Nothing. Simple inheritance with explicit override is the right pattern.
+
+### C14: Layout columns with typed kinds
+
+**Decision**: Layout columns have `kind: "header" | "canvas" | "value"` rather than relying on reserved name strings.
+
+**Why typed?** Each kind has different behavior and properties. A discriminated union makes this explicit and extensible.
+
+**Why a value lookup chain?** `track.values[name]` → `assembly.values[name]` covers the common cases (per-track metrics, assembly-level metadata) without requiring explicit path syntax.
+
+**What would change this**: If the lookup chain proves insufficient or ambiguous. Explicit path references could be added later.
+
 ## Appendix B — Active Residuals
 
 ### R1: Annotation Semantic Richness
@@ -814,7 +877,7 @@ The lens-based approach maps source entries to assemblies without templating. Th
 ### R3: Selector Simplicity vs Data Reality
 
 ```
-[selectors as pure lenses ‖ real-world data requires transformation]
+[selectors as declarative pointers ‖ real-world data requires transformation]
 ```
 
 Selectors navigate, they don't transform. The gap between raw data and SVS-shaped data is the user's problem. If painful, the answer is a companion adapter library.
@@ -827,6 +890,8 @@ Selectors navigate, they don't transform. The gap between raw data and SVS-shape
 [dense per-position arrays ‖ sparse/rule-based numbering schemes]
 ```
 
-The `numbering-scheme` type uses dense arrays. For large proteins with few insertions, this is wasteful. Source-backed references mitigate this (the data lives in the source file, not the SVS document), but a sparse mapping type may eventually be needed for inline cases.
+The `numbering-scheme` type uses dense arrays. For large proteins with few insertions, this is wasteful. Source-backed references mitigate this (the data lives in the source file, not the SVS state), but a sparse mapping type may eventually be needed for inline cases.
 
-**Constraint**: source-backed references handle the common large-data case. Inline dense arrays are acceptable for small sequences. A sparse format can be added later without breaking existing documents.
+The sparse object pattern introduced for per-residue annotations (`Record<number, value>` instead of arrays) could be applied to numbering scheme mappings as well — only non-default positions would be stored. This is not yet specified but would be a natural extension.
+
+**Constraint**: source-backed references handle the common large-data case. Inline dense arrays are acceptable for small sequences. A sparse format can be added later without breaking existing states.
