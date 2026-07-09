@@ -31,14 +31,21 @@ SVS is builder-first: the primary authoring interface is a fluent TypeScript API
 | **Annotation** | Named data attached to an assembly. Has an explicit `kind`: `range` (regions), `per-residue` (per-position values, dense or sparse), or `pairwise` (residue-residue relationships). |
 | **Source** | A data origin — a URL or inline string with a format hint. Sources are global and referenced by name. |
 | **Selector** | A declarative pointer into parsed source data. Navigates to a location (mmCIF field, FASTA entry, JSON path) without filtering or transforming. |
-| **Lens** | Informal design principle: describe where data lives, not how to process it. Selectors and batch expansion both follow this principle. |
+| **Lens** | Informal design principle: describe where data lives, not how to process it. Selectors and batch expansion both follow this principle. This seems to be redundant as presently described. I would strengthen this instead - perhaps as a distinct spec, since typically people think of Lens as the 'analytics' between data and view - this might be some sort of extension point perhaps ? |
 | **View** | A rendering context with a coordinate system, layout, sections, tracks, and features. A single SVS state can contain multiple views. |
 | **Section** | A layout region within a view that groups tracks. Controls scrolling, collapsing, and display behavior. |
 | **Track** | A horizontal lane within a section. References an assembly, contains features layered in declaration order, and can contain child tracks for hierarchical grouping. |
 | **Feature** | A leaf rendering primitive on a track. Has a `type` (from the core vocabulary or custom), inherits or references an assembly, and can reference a tooltip annotation for hover content. |
 | **Coordinate system** | The horizontal axis of a view, defined by an ordered list of polymer ranges with optional gaps between them. Derived from assemblies or explicitly specified. |
 | **Coordinate space** | One of three systems for addressing positions: *alignment* (column index including gaps), *sequence* (gap-free position), or *reference* (position in an external numbering system). |
-| **Gap symbols** | Characters in polymer sequences that represent alignment gaps (default: `["-"]`). Used by the runtime to derive alignment ↔ sequence mapping. |
+| **Gap symbols** | Characters in polymer sequences that represent alignment gaps (default: `["-"]`). Used by the runtime to derive alignment ↔ sequence mapping. Enhancement: propose standard for compact gap representations - CiGAR or similar - a3m is also now widely used, which is more complex to parse into a regular MSA, but preferred because it produces smaller files. |
+
+Enhancements:
+Machine & human readable mechanisms for describing origin of data that SVS consumer might present to user.
+- Labels/etc. Frequently the text associated with annotations requires additional explanation - e.g. conservation -> what type of conservation -> methods, dois, etc.
+- program used to generate msa, parameters used, etc.
+Simile: In jalview we discovered people wanted to customise text shown to users, include URLs to additional info, etc. SOmetimes these were hardwired, sometimes they were data dependent - e.g. a template for generating concrete URLs via identifiers.org for instance.
+
 
 ## 3. State Structure
 
@@ -144,6 +151,7 @@ Strings (one character per position) or arrays (for non-standard residues, ligan
 light: { sequence: "CTVPQQTYLRDT..." }
 chain: { sequence: ["ALA", "CYS", "MSE", "LYS", "NAG", "FUC"] }
 ```
+Clarification: Ligands may be part of a chain, but are often considered independently or as modifications. Ideally links to chembl/authoritative chemical/ligand db is needed.
 
 Sequences can be inline or from a source:
 
@@ -154,7 +162,7 @@ chain: { source: "structure", selector: { kind: "cif-field", category: "entity_p
 #### Polymer Identity
 
 Optional. Describes **provenance** — where this polymer comes from.
-
+This needs a bit more definition: identity mapping is not always clear - one/many segments to one coord system. Versions are required and a true uniform identifier required for authority (ie 'custom' seems to be a type of authority. ). 
 ```typescript
 type PolymerIdentity =
   | { kind: "uniprot"; id: string; start: number; end: number }
@@ -203,11 +211,20 @@ Identity and references serve different purposes:
 
 Both are optional. When absent, coordination uses assembly name + polymer name.
 
+Clarification: treatment of '0' and directionality.
+- some numbering systems include zero, others do not. Do we need an 'includes-zero' option ?
+- often, reverse strand sequences are written in fasta in reverse - e.g. as polymer/end-start (excluding zero)
+
+
 #### Annotation Data
 
-Annotations are named and carry an explicit `kind` discriminator.
+Annotations are named and carry an explicit `kind` discriminator. THis distinguishes range, positional (per-residue), pairwise, or other forms. 
+
+Clarification: data sources differ in the way they express some forms of annotation - e.g. a disulphide is marked as a range annotation but a viewer might recognise that this should be intepreted as a pairwise contact. Similarly for ligand contacts. Thus the *type* field is usually used to determine how any positional specification are interpreted. Simplest is to demand instance generators reify to form concrete kind: specifications.
 
 **Range annotations** (`kind: "range"`) — named regions with optional `group_by` for multi-polymer grouping:
+
+- Annotations may be on a specific atom or bond - atoms are supported but are bonds ? A simpler generalisation of this is on/vs before - ie is a splice site specified as before a position or between two adjacent positions ?
 
 ```typescript
 cdrs: {
@@ -222,7 +239,13 @@ cdrs: {
 
 When `group_by` is omitted, each annotation is independent. The value references a field on the annotation objects — `"name"` is the common case, but any field (e.g. `"group_id"`) can be used. If an annotation object is missing the `group_by` field, it is treated as an independent (ungrouped) annotation.
 
-**Per-residue annotations** (`kind: "per-residue"`) — per-position values, polymer-keyed. Values can be numeric, string (categorical), or null. Supports both dense (array) and sparse (object) representations:
+**Per-residue annotations** (`kind: "per-residue"`) — per-position values, polymer-keyed. Values can be numeric, string (categorical), or null. 
+Enhancement: 
+ - annotations commonly handled can also include lists, and vectors, and a mixture of numeric and categorical. 
+  e.g. a secondary structure symbol can have a probability score associated with it, a conservation-like score (e.g. column consensus, physicochemcial property conservation) can have a string label (resp. the consensus sequence or the physicochemcial conservation symbol) and a vector of string:values (the sequence or property logo).
+ - annotations may be dependent on a both an MSA context and one or more sequences. e.g. an msa is divided up into conserved subgroups each with their own conservation tracks.
+
+Supports both dense (array) and sparse (object) representations:
 
 ```typescript
 // Dense — array indexed by position
@@ -250,7 +273,8 @@ contacts: {
   ]
 }
 ```
-
+Enhancements:
+ Require matrix type pairwise data, and support directional semantics: e.g. PAE matrices are dense and not symmetric. 
 Annotations can also be sourced:
 
 ```typescript
@@ -262,6 +286,9 @@ domains: { kind: "range", source: "features", selector: { kind: "json-field", pa
 ```typescript
 { name: "conserved-col", range: { polymer: "light", start: 42, end: 42 }, coordinate_space: "alignment" }
 ```
+Enhancements: 
+- need to handle more than one alignment, so need to provide a specific identifier.
+- Annotations will come from other sources and be mapped directly or indirectly onto a particular chain. These could be baked in (ie recorded already transformed to destination coordinate space), or left associated with their original polymer (for instance, exon boundaries are useful to map on to proteins but are associated with a particular splice origin).
 
 Supported spaces: `"sequence"` (default), `"alignment"`, `"reference"`. When `"reference"` is used, the `reference_system` field specifies which: `{ coordinate_space: "reference", reference_system: "kabat" }`.
 
@@ -275,11 +302,13 @@ values: { organism: "H. sapiens", expression_yield: 0.85 }
 
 #### Gap Symbols
 
-`gap_symbols` (default `["-"]`) declares which elements in polymer sequences represent alignment gaps. The runtime uses this to derive the alignment ↔ sequence coordinate mapping.
+`gap_symbols` (default `["-"," ", "."]`) declares which elements in polymer sequences represent alignment gaps. The runtime uses this to derive the alignment ↔ sequence coordinate mapping.
 
 #### Selectors
 
 Selectors navigate into parsed data — they don't transform or filter.
+(suggest the following addition:)
+kind: defines the selector as sourcetype-field: where sourcetype is one of the core SVS formats or one provided by the implementation. Additional fields resolve to a stream of parsed data that is the same shape as the context expects.
 
 ```typescript
 { kind: "cif-field", category: string, field: string, row?: number }
@@ -322,6 +351,8 @@ When derived: polymer order follows the first assembly referenced by an assembly
 |--------------------|-------------------|------------------------------------------|
 | `base_track_height`| `number`          | Default track height in pixels.          |
 | `columns`          | `LayoutColumn[]`  | Column definitions controlling the horizontal structure of the view. |
+
+Recommend supporting rows as well as columns. Rchie is an example of an RNA layout where two alignments are shown above and below, so paired bases are shown in same column. The derefencable MSA 
 
 #### Layout Columns
 
@@ -382,6 +413,8 @@ msaSection
 | `options`         | `TrackOptions`          | Behavior options.                                    |
 
 **TrackOptions**: `draw_gaps` (boolean), `stack_features` (boolean).
+Clarification 
+ - does stack_features mean features on the track are rendered over eachother magically ? (see below re rendering overlaid annotations)
 
 #### Child Tracks
 
@@ -445,6 +478,15 @@ Features are the leaf rendering primitives. A feature inherits `assembly` from i
 | `ranges`     | `Record<string, Range[]>`      | Explicit ranges. Defaults to full coordinate system. |
 | `data`       | `any`                          | Inline data and/or renderer configuration.          |
 
+Enhancement/Clarification:
+ 1 - How do stackable features - overlaying on a preceeding track work ?
+   In jalview:
+   - range annotations (what we call features) are overlaid on a sequence in order, where each annotation has a distinct colours+alpha. Other changes to the sequence rendered at that position may also be possible per feature. I would model that as a renderer that takes an ordered list of annotation selectors, which allows the renderer to select for each sequence being rendered any relevant annotation in order according to the selector.
+    - filtering and per-value shading (e.g. a domain name string is used to generate a colour for a domain type feature).  
+2 - WHat if a renderer needs to modulate an existing rendered feature according to some other data ?
+   - Any form of per-residue shading (ie swatch) can be additionally modified by a function dependent on an annotation track proximal to the context. Ie an MSA is a sequence render context with a conservation annotation score, and groups of aligned sequences within the MSA can also have a conservation annotation score which passed to the renderer instead of the msa-context's conservation score. These effects can be combined: ie. one can have one annotation that modulates shading, and another that defines a threshold for display. 
+
+
 #### Tooltip Behavior
 
 The `tooltip` field references an annotation on the assembly by name. The renderer resolves content based on the hovered position:
@@ -473,7 +515,10 @@ Unknown types are passed through — renderers should ignore them or render a fa
 
 ### 4.7 Batch Expansion
 
-For MSA-scale data, assemblies can be expanded from a single source. Batch expansion describes how entries in a source map to assemblies — no templating, no string interpolation.
+For MSA-scale data, assemblies can be expanded from a single source. Batch expansion describes how entries in a source map to assemblies. Expansions currently are explicit - ie no expressions, conditionals or other parameterisations (aka templating) are allowed. Complex mappings are resolved prior serialization.
+
+Discussion:
+  - making the data composition of the MSA explit at serialization has advantages - e.g. conservation values that depend on the visible set of sequences are recalculated prior to display, and since the -star framework will also ensure efficient differential updates, transitions between different views of the same MSA will be handled smoothly. However, I'm slightly concerned that bloat will happen, since the serializing function will need to manage the superset of msa data to generate a series of transitions. The pathological case is - for instance, transitioning from an msa showing all sequences, to all even, then all odd sequences. 
 
 ```typescript
 builder.assemblies("msa-entries", {
@@ -510,7 +555,7 @@ msaSection.tracks("msa-entries", {
 })
 ```
 
-This area of the spec is less mature than other sections. The approach avoids the complexity of a template language — there are no expressions, no conditionals, no string interpolation. If more complex mapping is needed, it should happen in the builder layer before serialization.
+This area of the spec is less mature (not sure if you mean 'mature' ? perhaps less complex ?) than other sections. The approach avoids the complexity of a template language — there are no expressions, no conditionals, no string interpolation. If more complex mapping is needed, it should happen in the builder layer before serialization.
 
 ### 4.8 Custom Fields
 
@@ -552,26 +597,35 @@ interface SequenceEvent {
   selections: SequenceSelection[]      // one or more, potentially multi-polymer
 }
 
+Refinement: Suggest allowing multiple positions per reference, rather than having to repeat the context multiple times. Sometimes a reference may map to several sequence positions and vice-versa (DNA/Protein is one). 
+
+Clarification: I guess we leave it to the viewer to determine whether it is sensitive to the order of the list in selections: ?
+
 interface SequenceSelection {
   polymer: string
-  start: SequencePosition
-  end: SequencePosition                // same as start for single-residue
+  start: SequencePositions
+  end: SequencePositions                // same as start for single-residue
   identity?: PolymerIdentity
 }
 
-interface SequencePosition {
-  alignment_position?: number
-  sequence_position: number
+interface SequencePositions {
+  alignment_position?: number[]
+  sequence_position: number[]
   reference_positions?: ReferencePosition[]
 }
 
-interface ReferencePosition {
+
+
+interface ReferencePositions {
   system: string                       // "uniprot", "kabat", "imgt", "pdb-auth", etc.
-  position: number | string            // string for insertion codes like "27A"
+  position: number[] | string[]            // string for insertion codes like "27A"
 }
 ```
 
 A single-residue hover is one selection with `start === end`. A crosslink between VL and VH is two selections. Reference positions are explicit about which system they belong to — a Mol* viewer looks for `system: "uniprot"`, an antibody tool looks for `system: "kabat"`.
+
+Clarification: This suggests an event generator produces the reference position mapping ? Ie if a kabat or uniprot reference is missed, and only the minimum of polymer:position is given, is there an expectation that viewers can interpolate to coordinates they understand ? 
+Enhancement: It is important to preserve the semantics of *what* was interacted with - e.g. if a cross-link was interacted with then it should be referenced in the selection too - not least because there could be many cross links (each with different metadata), and a selection message involving a crosslink should be distinct from one that selects the two sites on VL and VH.
 
 Event kinds are viewer-defined — the spec does not enumerate them.
 
