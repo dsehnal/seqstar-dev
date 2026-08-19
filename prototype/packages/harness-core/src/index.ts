@@ -490,3 +490,12 @@ export interface HarnessCorePackageBoundary {
   readonly coordinates: import("@seq-star/seq-coords").SeqCoordsPackageBoundary;
   readonly packageName: "@seq-star/harness-core";
 }
+
+export type { ApplicationHarness, ApplicationHarnessHost, EventFabricOptions } from "./runtime.js";
+export {
+  createApplicationHarness,
+  createEventFabric,
+  createMessageSchemaRegistry,
+  createTranslatorRegistry,
+  installCoreMessageSchemas,
+} from "./runtime.js";
