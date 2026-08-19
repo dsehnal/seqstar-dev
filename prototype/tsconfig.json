@@ -1,0 +1,15 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/seq-core" },
+    { "path": "packages/seq-coords" },
+    { "path": "packages/seq-view-spec" },
+    { "path": "packages/seq-viewer" },
+    { "path": "packages/harness-core" },
+    { "path": "packages/harness-react" },
+    { "path": "packages/wrapper-seq-viewer" },
+    { "path": "packages/wrapper-nightingale" },
+    { "path": "packages/wrapper-molstar" },
+    { "path": "packages/integration-plugins" }
+  ]
+}

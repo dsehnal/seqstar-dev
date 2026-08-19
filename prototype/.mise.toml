@@ -1,0 +1,31 @@
+[tools]
+node = "26.7.0"
+pnpm = "11.22.0"
+
+[tasks.install]
+description = "Install workspace dependencies from the frozen lockfile"
+run = "pnpm install --frozen-lockfile"
+
+[tasks."install:browser"]
+description = "Install the Chromium browser pinned by @playwright/test"
+run = "pnpm run install:browser"
+
+[tasks.dev]
+description = "Start the prototype web application"
+run = "pnpm run dev"
+
+[tasks.check]
+description = "Run formatting, linting, and TypeScript project checks"
+run = "pnpm run check"
+
+[tasks.test]
+description = "Run unit and contract tests"
+run = "pnpm run test"
+
+[tasks.build]
+description = "Build library declarations and the prototype web application"
+run = "pnpm run build"
+
+[tasks."test:e2e"]
+description = "Run browser integration tests"
+run = "pnpm run test:e2e"

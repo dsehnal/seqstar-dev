@@ -1,0 +1,30 @@
+{
+  "name": "@seq-star/prototype-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": "26.7.0",
+    "pnpm": "11.22.0"
+  },
+  "scripts": {
+    "install:frozen": "pnpm install --frozen-lockfile",
+    "install:browser": "playwright install chromium",
+    "dev": "pnpm --filter @seq-star/prototype-web dev",
+    "check": "pnpm run check:biome && pnpm run check:types",
+    "check:biome": "biome check .",
+    "check:types": "tsc -b && tsc -p apps/web/tsconfig.app.json --noEmit && tsc -p apps/web/tsconfig.node.json --noEmit",
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc -b && pnpm --filter @seq-star/prototype-web build",
+    "test:e2e": "playwright test",
+    "test:e2e:smoke": "playwright test tests/e2e/smoke.spec.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.9",
+    "@playwright/test": "1.62.1",
+    "typescript": "6.0.3",
+    "vite": "8.2.1",
+    "vitest": "4.1.11"
+  }
+}
