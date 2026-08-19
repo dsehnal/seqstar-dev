@@ -10,33 +10,43 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as P01FeasibilityRouteImport } from './routes/p01-feasibility'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const P01FeasibilityRoute = P01FeasibilityRouteImport.update({
+  id: '/p01-feasibility',
+  path: '/p01-feasibility',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/p01-feasibility': typeof P01FeasibilityRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/p01-feasibility': typeof P01FeasibilityRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/p01-feasibility': typeof P01FeasibilityRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths: '/' | '/p01-feasibility'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to: '/' | '/p01-feasibility'
+  id: '__root__' | '/' | '/p01-feasibility'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  P01FeasibilityRoute: typeof P01FeasibilityRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +58,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/p01-feasibility': {
+      id: '/p01-feasibility'
+      path: '/p01-feasibility'
+      fullPath: '/p01-feasibility'
+      preLoaderRoute: typeof P01FeasibilityRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  P01FeasibilityRoute: P01FeasibilityRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

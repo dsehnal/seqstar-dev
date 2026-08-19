@@ -16,6 +16,7 @@
     "build": "tsc -b"
   },
   "dependencies": {
-    "@seq-star/harness-core": "workspace:*"
+    "@seq-star/harness-core": "workspace:*",
+    "molstar": "5.11.0"
   }
 }

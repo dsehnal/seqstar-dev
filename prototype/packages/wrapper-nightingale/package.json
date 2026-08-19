@@ -16,6 +16,9 @@
     "build": "tsc -b"
   },
   "dependencies": {
+    "@nightingale-elements/nightingale-linegraph-track": "workspace:*",
+    "@nightingale-elements/nightingale-sequence": "workspace:*",
+    "@nightingale-elements/nightingale-track": "workspace:*",
     "@seq-star/harness-core": "workspace:*"
   }
 }

@@ -1,0 +1,50 @@
+{
+  "parserPackage": "molstar@5.11.0",
+  "imports": [
+    "molstar/lib/mol-io/reader/cif.js",
+    "molstar/lib/mol-model-formats/structure/mmcif.js",
+    "molstar/lib/mol-model/structure.js"
+  ],
+  "checks": [
+    "CIF.parseText completed without error",
+    "trajectoryFromMmCIF produced a representative model",
+    "Structure.ofModel element locations supplied observed residues and coordinates",
+    "Mol* scheme/model identities agreed with SIFTS for every selected construct row"
+  ],
+  "pdbId": "1BRS",
+  "chains": [
+    {
+      "accession": "P00648",
+      "labelAsymId": "A",
+      "authAsymId": "A",
+      "schemeRows": 110,
+      "observedResidues": 108,
+      "mappingCounts": {
+        "exact": 108,
+        "missing_coordinate": 2,
+        "outside_construct": 47
+      }
+    },
+    {
+      "accession": "P11540",
+      "labelAsymId": "D",
+      "authAsymId": "D",
+      "schemeRows": 89,
+      "observedResidues": 87,
+      "mappingCounts": {
+        "exact": 85,
+        "exact_conflict": 2,
+        "missing_coordinate": 2,
+        "outside_construct": 1
+      }
+    }
+  ],
+  "contactRule": {
+    "model": 1,
+    "cutoffAngstromInclusive": 4.5,
+    "atomSelection": "non-hydrogen atoms; primary/unspecified alternate location",
+    "contactPairs": 43,
+    "barnaseInterfaceResidues": 19,
+    "barstarInterfaceResidues": 16
+  }
+}

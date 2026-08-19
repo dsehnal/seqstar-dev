@@ -9,7 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@seq-star/wrapper-molstar": "workspace:*",
+    "@seq-star/wrapper-nightingale": "workspace:*",
     "@tanstack/react-router": "catalog:",
+    "molstar": "5.11.0",
     "react": "catalog:",
     "react-dom": "catalog:"
   },

@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
   component: OverviewPage,
@@ -17,6 +17,12 @@ function OverviewPage() {
         The toolchain, package boundaries, and browser verification skeleton are in place. Domain
         behavior will arrive in reviewed implementation packets.
       </p>
+      <Link
+        className="mt-8 inline-flex rounded bg-sky-700 px-4 py-2 font-semibold text-white"
+        to="/p01-feasibility"
+      >
+        Open P01 feasibility probes
+      </Link>
     </main>
   );
 }

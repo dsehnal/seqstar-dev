@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "caseId": "complex",
+  "title": "Barnase–barstar complex from PDB 1BRS, chains A and D",
+  "status": "approved",
+  "retrievalDate": "2026-08-19",
+  "identifiers": {
+    "pdbId": "1BRS",
+    "pdbRevision": "1.4",
+    "pdbRevisionDate": "2024-02-07",
+    "siftsDate": "2026-08-17",
+    "barnase": {
+      "uniprotAccession": "P00648",
+      "entryVersion": 145,
+      "sequenceVersion": 2,
+      "labelAsymId": "A",
+      "authAsymId": "A",
+      "entityId": "1"
+    },
+    "barstar": {
+      "uniprotAccession": "P11540",
+      "entryVersion": 124,
+      "sequenceVersion": 3,
+      "labelAsymId": "D",
+      "authAsymId": "D",
+      "entityId": "2"
+    }
+  },
+  "sources": [
+    {
+      "name": "UniProtKB P00648",
+      "url": "https://rest.uniprot.org/uniprotkb/P00648.json",
+      "recordUrl": "https://www.uniprot.org/uniprotkb/P00648/entry",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://www.uniprot.org/help/license/"
+    },
+    {
+      "name": "UniProtKB P11540",
+      "url": "https://rest.uniprot.org/uniprotkb/P11540.json",
+      "recordUrl": "https://www.uniprot.org/uniprotkb/P11540/entry",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://www.uniprot.org/help/license/"
+    },
+    {
+      "name": "wwPDB 1BRS mmCIF",
+      "url": "https://files.rcsb.org/download/1BRS.cif",
+      "recordUrl": "https://www.rcsb.org/structure/1BRS",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://www.wwpdb.org/about/usage-policies"
+    },
+    {
+      "name": "PDBe SIFTS 1BRS residue mappings",
+      "url": "https://ftp.ebi.ac.uk/pub/databases/msd/sifts/xml/1brs.xml.gz",
+      "recordUrl": "https://www.ebi.ac.uk/pdbe/docs/sifts/quick.html",
+      "usageTerms": "The downloaded XML embeds its PDBe-UniProt copyright and licence notice; retain the raw record and cite SIFTS.",
+      "usageTermsUrl": "https://www.ebi.ac.uk/pdbe/docs/sifts/quick.html"
+    }
+  ],
+  "mappingAudit": {
+    "barnase": {
+      "precursorLength": 157,
+      "signalRangeInclusive": [1, 34],
+      "propeptideRangeInclusive": [35, 47],
+      "matureRangeInclusive": [48, 157],
+      "constructLength": 110,
+      "missingCoordinateUniProtPositions": [48, 49],
+      "residueConflicts": []
+    },
+    "barstar": {
+      "precursorLength": 90,
+      "removedInitiatorMethionine": 1,
+      "matureRangeInclusive": [2, 90],
+      "constructLength": 89,
+      "missingCoordinateUniProtPositions": [65, 66],
+      "verifiedConstructConflicts": [
+        {
+          "uniprotPosition": 41,
+          "uniprotResidue": "C",
+          "constructResidue": "A",
+          "mutation": "C41A"
+        },
+        {
+          "uniprotPosition": 83,
+          "uniprotResidue": "C",
+          "constructResidue": "A",
+          "mutation": "C83A"
+        }
+      ]
+    },
+    "contactRule": {
+      "status": "validated-and-frozen",
+      "model": 1,
+      "chains": ["A", "D"],
+      "atomSelection": "all non-hydrogen atoms in polymer residues; primary/unspecified alternate location only",
+      "cutoffAngstromInclusive": 4.5,
+      "pairIdentity": "ordered barnase label_seq_id then barstar label_seq_id",
+      "distance": "minimum Euclidean atom-pair distance",
+      "molstarValidation": {
+        "package": "molstar@5.11.0",
+        "contactPairs": 43,
+        "barnaseInterfaceResidues": 19,
+        "barstarInterfaceResidues": 16,
+        "result": "Frozen in mappings/1BRS-chain-A-D-heavy-atom-contacts.tsv."
+      }
+    }
+  },
+  "transformations": [
+    {
+      "id": "synthetic-confidence",
+      "classification": "synthetic",
+      "description": "For mature position i, score = 70 + ((i * 37 + seed) mod 31), with seed 11 for barnase and 23 for barstar. Scores are a deterministic UI probe and are not experimental or predicted confidence."
+    },
+    {
+      "id": "structure-mappings-and-contacts",
+      "classification": "transformed-real",
+      "description": "Pinned Mol* 5.11.0 parsed the scheme/model identities and atomic coordinates. Mapping rows were cross-checked with SIFTS; contacts use the declared 4.5 Å minimum-heavy-atom rule."
+    }
+  ],
+  "files": [
+    {
+      "path": "input/P00648.uniprot.json.raw",
+      "bytes": 27172,
+      "sha256": "e8f6caa2fd2243093d872092e38ee5b20f553c1c54e764c651130525cd78f884",
+      "classification": "real"
+    },
+    {
+      "path": "input/P00648.fasta",
+      "bytes": 243,
+      "sha256": "b8a48138cca5ec616e6f77880334b2983769056b883f72d54eefd410b1dc9d25",
+      "classification": "real"
+    },
+    {
+      "path": "input/P11540.uniprot.json.raw",
+      "bytes": 14001,
+      "sha256": "ec3f489c6ef536d3842d79fccb41cc62549d16ada5744c1ce9eef6bb85873f08",
+      "classification": "real"
+    },
+    {
+      "path": "input/P11540.fasta",
+      "bytes": 170,
+      "sha256": "ac9d13528a829b3cf1e6c3005052fa1ddebdddc7b9749cad1fb0f7179c87d6d4",
+      "classification": "real"
+    },
+    {
+      "path": "input/1BRS.cif",
+      "bytes": 553617,
+      "sha256": "1c98dcc3eac7ccb88657e3ab0f745121d7ddbd2fe11357c65dbaffdd5704f153",
+      "classification": "real"
+    },
+    {
+      "path": "input/1BRS.sifts.xml.gz",
+      "bytes": 33556,
+      "sha256": "4a778626a955ae2d2cf87d4dcb703196a3bbc6c57b4383482d9a6ed6b8c571f0",
+      "classification": "real"
+    },
+    {
+      "path": "expected/synthetic-confidence.tsv",
+      "bytes": 6922,
+      "sha256": "9e488976d82b6690e17d47458623834844e137540d6386f77a651a8afb058c31",
+      "classification": "synthetic"
+    },
+    {
+      "path": "mappings/P00648-1BRS-chain-A.tsv",
+      "bytes": 8821,
+      "sha256": "923afca08a5c7078e42197530159b639601d6ae2994556369e9d76f222f1cfc9",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "mappings/P11540-1BRS-chain-D.tsv",
+      "bytes": 5073,
+      "sha256": "78d51a3e7643e060b73357bba1596cbe16b1c19b854e146c602f5a6cb2fe2c0c",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "mappings/1BRS-chain-A-D-heavy-atom-contacts.tsv",
+      "bytes": 3882,
+      "sha256": "7eb55dcf17146ed3c3f6c4562681adf9f08288e4e58582f44b897bca432a3e29",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "expected/molstar-mapping-audit.json",
+      "bytes": 1346,
+      "sha256": "cbe864fe1c1f71f37226016abc821022bd2a665021d43962b4619e06577c9a99",
+      "classification": "verification"
+    }
+  ],
+  "sizeBudget": {
+    "checkedInBytes": 654803,
+    "browserInputBudgetBytes": 1048576,
+    "withinBudget": true
+  },
+  "syntheticData": {
+    "present": true,
+    "files": ["expected/synthetic-confidence.tsv"],
+    "requiredDisplayLabel": "Synthetic confidence — deterministic prototype values, not a biological prediction"
+  }
+}

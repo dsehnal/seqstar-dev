@@ -29,3 +29,15 @@ run = "pnpm run build"
 [tasks."test:e2e"]
 description = "Run browser integration tests"
 run = "pnpm run test:e2e"
+
+[tasks."check:fixtures"]
+description = "Verify the offline P01 fixture manifest, hashes, mappings, and labels"
+run = "pnpm run check:fixtures"
+
+[tasks."check:dependencies"]
+description = "Verify the P01 local Nightingale and single-Mol* dependency graph"
+run = "pnpm run check:dependencies"
+
+[tasks."test:e2e:p01"]
+description = "Run the offline P01 Nightingale and Mol* browser feasibility proof"
+run = "pnpm run test:e2e:p01"

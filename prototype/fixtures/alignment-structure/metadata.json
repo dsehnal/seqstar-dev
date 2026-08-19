@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "caseId": "alignment-structure",
+  "title": "PF00042 globin alignment with P69905 and PDB 1A3N chain A",
+  "status": "approved",
+  "retrievalDate": "2026-08-19",
+  "selectionDecision": {
+    "rejectedCandidate": "AlphaFold DB P69905 A3M",
+    "reason": "No stable, versioned AlphaFold DB endpoint exposing a P69905 MSA was available for deterministic redistribution. The implementation-plan-mandated PF00042 fallback was therefore used explicitly.",
+    "selectedCandidate": "InterPro 109.0 downloadable PF00042.29 full alignment, CC0 1.0"
+  },
+  "identifiers": {
+    "uniprotAccession": "P69905",
+    "uniprotEntryVersion": 218,
+    "uniprotSequenceVersion": 2,
+    "pfamAccessionVersion": "PF00042.29",
+    "interproRelease": "109.0",
+    "sourceAlignmentRows": 20705,
+    "selectedRows": 32,
+    "selectedQueryRow": "HBA_HUMAN/27-137",
+    "selectedQueryAccessionVersion": "P69905.2",
+    "normalizedColumns": 118,
+    "pdbId": "1A3N",
+    "pdbRevision": "1.4",
+    "pdbRevisionDate": "2026-08-12",
+    "selectedLabelAsymId": "A",
+    "selectedAuthAsymId": "A",
+    "selectedEntityId": "1"
+  },
+  "sources": [
+    {
+      "name": "UniProtKB P69905",
+      "url": "https://rest.uniprot.org/uniprotkb/P69905.json",
+      "recordUrl": "https://www.uniprot.org/uniprotkb/P69905/entry",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://www.uniprot.org/help/license/"
+    },
+    {
+      "name": "InterPro/Pfam PF00042 full alignment",
+      "url": "https://www.ebi.ac.uk/interpro/api/entry/pfam/PF00042/?annotation=alignment:full&download",
+      "recordUrl": "https://www.ebi.ac.uk/interpro/entry/pfam/PF00042/entry_alignments",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://www.ebi.ac.uk/interpro/about/license/",
+      "downloadSha256": "07378700d0e3c8ea7ab80348bf09b4750d712cd925ed6fd487ce901628cd97e3"
+    },
+    {
+      "name": "wwPDB 1A3N mmCIF",
+      "url": "https://files.rcsb.org/download/1A3N.cif",
+      "recordUrl": "https://www.rcsb.org/structure/1A3N",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://www.wwpdb.org/about/usage-policies"
+    },
+    {
+      "name": "PDBe SIFTS 1A3N residue mappings",
+      "url": "https://ftp.ebi.ac.uk/pub/databases/msd/sifts/xml/1a3n.xml.gz",
+      "recordUrl": "https://www.ebi.ac.uk/pdbe/docs/sifts/quick.html",
+      "usageTerms": "The downloaded XML embeds its PDBe-UniProt copyright and licence notice; retain the raw record and cite SIFTS.",
+      "usageTermsUrl": "https://www.ebi.ac.uk/pdbe/docs/sifts/quick.html"
+    }
+  ],
+  "transformations": [
+    {
+      "id": "deterministic-32-row-selection",
+      "classification": "transformed-real",
+      "description": "Keep HBA_HUMAN/27-137 first. For all other PF00042.29 rows with a UniProt accession, compute a query-centric normalization, require at least 70% non-gap coverage, deduplicate primary accession and normalized sequence, sort by source row ID, and select 31 rows at rounded evenly spaced ranks from 0 through N-1."
+    },
+    {
+      "id": "query-centric-normalization",
+      "classification": "transformed-real",
+      "description": "Pfam full alignment dots are insert-state padding. Retain every source column where the P69905 query is not a dot, uppercase residue letters, and serialize dot/hyphen gaps as '-'. The ungapped query is exactly UniProt P69905 positions 27–137."
+    }
+  ],
+  "alignmentAudit": {
+    "rows": 32,
+    "columns": 118,
+    "queryResidues": 111,
+    "queryGapColumns": 7,
+    "queryUniProtRangeInclusive": [27, 137],
+    "structureChainUniProtRangeInclusive": [2, 142],
+    "structureOutsideAlignmentRangesInclusive": [[2, 26], [138, 142]],
+    "initiatorMethionineUnmappedToStructure": 1,
+    "molstarValidation": {
+      "package": "molstar@5.11.0",
+      "schemeRows": 141,
+      "observedResidues": 141,
+      "result": "P69905 positions 2–142 map exactly to observed 1A3N chain A label/auth residues 1–141; the query-column and sequence/structure tables are frozen."
+    }
+  },
+  "files": [
+    {
+      "path": "input/P69905.uniprot.json.raw",
+      "bytes": 269400,
+      "sha256": "a9de50570a2c69e3b5593c82e290c31403682bcdecb19ba04e5632ac8771601a",
+      "classification": "real"
+    },
+    {
+      "path": "input/P69905.fasta",
+      "bytes": 233,
+      "sha256": "aecc3cb75f840f242f6b4489d501384d0c50cf0d61a8dab5a1dab81a80aa4bae",
+      "classification": "real"
+    },
+    {
+      "path": "input/PF00042.29-32rows.source.sto",
+      "bytes": 25467,
+      "sha256": "6ad12ec174fd84af4a5182948085d61da3cbf1e00c2d370f488333de14696a01",
+      "classification": "transformed-real-source-extract"
+    },
+    {
+      "path": "mappings/PF00042.29-32rows.selection.tsv",
+      "bytes": 2509,
+      "sha256": "191ac79ddd491e516a7994b2933679d972fedcb84dda33f3cc1880c36bff45cc",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "expected/PF00042.29-32rows.query-centric.afa",
+      "bytes": 5554,
+      "sha256": "df9d6c9cb89012620d8dd335ca70d0048704abc59239127af12c9a359af9f8e7",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "input/1A3N.cif",
+      "bytes": 560920,
+      "sha256": "7cd2eb16d3469a3ef32864f33ee2ca09258b1b1fff2c1c83214b9af3087f93dd",
+      "classification": "real"
+    },
+    {
+      "path": "input/1A3N.sifts.xml.gz",
+      "bytes": 57030,
+      "sha256": "b79da8d74c4ab218647e20643d5c9bbf9795ad319ce950ac89bd9a0716d76e7f",
+      "classification": "real"
+    },
+    {
+      "path": "mappings/P69905-1A3N-chain-A.tsv",
+      "bytes": 8048,
+      "sha256": "535233812d4661d5c88c13ad97b816013f2f021a44738c2d0ecb3f69c4969d2c",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "mappings/P69905-PF00042-1A3N-chain-A.tsv",
+      "bytes": 5501,
+      "sha256": "b16d450e42370f16e1e5166c8b3b65cb46c92a2ce24df9ee5ba667324468df50",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "expected/molstar-mapping-audit.json",
+      "bytes": 827,
+      "sha256": "8d3271247ef9665c6663137bfa4454ecea7f9bdf9c35bbda49d78d1188799847",
+      "classification": "verification"
+    }
+  ],
+  "sizeBudget": {
+    "checkedInBytes": 935489,
+    "browserInputBudgetBytes": 1048576,
+    "withinBudget": true
+  },
+  "syntheticData": false
+}

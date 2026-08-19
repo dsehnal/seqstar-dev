@@ -1,0 +1,24 @@
+{
+  "parserPackage": "molstar@5.11.0",
+  "imports": [
+    "molstar/lib/mol-io/reader/cif.js",
+    "molstar/lib/mol-model-formats/structure/mmcif.js",
+    "molstar/lib/mol-model/structure.js"
+  ],
+  "checks": [
+    "CIF.parseText completed without error",
+    "trajectoryFromMmCIF produced a representative model",
+    "Structure.ofModel element locations supplied observed residues and coordinates",
+    "Mol* scheme/model identities agreed with SIFTS for every selected construct row"
+  ],
+  "pdbId": "1TUP",
+  "labelAsymId": "C",
+  "authAsymId": "A",
+  "schemeRows": 219,
+  "observedResidues": 196,
+  "mappingCounts": {
+    "exact": 196,
+    "missing_coordinate": 23,
+    "outside_construct": 174
+  }
+}

@@ -1,0 +1,235 @@
+{
+  "schemaVersion": 1,
+  "packId": "seq-star-p01c-fixtures-2026-08-19",
+  "status": "approved",
+  "retrievalDate": "2026-08-19",
+  "structureParserValidation": {
+    "package": "molstar@5.11.0",
+    "allSelectedSchemeAndObservedRowsMatchedSifts": true,
+    "repositoryOwnedMmcifParser": false
+  },
+  "cases": [
+    {
+      "caseId": "renderer-portability",
+      "status": "approved",
+      "metadataSha256": "2a5f3eadc17e483b6b49cb4111453ee782214a8c8631a054915a996870dd7cc7",
+      "metadataBytes": 2876,
+      "contentBytes": 881035,
+      "files": [
+        {
+          "path": "renderer-portability/input/P04637.uniprot.json.raw",
+          "bytes": 869335,
+          "sha256": "452b62f11172605b76fc7a8edb9b617fbdff7e52693d04520a3d70d2ccc16839",
+          "classification": "real"
+        },
+        {
+          "path": "renderer-portability/input/P04637.fasta",
+          "bytes": 490,
+          "sha256": "59aace7211b64e5918ef6547fc48d6419a134fa91f158415d598d3416882f063",
+          "classification": "real"
+        },
+        {
+          "path": "renderer-portability/expected/feature-inventory.json",
+          "bytes": 745,
+          "sha256": "7331a610cdc29d2d4fa8a973393205dabab8e5aa7ef5e8e60c0d8539d3e10df8",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "renderer-portability/expected/variant-density.tsv",
+          "bytes": 10465,
+          "sha256": "85ee5dfa7998af71d7d722f3a7ea6efe50a06fac3aff5780e0558387ecc24cd4",
+          "classification": "transformed-real"
+        }
+      ]
+    },
+    {
+      "caseId": "uniprot-structure",
+      "status": "approved",
+      "metadataSha256": "fe723867f0436cc46c2c76e859fe4182c3589c5e07519a88a489550b70c3aa7b",
+      "metadataBytes": 3792,
+      "contentBytes": 1671509,
+      "files": [
+        {
+          "path": "uniprot-structure/input/P04637.uniprot.json.raw",
+          "bytes": 869335,
+          "sha256": "452b62f11172605b76fc7a8edb9b617fbdff7e52693d04520a3d70d2ccc16839",
+          "classification": "real"
+        },
+        {
+          "path": "uniprot-structure/input/P04637.fasta",
+          "bytes": 490,
+          "sha256": "59aace7211b64e5918ef6547fc48d6419a134fa91f158415d598d3416882f063",
+          "classification": "real"
+        },
+        {
+          "path": "uniprot-structure/input/1TUP.cif",
+          "bytes": 698225,
+          "sha256": "cbc6ebdae1444998cf55744339e1a500d8822ac0761841d1eed96f5e8b59cb37",
+          "classification": "real"
+        },
+        {
+          "path": "uniprot-structure/input/1TUP.sifts.xml.gz",
+          "bytes": 79959,
+          "sha256": "d7170a4eadffba90adce8f48ba729f1c886db0ea6cfe09982cf02453b2094425",
+          "classification": "real"
+        },
+        {
+          "path": "uniprot-structure/mappings/P04637-1TUP-chain-A.tsv",
+          "bytes": 22795,
+          "sha256": "651b6be3a851ab71d68106b74fafe43c2e69a2771edf1debf7e08c7adffe27a2",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "uniprot-structure/expected/molstar-mapping-audit.json",
+          "bytes": 705,
+          "sha256": "8bb686d1c53dd4a9d80c253cbdc0637088c5bceb4a5c7a86b17893886935691f",
+          "classification": "verification"
+        }
+      ]
+    },
+    {
+      "caseId": "complex",
+      "status": "approved",
+      "metadataSha256": "13c624912b4fd9b0791ee4742354388b64eed7579298e65a8d22f9f484b664bd",
+      "metadataBytes": 6644,
+      "contentBytes": 654803,
+      "files": [
+        {
+          "path": "complex/input/P00648.uniprot.json.raw",
+          "bytes": 27172,
+          "sha256": "e8f6caa2fd2243093d872092e38ee5b20f553c1c54e764c651130525cd78f884",
+          "classification": "real"
+        },
+        {
+          "path": "complex/input/P00648.fasta",
+          "bytes": 243,
+          "sha256": "b8a48138cca5ec616e6f77880334b2983769056b883f72d54eefd410b1dc9d25",
+          "classification": "real"
+        },
+        {
+          "path": "complex/input/P11540.uniprot.json.raw",
+          "bytes": 14001,
+          "sha256": "ec3f489c6ef536d3842d79fccb41cc62549d16ada5744c1ce9eef6bb85873f08",
+          "classification": "real"
+        },
+        {
+          "path": "complex/input/P11540.fasta",
+          "bytes": 170,
+          "sha256": "ac9d13528a829b3cf1e6c3005052fa1ddebdddc7b9749cad1fb0f7179c87d6d4",
+          "classification": "real"
+        },
+        {
+          "path": "complex/input/1BRS.cif",
+          "bytes": 553617,
+          "sha256": "1c98dcc3eac7ccb88657e3ab0f745121d7ddbd2fe11357c65dbaffdd5704f153",
+          "classification": "real"
+        },
+        {
+          "path": "complex/input/1BRS.sifts.xml.gz",
+          "bytes": 33556,
+          "sha256": "4a778626a955ae2d2cf87d4dcb703196a3bbc6c57b4383482d9a6ed6b8c571f0",
+          "classification": "real"
+        },
+        {
+          "path": "complex/expected/synthetic-confidence.tsv",
+          "bytes": 6922,
+          "sha256": "9e488976d82b6690e17d47458623834844e137540d6386f77a651a8afb058c31",
+          "classification": "synthetic"
+        },
+        {
+          "path": "complex/mappings/P00648-1BRS-chain-A.tsv",
+          "bytes": 8821,
+          "sha256": "923afca08a5c7078e42197530159b639601d6ae2994556369e9d76f222f1cfc9",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "complex/mappings/P11540-1BRS-chain-D.tsv",
+          "bytes": 5073,
+          "sha256": "78d51a3e7643e060b73357bba1596cbe16b1c19b854e146c602f5a6cb2fe2c0c",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "complex/mappings/1BRS-chain-A-D-heavy-atom-contacts.tsv",
+          "bytes": 3882,
+          "sha256": "7eb55dcf17146ed3c3f6c4562681adf9f08288e4e58582f44b897bca432a3e29",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "complex/expected/molstar-mapping-audit.json",
+          "bytes": 1346,
+          "sha256": "cbe864fe1c1f71f37226016abc821022bd2a665021d43962b4619e06577c9a99",
+          "classification": "verification"
+        }
+      ]
+    },
+    {
+      "caseId": "alignment-structure",
+      "status": "approved",
+      "metadataSha256": "5c1b3af6048c7777fa1c579b187e6bf92e45ccb20ae4c035f990ac8b9bd10291",
+      "metadataBytes": 6222,
+      "contentBytes": 935489,
+      "files": [
+        {
+          "path": "alignment-structure/input/P69905.uniprot.json.raw",
+          "bytes": 269400,
+          "sha256": "a9de50570a2c69e3b5593c82e290c31403682bcdecb19ba04e5632ac8771601a",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/P69905.fasta",
+          "bytes": 233,
+          "sha256": "aecc3cb75f840f242f6b4489d501384d0c50cf0d61a8dab5a1dab81a80aa4bae",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/PF00042.29-32rows.source.sto",
+          "bytes": 25467,
+          "sha256": "6ad12ec174fd84af4a5182948085d61da3cbf1e00c2d370f488333de14696a01",
+          "classification": "transformed-real-source-extract"
+        },
+        {
+          "path": "alignment-structure/mappings/PF00042.29-32rows.selection.tsv",
+          "bytes": 2509,
+          "sha256": "191ac79ddd491e516a7994b2933679d972fedcb84dda33f3cc1880c36bff45cc",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/expected/PF00042.29-32rows.query-centric.afa",
+          "bytes": 5554,
+          "sha256": "df9d6c9cb89012620d8dd335ca70d0048704abc59239127af12c9a359af9f8e7",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/input/1A3N.cif",
+          "bytes": 560920,
+          "sha256": "7cd2eb16d3469a3ef32864f33ee2ca09258b1b1fff2c1c83214b9af3087f93dd",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/1A3N.sifts.xml.gz",
+          "bytes": 57030,
+          "sha256": "b79da8d74c4ab218647e20643d5c9bbf9795ad319ce950ac89bd9a0716d76e7f",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/mappings/P69905-1A3N-chain-A.tsv",
+          "bytes": 8048,
+          "sha256": "535233812d4661d5c88c13ad97b816013f2f021a44738c2d0ecb3f69c4969d2c",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/mappings/P69905-PF00042-1A3N-chain-A.tsv",
+          "bytes": 5501,
+          "sha256": "b16d450e42370f16e1e5166c8b3b65cb46c92a2ce24df9ee5ba667324468df50",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/expected/molstar-mapping-audit.json",
+          "bytes": 827,
+          "sha256": "8d3271247ef9665c6663137bfa4454ecea7f9bdf9c35bbda49d78d1188799847",
+          "classification": "verification"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,92 @@
+{
+  "schemaVersion": 1,
+  "caseId": "renderer-portability",
+  "title": "Renderer portability — UniProt TP53 P04637",
+  "status": "approved",
+  "retrievalDate": "2026-08-19",
+  "identifiers": {
+    "uniprotAccession": "P04637",
+    "uniprotEntryVersion": 314,
+    "uniprotSequenceVersion": 4,
+    "sequenceLength": 393
+  },
+  "sources": [
+    {
+      "name": "UniProtKB P04637",
+      "url": "https://rest.uniprot.org/uniprotkb/P04637.json",
+      "recordUrl": "https://www.uniprot.org/uniprotkb/P04637/entry",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://www.uniprot.org/help/license/",
+      "lastAnnotationUpdateDate": "2026-06-10",
+      "lastSequenceUpdateDate": "2009-11-24"
+    }
+  ],
+  "transformations": [
+    {
+      "id": "feature-inventory",
+      "classification": "transformed-real",
+      "description": "Count UniProt feature records by their declared feature type; do not merge, repair, or reinterpret locations."
+    },
+    {
+      "id": "variant-density",
+      "classification": "transformed-real",
+      "description": "For each 1-based P04637 residue, count Natural variant feature records whose inclusive UniProt location covers that residue. No missing value is imputed."
+    }
+  ],
+  "feasibility": {
+    "sequenceLength": 393,
+    "zoomRequired": true,
+    "overlappingRangeCandidates": ["Region", "Compositional bias", "Motif"],
+    "categoricalResidueCandidates": ["Modified residue", "Binding site", "Site"],
+    "numericPerResidueCandidate": "expected/variant-density.tsv",
+    "featureCounts": {
+      "Natural variant": 1363,
+      "Mutagenesis": 38,
+      "Modified residue": 30,
+      "Helix": 21,
+      "Region": 20,
+      "Beta strand": 17,
+      "Turn": 7,
+      "Cross-link": 6,
+      "Alternative sequence": 6,
+      "Motif": 5,
+      "Binding site": 4,
+      "Compositional bias": 3,
+      "Chain": 1,
+      "DNA binding": 1,
+      "Site": 1
+    }
+  },
+  "files": [
+    {
+      "path": "input/P04637.uniprot.json.raw",
+      "bytes": 869335,
+      "sha256": "452b62f11172605b76fc7a8edb9b617fbdff7e52693d04520a3d70d2ccc16839",
+      "classification": "real"
+    },
+    {
+      "path": "input/P04637.fasta",
+      "bytes": 490,
+      "sha256": "59aace7211b64e5918ef6547fc48d6419a134fa91f158415d598d3416882f063",
+      "classification": "real"
+    },
+    {
+      "path": "expected/feature-inventory.json",
+      "bytes": 745,
+      "sha256": "7331a610cdc29d2d4fa8a973393205dabab8e5aa7ef5e8e60c0d8539d3e10df8",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "expected/variant-density.tsv",
+      "bytes": 10465,
+      "sha256": "85ee5dfa7998af71d7d722f3a7ea6efe50a06fac3aff5780e0558387ecc24cd4",
+      "classification": "transformed-real"
+    }
+  ],
+  "sizeBudget": {
+    "checkedInBytes": 881035,
+    "browserInitialInputBudgetBytes": 1048576,
+    "withinBudget": true
+  },
+  "syntheticData": false
+}
