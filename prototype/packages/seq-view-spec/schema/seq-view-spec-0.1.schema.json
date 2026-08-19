@@ -1,0 +1,3378 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "required": ["kind", "version", "id", "sequences", "views"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "const": "seq-view-spec"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)\\.(?:0|[1-9][0-9]*)$"
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "links": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["label", "href"],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "href": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "sequences": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "coordinateSpace", "alphabet", "residues"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+          },
+          "coordinateSpace": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+          },
+          "alphabet": {
+            "anyOf": [
+              {
+                "type": "string",
+                "const": "protein"
+              },
+              {
+                "type": "string",
+                "const": "dna"
+              },
+              {
+                "type": "string",
+                "const": "rna"
+              },
+              {
+                "type": "string",
+                "const": "custom"
+              }
+            ]
+          },
+          "residues": {
+            "type": "string",
+            "minLength": 1
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["label", "href"],
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "href": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "identifiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["namespace", "value"],
+              "properties": {
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "required": ["label"],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "uri": {
+                "type": "string"
+              },
+              "citation": {
+                "type": "string"
+              },
+              "generatedBy": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "extensions": {
+            "type": "object",
+            "patternProperties": {
+              "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                "$defs": {
+                  "value": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                },
+                "$ref": "#/$defs/JsonValue"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "assemblies": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "members"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "sequence"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                },
+                "sequence": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                },
+                "role": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["label", "href"],
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "href": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "identifiers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["namespace", "value"],
+              "properties": {
+                "namespace": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "value": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "version": {
+                  "type": "string"
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "provenance": {
+            "type": "object",
+            "required": ["label"],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "uri": {
+                "type": "string"
+              },
+              "citation": {
+                "type": "string"
+              },
+              "generatedBy": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "extensions": {
+            "type": "object",
+            "patternProperties": {
+              "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                "$defs": {
+                  "value": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                },
+                "$ref": "#/$defs/JsonValue"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "alignments": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "coordinateSpace", "length", "members"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+          },
+          "coordinateSpace": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+          },
+          "length": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "members": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "sequence", "positions"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                },
+                "sequence": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                },
+                "positions": {
+                  "type": "array",
+                  "items": {
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 0
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "metadata": {
+                  "type": "object",
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "tags": {
+                      "type": "array",
+                      "items": {
+                        "type": "string"
+                      }
+                    },
+                    "links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["label", "href"],
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["label", "href"],
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "href": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "provenance": {
+            "type": "object",
+            "required": ["label"],
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "uri": {
+                "type": "string"
+              },
+              "citation": {
+                "type": "string"
+              },
+              "generatedBy": {
+                "type": "string"
+              }
+            },
+            "additionalProperties": false
+          },
+          "extensions": {
+            "type": "object",
+            "patternProperties": {
+              "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                "$defs": {
+                  "value": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                },
+                "$ref": "#/$defs/JsonValue"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "annotations": {
+      "type": "array",
+      "items": {
+        "anyOf": [
+          {
+            "type": "object",
+            "required": ["id", "semanticType", "kind", "items"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+              },
+              "semanticType": {
+                "type": "string",
+                "minLength": 1
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["label", "href"],
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "href": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "provenance": {
+                "type": "object",
+                "required": ["label"],
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "uri": {
+                    "type": "string"
+                  },
+                  "citation": {
+                    "type": "string"
+                  },
+                  "generatedBy": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "patternProperties": {
+                  "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                    "$defs": {
+                      "value": {
+                        "$ref": "#/$defs/JsonValue"
+                      }
+                    },
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "loci"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "loci"],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                    },
+                    "loci": {
+                      "type": "array",
+                      "items": {
+                        "anyOf": [
+                          {
+                            "type": "object",
+                            "required": ["kind", "space", "position"],
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "point"
+                              },
+                              "space": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                              },
+                              "position": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "required": ["kind", "space", "start", "end"],
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "interval"
+                              },
+                              "space": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                              },
+                              "start": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "end": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "additionalProperties": false
+                          },
+                          {
+                            "type": "object",
+                            "required": ["kind", "space", "position"],
+                            "properties": {
+                              "kind": {
+                                "type": "string",
+                                "const": "boundary"
+                              },
+                              "space": {
+                                "type": "string",
+                                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                              },
+                              "position": {
+                                "type": "integer",
+                                "minimum": 0
+                              }
+                            },
+                            "additionalProperties": false
+                          }
+                        ]
+                      },
+                      "minItems": 1
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.*$": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "links": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["label", "href"],
+                        "properties": {
+                          "label": {
+                            "type": "string"
+                          },
+                          "href": {
+                            "type": "string"
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["id", "semanticType", "kind", "space", "valueType", "values"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+              },
+              "semanticType": {
+                "type": "string",
+                "minLength": 1
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["label", "href"],
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "href": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "provenance": {
+                "type": "object",
+                "required": ["label"],
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "uri": {
+                    "type": "string"
+                  },
+                  "citation": {
+                    "type": "string"
+                  },
+                  "generatedBy": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "patternProperties": {
+                  "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                    "$defs": {
+                      "value": {
+                        "$ref": "#/$defs/JsonValue"
+                      }
+                    },
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "values"
+              },
+              "space": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+              },
+              "valueType": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "number"
+                  },
+                  {
+                    "type": "string",
+                    "const": "category"
+                  },
+                  {
+                    "type": "string",
+                    "const": "boolean"
+                  }
+                ]
+              },
+              "values": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "required": ["encoding", "data"],
+                    "properties": {
+                      "encoding": {
+                        "type": "string",
+                        "const": "dense"
+                      },
+                      "data": {
+                        "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "object",
+                    "required": ["encoding", "data"],
+                    "properties": {
+                      "encoding": {
+                        "type": "string",
+                        "const": "sparse"
+                      },
+                      "data": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "required": ["position", "value"],
+                          "properties": {
+                            "position": {
+                              "type": "integer",
+                              "minimum": 0
+                            },
+                            "value": {
+                              "anyOf": [
+                                {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "number"
+                                    },
+                                    {
+                                      "type": "boolean"
+                                    }
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  }
+                ]
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": ["id", "semanticType", "kind", "items"],
+            "properties": {
+              "id": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+              },
+              "semanticType": {
+                "type": "string",
+                "minLength": 1
+              },
+              "metadata": {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "tags": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "links": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": ["label", "href"],
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "href": {
+                          "type": "string"
+                        }
+                      },
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "provenance": {
+                "type": "object",
+                "required": ["label"],
+                "properties": {
+                  "label": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "uri": {
+                    "type": "string"
+                  },
+                  "citation": {
+                    "type": "string"
+                  },
+                  "generatedBy": {
+                    "type": "string"
+                  }
+                },
+                "additionalProperties": false
+              },
+              "extensions": {
+                "type": "object",
+                "patternProperties": {
+                  "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                    "$defs": {
+                      "value": {
+                        "$ref": "#/$defs/JsonValue"
+                      }
+                    },
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                }
+              },
+              "kind": {
+                "type": "string",
+                "const": "relationships"
+              },
+              "directed": {
+                "type": "boolean"
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "endpoints"],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                    },
+                    "endpoints": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "required": ["role", "loci"],
+                        "properties": {
+                          "role": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "loci": {
+                            "type": "array",
+                            "items": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "required": ["kind", "space", "position"],
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "point"
+                                    },
+                                    "space": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                    },
+                                    "position": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "required": ["kind", "space", "start", "end"],
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "interval"
+                                    },
+                                    "space": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                    },
+                                    "start": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    },
+                                    "end": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "object",
+                                  "required": ["kind", "space", "position"],
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "boundary"
+                                    },
+                                    "space": {
+                                      "type": "string",
+                                      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                    },
+                                    "position": {
+                                      "type": "integer",
+                                      "minimum": 0
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              ]
+                            },
+                            "minItems": 1
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      "minItems": 2
+                    },
+                    "label": {
+                      "type": "string"
+                    },
+                    "description": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "number"
+                        },
+                        {
+                          "type": "boolean"
+                        }
+                      ]
+                    },
+                    "properties": {
+                      "type": "object",
+                      "patternProperties": {
+                        "^.*$": {
+                          "anyOf": [
+                            {
+                              "anyOf": [
+                                {
+                                  "type": "string"
+                                },
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "boolean"
+                                }
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 1
+              }
+            },
+            "additionalProperties": false
+          }
+        ]
+      }
+    },
+    "views": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "axis", "sections"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+          },
+          "context": {
+            "type": "object",
+            "properties": {
+              "assembly": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+              },
+              "alignment": {
+                "type": "string",
+                "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+              }
+            },
+            "additionalProperties": false
+          },
+          "axis": {
+            "type": "object",
+            "required": ["segments"],
+            "properties": {
+              "segments": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["id", "space", "start", "end"],
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                    },
+                    "space": {
+                      "type": "string",
+                      "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                    },
+                    "start": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "end": {
+                      "type": "integer",
+                      "minimum": 0
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "minItems": 1
+              },
+              "gap": {
+                "type": "number"
+              },
+              "ruler": {
+                "type": "object",
+                "properties": {
+                  "visible": {
+                    "type": "boolean"
+                  },
+                  "numbering": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "const": "zero-based"
+                      },
+                      {
+                        "type": "string",
+                        "const": "one-based"
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "sections": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "tracks"],
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                },
+                "tracks": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["id", "layers"],
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                      },
+                      "layers": {
+                        "type": "array",
+                        "items": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "required": ["id", "representation", "sequence"],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "opacity": {
+                                  "type": "number"
+                                },
+                                "tooltip": {
+                                  "type": "object",
+                                  "required": ["fields"],
+                                  "properties": {
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "extensions": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                                      "$defs": {
+                                        "value": {
+                                          "$ref": "#/$defs/JsonValue"
+                                        }
+                                      },
+                                      "$ref": "#/$defs/JsonValue"
+                                    }
+                                  }
+                                },
+                                "representation": {
+                                  "type": "string",
+                                  "const": "sequence"
+                                },
+                                "sequence": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "showLetters": {
+                                  "type": "boolean"
+                                },
+                                "color": {
+                                  "type": "object",
+                                  "required": ["kind", "color"],
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "fixed"
+                                    },
+                                    "color": {
+                                      "type": "string",
+                                      "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "required": ["id", "representation", "alignment"],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "opacity": {
+                                  "type": "number"
+                                },
+                                "tooltip": {
+                                  "type": "object",
+                                  "required": ["fields"],
+                                  "properties": {
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "extensions": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                                      "$defs": {
+                                        "value": {
+                                          "$ref": "#/$defs/JsonValue"
+                                        }
+                                      },
+                                      "$ref": "#/$defs/JsonValue"
+                                    }
+                                  }
+                                },
+                                "representation": {
+                                  "type": "string",
+                                  "const": "alignment"
+                                },
+                                "alignment": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "members": {
+                                  "type": "array",
+                                  "items": {
+                                    "type": "string",
+                                    "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                  }
+                                },
+                                "showLetters": {
+                                  "type": "boolean"
+                                },
+                                "color": {
+                                  "type": "object",
+                                  "required": ["kind", "color"],
+                                  "properties": {
+                                    "kind": {
+                                      "type": "string",
+                                      "const": "fixed"
+                                    },
+                                    "color": {
+                                      "type": "string",
+                                      "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "required": ["id", "annotation", "representation"],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "opacity": {
+                                  "type": "number"
+                                },
+                                "tooltip": {
+                                  "type": "object",
+                                  "required": ["fields"],
+                                  "properties": {
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "extensions": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                                      "$defs": {
+                                        "value": {
+                                          "$ref": "#/$defs/JsonValue"
+                                        }
+                                      },
+                                      "$ref": "#/$defs/JsonValue"
+                                    }
+                                  }
+                                },
+                                "annotation": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "fallback": {
+                                  "type": "object",
+                                  "required": ["representation"],
+                                  "properties": {
+                                    "representation": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "blocks"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "markers"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "bars"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "heatmap"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "swatch"
+                                        }
+                                      ]
+                                    },
+                                    "color": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "color"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            },
+                                            "color": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "field", "colors", "fallback"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "categorical"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                            },
+                                            "colors": {
+                                              "type": "object",
+                                              "patternProperties": {
+                                                "^.*$": {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              }
+                                            },
+                                            "fallback": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "kind",
+                                            "field",
+                                            "domain",
+                                            "range",
+                                            "missing"
+                                          ],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "continuous"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "const": "value"
+                                            },
+                                            "domain": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "range": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "clamp": {
+                                              "type": "boolean"
+                                            },
+                                            "missing": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "representation": {
+                                  "type": "string",
+                                  "const": "blocks"
+                                },
+                                "laneMode": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "const": "overlay"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "const": "stack"
+                                    }
+                                  ]
+                                },
+                                "color": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "color"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "fixed"
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "colors", "fallback"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "categorical"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                        },
+                                        "colors": {
+                                          "type": "object",
+                                          "patternProperties": {
+                                            "^.*$": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          }
+                                        },
+                                        "fallback": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "domain", "range", "missing"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "continuous"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "const": "value"
+                                        },
+                                        "domain": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "number"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "range": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "clamp": {
+                                          "type": "boolean"
+                                        },
+                                        "missing": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "required": ["id", "annotation", "representation"],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "opacity": {
+                                  "type": "number"
+                                },
+                                "tooltip": {
+                                  "type": "object",
+                                  "required": ["fields"],
+                                  "properties": {
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "extensions": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                                      "$defs": {
+                                        "value": {
+                                          "$ref": "#/$defs/JsonValue"
+                                        }
+                                      },
+                                      "$ref": "#/$defs/JsonValue"
+                                    }
+                                  }
+                                },
+                                "annotation": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "fallback": {
+                                  "type": "object",
+                                  "required": ["representation"],
+                                  "properties": {
+                                    "representation": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "blocks"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "markers"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "bars"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "heatmap"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "swatch"
+                                        }
+                                      ]
+                                    },
+                                    "color": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "color"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            },
+                                            "color": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "field", "colors", "fallback"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "categorical"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                            },
+                                            "colors": {
+                                              "type": "object",
+                                              "patternProperties": {
+                                                "^.*$": {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              }
+                                            },
+                                            "fallback": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "kind",
+                                            "field",
+                                            "domain",
+                                            "range",
+                                            "missing"
+                                          ],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "continuous"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "const": "value"
+                                            },
+                                            "domain": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "range": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "clamp": {
+                                              "type": "boolean"
+                                            },
+                                            "missing": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "representation": {
+                                  "type": "string",
+                                  "const": "markers"
+                                },
+                                "shape": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "const": "circle"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "const": "diamond"
+                                    },
+                                    {
+                                      "type": "string",
+                                      "const": "line"
+                                    }
+                                  ]
+                                },
+                                "color": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "color"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "fixed"
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "colors", "fallback"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "categorical"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                        },
+                                        "colors": {
+                                          "type": "object",
+                                          "patternProperties": {
+                                            "^.*$": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          }
+                                        },
+                                        "fallback": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "domain", "range", "missing"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "continuous"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "const": "value"
+                                        },
+                                        "domain": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "number"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "range": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "clamp": {
+                                          "type": "boolean"
+                                        },
+                                        "missing": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "required": ["id", "annotation", "representation"],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "opacity": {
+                                  "type": "number"
+                                },
+                                "tooltip": {
+                                  "type": "object",
+                                  "required": ["fields"],
+                                  "properties": {
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "extensions": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                                      "$defs": {
+                                        "value": {
+                                          "$ref": "#/$defs/JsonValue"
+                                        }
+                                      },
+                                      "$ref": "#/$defs/JsonValue"
+                                    }
+                                  }
+                                },
+                                "annotation": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "fallback": {
+                                  "type": "object",
+                                  "required": ["representation"],
+                                  "properties": {
+                                    "representation": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "blocks"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "markers"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "bars"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "heatmap"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "swatch"
+                                        }
+                                      ]
+                                    },
+                                    "color": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "color"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            },
+                                            "color": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "field", "colors", "fallback"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "categorical"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                            },
+                                            "colors": {
+                                              "type": "object",
+                                              "patternProperties": {
+                                                "^.*$": {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              }
+                                            },
+                                            "fallback": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "kind",
+                                            "field",
+                                            "domain",
+                                            "range",
+                                            "missing"
+                                          ],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "continuous"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "const": "value"
+                                            },
+                                            "domain": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "range": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "clamp": {
+                                              "type": "boolean"
+                                            },
+                                            "missing": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "representation": {
+                                  "type": "string",
+                                  "const": "bars"
+                                },
+                                "scale": {
+                                  "type": "object",
+                                  "properties": {
+                                    "domain": {
+                                      "type": "array",
+                                      "additionalItems": false,
+                                      "items": [
+                                        {
+                                          "type": "number"
+                                        },
+                                        {
+                                          "type": "number"
+                                        }
+                                      ],
+                                      "minItems": 2
+                                    },
+                                    "baseline": {
+                                      "type": "number"
+                                    },
+                                    "clamp": {
+                                      "type": "boolean"
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "color": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "color"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "fixed"
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "colors", "fallback"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "categorical"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                        },
+                                        "colors": {
+                                          "type": "object",
+                                          "patternProperties": {
+                                            "^.*$": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          }
+                                        },
+                                        "fallback": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "domain", "range", "missing"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "continuous"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "const": "value"
+                                        },
+                                        "domain": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "number"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "range": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "clamp": {
+                                          "type": "boolean"
+                                        },
+                                        "missing": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "required": ["id", "annotation", "representation", "color"],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "opacity": {
+                                  "type": "number"
+                                },
+                                "tooltip": {
+                                  "type": "object",
+                                  "required": ["fields"],
+                                  "properties": {
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "extensions": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                                      "$defs": {
+                                        "value": {
+                                          "$ref": "#/$defs/JsonValue"
+                                        }
+                                      },
+                                      "$ref": "#/$defs/JsonValue"
+                                    }
+                                  }
+                                },
+                                "annotation": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "fallback": {
+                                  "type": "object",
+                                  "required": ["representation"],
+                                  "properties": {
+                                    "representation": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "blocks"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "markers"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "bars"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "heatmap"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "swatch"
+                                        }
+                                      ]
+                                    },
+                                    "color": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "color"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            },
+                                            "color": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "field", "colors", "fallback"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "categorical"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                            },
+                                            "colors": {
+                                              "type": "object",
+                                              "patternProperties": {
+                                                "^.*$": {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              }
+                                            },
+                                            "fallback": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "kind",
+                                            "field",
+                                            "domain",
+                                            "range",
+                                            "missing"
+                                          ],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "continuous"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "const": "value"
+                                            },
+                                            "domain": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "range": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "clamp": {
+                                              "type": "boolean"
+                                            },
+                                            "missing": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "representation": {
+                                  "type": "string",
+                                  "const": "heatmap"
+                                },
+                                "color": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "color"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "fixed"
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "colors", "fallback"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "categorical"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                        },
+                                        "colors": {
+                                          "type": "object",
+                                          "patternProperties": {
+                                            "^.*$": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          }
+                                        },
+                                        "fallback": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "domain", "range", "missing"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "continuous"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "const": "value"
+                                        },
+                                        "domain": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "number"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "range": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "clamp": {
+                                          "type": "boolean"
+                                        },
+                                        "missing": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "required": ["id", "annotation", "representation", "color"],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "opacity": {
+                                  "type": "number"
+                                },
+                                "tooltip": {
+                                  "type": "object",
+                                  "required": ["fields"],
+                                  "properties": {
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "extensions": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                                      "$defs": {
+                                        "value": {
+                                          "$ref": "#/$defs/JsonValue"
+                                        }
+                                      },
+                                      "$ref": "#/$defs/JsonValue"
+                                    }
+                                  }
+                                },
+                                "annotation": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "fallback": {
+                                  "type": "object",
+                                  "required": ["representation"],
+                                  "properties": {
+                                    "representation": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "blocks"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "markers"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "bars"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "heatmap"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "swatch"
+                                        }
+                                      ]
+                                    },
+                                    "color": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "color"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            },
+                                            "color": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "field", "colors", "fallback"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "categorical"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                            },
+                                            "colors": {
+                                              "type": "object",
+                                              "patternProperties": {
+                                                "^.*$": {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              }
+                                            },
+                                            "fallback": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "kind",
+                                            "field",
+                                            "domain",
+                                            "range",
+                                            "missing"
+                                          ],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "continuous"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "const": "value"
+                                            },
+                                            "domain": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "range": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "clamp": {
+                                              "type": "boolean"
+                                            },
+                                            "missing": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "representation": {
+                                  "type": "string",
+                                  "const": "swatch"
+                                },
+                                "color": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "color"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "fixed"
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "colors", "fallback"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "categorical"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                        },
+                                        "colors": {
+                                          "type": "object",
+                                          "patternProperties": {
+                                            "^.*$": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          }
+                                        },
+                                        "fallback": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "domain", "range", "missing"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "continuous"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "const": "value"
+                                        },
+                                        "domain": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "number"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "range": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "clamp": {
+                                          "type": "boolean"
+                                        },
+                                        "missing": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "required": ["id", "annotation", "representation"],
+                              "properties": {
+                                "id": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "opacity": {
+                                  "type": "number"
+                                },
+                                "tooltip": {
+                                  "type": "object",
+                                  "required": ["fields"],
+                                  "properties": {
+                                    "fields": {
+                                      "type": "array",
+                                      "items": {
+                                        "type": "string"
+                                      },
+                                      "minItems": 1
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "extensions": {
+                                  "type": "object",
+                                  "patternProperties": {
+                                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                                      "$defs": {
+                                        "value": {
+                                          "$ref": "#/$defs/JsonValue"
+                                        }
+                                      },
+                                      "$ref": "#/$defs/JsonValue"
+                                    }
+                                  }
+                                },
+                                "annotation": {
+                                  "type": "string",
+                                  "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                                },
+                                "fallback": {
+                                  "type": "object",
+                                  "required": ["representation"],
+                                  "properties": {
+                                    "representation": {
+                                      "anyOf": [
+                                        {
+                                          "type": "string",
+                                          "const": "blocks"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "markers"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "bars"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "heatmap"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "swatch"
+                                        }
+                                      ]
+                                    },
+                                    "color": {
+                                      "anyOf": [
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "color"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "fixed"
+                                            },
+                                            "color": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": ["kind", "field", "colors", "fallback"],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "categorical"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                            },
+                                            "colors": {
+                                              "type": "object",
+                                              "patternProperties": {
+                                                "^.*$": {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              }
+                                            },
+                                            "fallback": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        },
+                                        {
+                                          "type": "object",
+                                          "required": [
+                                            "kind",
+                                            "field",
+                                            "domain",
+                                            "range",
+                                            "missing"
+                                          ],
+                                          "properties": {
+                                            "kind": {
+                                              "type": "string",
+                                              "const": "continuous"
+                                            },
+                                            "field": {
+                                              "type": "string",
+                                              "const": "value"
+                                            },
+                                            "domain": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "number"
+                                                },
+                                                {
+                                                  "type": "number"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "range": {
+                                              "type": "array",
+                                              "additionalItems": false,
+                                              "items": [
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                },
+                                                {
+                                                  "type": "string",
+                                                  "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                                }
+                                              ],
+                                              "minItems": 2
+                                            },
+                                            "clamp": {
+                                              "type": "boolean"
+                                            },
+                                            "missing": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          },
+                                          "additionalProperties": false
+                                        }
+                                      ]
+                                    }
+                                  },
+                                  "additionalProperties": false
+                                },
+                                "representation": {
+                                  "type": "string",
+                                  "const": "links"
+                                },
+                                "color": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "color"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "fixed"
+                                        },
+                                        "color": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "colors", "fallback"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "categorical"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "pattern": "^(?:id|value|properties\\.[^.]+)$"
+                                        },
+                                        "colors": {
+                                          "type": "object",
+                                          "patternProperties": {
+                                            "^.*$": {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          }
+                                        },
+                                        "fallback": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "object",
+                                      "required": ["kind", "field", "domain", "range", "missing"],
+                                      "properties": {
+                                        "kind": {
+                                          "type": "string",
+                                          "const": "continuous"
+                                        },
+                                        "field": {
+                                          "type": "string",
+                                          "const": "value"
+                                        },
+                                        "domain": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "number"
+                                            },
+                                            {
+                                              "type": "number"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "range": {
+                                          "type": "array",
+                                          "additionalItems": false,
+                                          "items": [
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                            }
+                                          ],
+                                          "minItems": 2
+                                        },
+                                        "clamp": {
+                                          "type": "boolean"
+                                        },
+                                        "missing": {
+                                          "type": "string",
+                                          "pattern": "^#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?$"
+                                        }
+                                      },
+                                      "additionalProperties": false
+                                    }
+                                  ]
+                                }
+                              },
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        "minItems": 1
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "height": {
+                        "type": "number"
+                      },
+                      "extensions": {
+                        "type": "object",
+                        "patternProperties": {
+                          "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                            "$defs": {
+                              "value": {
+                                "$ref": "#/$defs/JsonValue"
+                              }
+                            },
+                            "$ref": "#/$defs/JsonValue"
+                          }
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "minItems": 1
+                },
+                "label": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "initiallyCollapsed": {
+                  "type": "boolean"
+                },
+                "extensions": {
+                  "type": "object",
+                  "patternProperties": {
+                    "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                      "$defs": {
+                        "value": {
+                          "$ref": "#/$defs/JsonValue"
+                        }
+                      },
+                      "$ref": "#/$defs/JsonValue"
+                    }
+                  }
+                }
+              },
+              "additionalProperties": false
+            },
+            "minItems": 1
+          },
+          "initialViewport": {
+            "anyOf": [
+              {
+                "type": "object",
+                "required": ["kind"],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "fit"
+                  }
+                },
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "required": ["kind", "locus"],
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "locus"
+                  },
+                  "locus": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "required": ["kind", "space", "position"],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "point"
+                          },
+                          "space": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                          },
+                          "position": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "object",
+                        "required": ["kind", "space", "start", "end"],
+                        "properties": {
+                          "kind": {
+                            "type": "string",
+                            "const": "interval"
+                          },
+                          "space": {
+                            "type": "string",
+                            "pattern": "^[A-Za-z][A-Za-z0-9._:-]*$"
+                          },
+                          "start": {
+                            "type": "integer",
+                            "minimum": 0
+                          },
+                          "end": {
+                            "type": "integer",
+                            "minimum": 0
+                          }
+                        },
+                        "additionalProperties": false
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false
+              }
+            ]
+          },
+          "metadata": {
+            "type": "object",
+            "properties": {
+              "label": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "tags": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "links": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["label", "href"],
+                  "properties": {
+                    "label": {
+                      "type": "string"
+                    },
+                    "href": {
+                      "type": "string"
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              }
+            },
+            "additionalProperties": false
+          },
+          "extensions": {
+            "type": "object",
+            "patternProperties": {
+              "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+                "$defs": {
+                  "value": {
+                    "$ref": "#/$defs/JsonValue"
+                  }
+                },
+                "$ref": "#/$defs/JsonValue"
+              }
+            }
+          }
+        },
+        "additionalProperties": false
+      },
+      "minItems": 1
+    },
+    "provenance": {
+      "type": "object",
+      "required": ["label"],
+      "properties": {
+        "label": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "uri": {
+          "type": "string"
+        },
+        "citation": {
+          "type": "string"
+        },
+        "generatedBy": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "extensions": {
+      "type": "object",
+      "patternProperties": {
+        "^[A-Za-z][A-Za-z0-9-]*(?:\\.[A-Za-z][A-Za-z0-9-]*)+(?:[.-][A-Za-z0-9-]+)*$": {
+          "$defs": {
+            "value": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          },
+          "$ref": "#/$defs/JsonValue"
+        }
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$id": "https://seq-star.org/schema/seq-view-spec-0.1.schema.json",
+  "$defs": {
+    "JsonValue": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "null"
+        },
+        {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/JsonValue"
+          }
+        },
+        {
+          "type": "object",
+          "patternProperties": {
+            "^.*$": {
+              "$ref": "#/$defs/JsonValue"
+            }
+          }
+        }
+      ]
+    }
+  }
+}

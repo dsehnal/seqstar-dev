@@ -1,0 +1,31 @@
+{
+  "kind": "seq-view-spec",
+  "version": "0.1.0",
+  "id": "invalid-reference",
+  "sequences": [
+    {
+      "id": "protein",
+      "coordinateSpace": "protein-space",
+      "alphabet": "protein",
+      "residues": "MKT"
+    }
+  ],
+  "assemblies": [{ "id": "assembly", "members": [{ "id": "member", "sequence": "missing" }] }],
+  "views": [
+    {
+      "id": "main",
+      "axis": { "segments": [{ "id": "axis", "space": "protein-space", "start": 0, "end": 3 }] },
+      "sections": [
+        {
+          "id": "section",
+          "tracks": [
+            {
+              "id": "track",
+              "layers": [{ "id": "letters", "representation": "sequence", "sequence": "protein" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

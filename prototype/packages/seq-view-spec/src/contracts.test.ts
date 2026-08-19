@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   type ActiveSeqViewSpecProjection,
+  createSeqViewSpec,
   isSeqViewSpecDigest,
   isSha256Digest,
   type SeqViewSpecDigest,
@@ -97,5 +98,74 @@ describe("SeqViewSpec projection and digest contract", () => {
     });
     expect(() => validateSeqViewSpecShape(changingGetter)).not.toThrow();
     expect(validateSeqViewSpecShape(changingGetter).ok).toBe(false);
+    const withAssemblyMemberMetadata = {
+      kind: "seq-view-spec",
+      version: "0.1.0",
+      id: "doc",
+      sequences: [{ id: "sequence", coordinateSpace: "space", alphabet: "protein", residues: "A" }],
+      assemblies: [
+        {
+          id: "assembly",
+          members: [{ id: "member", sequence: "sequence", metadata: { label: "not allowed" } }],
+        },
+      ],
+      views: [
+        {
+          id: "view",
+          axis: { segments: [{ id: "axis", space: "space", start: 0, end: 1 }] },
+          sections: [
+            {
+              id: "section",
+              tracks: [
+                {
+                  id: "track",
+                  layers: [{ id: "layer", representation: "sequence", sequence: "sequence" }],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    expect(validateSeqViewSpecShape(withAssemblyMemberMetadata).ok).toBe(false);
+  });
+
+  it("rejects hostile accessors before semantic reads in validation transactions", () => {
+    let reads = 0;
+    const thirdReadGetter = {
+      kind: "seq-view-spec",
+      version: "0.1.0",
+      id: "doc",
+      sequences: [],
+      views: [],
+    };
+    Object.defineProperty(thirdReadGetter, "kind", {
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        if (reads >= 3) throw new Error("third read");
+        return "seq-view-spec";
+      },
+    });
+    const throwingGetter = {
+      kind: "seq-view-spec",
+      version: "0.1.0",
+      id: "doc",
+      sequences: [],
+      views: [],
+    };
+    Object.defineProperty(throwingGetter, "kind", {
+      enumerable: true,
+      get: () => {
+        throw new Error("always throws");
+      },
+    });
+    for (const input of [thirdReadGetter, throwingGetter]) {
+      expect(() => validateSeqViewSpecShape(input)).not.toThrow();
+      expect(validateSeqViewSpecShape(input).ok).toBe(false);
+    }
+    expect(reads).toBe(0);
+    expect(() => createSeqViewSpec(thirdReadGetter as never)).not.toThrow();
+    expect(createSeqViewSpec(thirdReadGetter as never).ok).toBe(false);
   });
 });

@@ -13,7 +13,9 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "generate:schema": "node scripts/generate-schema.mjs",
+    "check:schema": "pnpm run build && pnpm run generate:schema && node scripts/check-schema-artifact.mjs && node scripts/verify-schema-export.mjs && node scripts/verify-examples.mjs && git diff --exit-code -- schema/seq-view-spec-0.1.schema.json"
   },
   "dependencies": {
     "@seq-star/seq-coords": "workspace:*",
