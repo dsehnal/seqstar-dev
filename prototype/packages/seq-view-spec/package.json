@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@seq-star/seq-coords": "workspace:*",
-    "@seq-star/seq-core": "workspace:*"
+    "@seq-star/seq-core": "workspace:*",
+    "typebox": "1.3.7"
   }
 }

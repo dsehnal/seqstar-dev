@@ -114,6 +114,12 @@ importers:
       '@seq-star/seq-core':
         specifier: workspace:*
         version: link:../seq-core
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
+      typebox:
+        specifier: 1.3.7
+        version: 1.3.7
 
   packages/harness-react:
     dependencies:
@@ -145,8 +151,15 @@ importers:
       '@seq-star/seq-core':
         specifier: workspace:*
         version: link:../seq-core
+      typebox:
+        specifier: 1.3.7
+        version: 1.3.7
 
-  packages/seq-core: {}
+  packages/seq-core:
+    dependencies:
+      typebox:
+        specifier: 1.3.7
+        version: 1.3.7
 
   packages/seq-view-spec:
     dependencies:
@@ -156,6 +169,9 @@ importers:
       '@seq-star/seq-core':
         specifier: workspace:*
         version: link:../seq-core
+      typebox:
+        specifier: 1.3.7
+        version: 1.3.7
 
   packages/seq-viewer:
     dependencies:
@@ -2032,6 +2048,9 @@ packages:
   type-is@2.1.0:
     resolution: {integrity: sha512-faYHw0anBbc/kWF3zFTEnxSFOAGUX9GFbOBthvDdLsIlEoWOFOtS0zgCiQYwIskL9iGXZL3kAXD8OoZ4GmMATA==}
     engines: {node: '>= 18'}
+
+  typebox@1.3.7:
+    resolution: {integrity: sha512-meKuifc33Pccx0O6PdIzYMq3Og8zvP4TIi/a+Bw3AEMZMxOD0+RHGQvpglEe6Zdy3wZ8nqn/j95h8LUZLk/6Hg==}
 
   typescript@6.0.3:
     resolution: {integrity: sha512-y2TvuxSZPDyQakkFRPZHKFm+KKVqIisdg9/CZwm9ftvKXLP8NRWj38/ODjNbr43SsoXqNuAisEf1GdCxqWcdBw==}
@@ -4191,6 +4210,8 @@ snapshots:
       content-type: 2.1.0
       media-typer: 1.1.1
       mime-types: 3.0.2
+
+  typebox@1.3.7: {}
 
   typescript@6.0.3: {}
 
