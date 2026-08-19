@@ -104,9 +104,10 @@ describe("coordinate contract golden examples", () => {
       ],
     ]);
     const result = composeMappingResults(first, continuation, { maxExpansion: 1 });
-    expect(result.associations[0]).toMatchObject({ source: point, status: "ambiguous" });
+    expect(result.associations[0]).toMatchObject({ source: point, status: "partial" });
     expect(result.associations[0]?.targets).toHaveLength(1);
     expect(result.translatorIds).toEqual(["source-to-mid", "mid-to-target"]);
+    expect(result.diagnostics[0]?.code).toBe("seq.coords.composition.expansion-capped");
   });
 
   it("continues only exact intermediate associations and never leaks a sibling target", () => {
