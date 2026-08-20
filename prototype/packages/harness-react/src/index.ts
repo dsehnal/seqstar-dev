@@ -113,6 +113,23 @@ export function HarnessProvider({
       return;
     }
     let active = true;
+    // Read-only DOM telemetry makes an app-host lifecycle auditable without
+    // adding a second state store or exposing a mutable harness handle.
+    const telemetryRoot = document.documentElement;
+    telemetryRoot.dataset.seqstarHarnessTelemetrySubscriptions = String(
+      Number(telemetryRoot.dataset.seqstarHarnessTelemetrySubscriptions ?? "0") + 1,
+    );
+    telemetryRoot.dataset.seqstarHarnessMessageCount = "0";
+    const telemetry = harness.fabric.observe().subscribe((message) => {
+      telemetryRoot.dataset.seqstarHarnessMessageCount = String(
+        Number(telemetryRoot.dataset.seqstarHarnessMessageCount ?? "0") + 1,
+      );
+      telemetryRoot.dataset.seqstarHarnessLastMessage = [
+        message.type,
+        message.source.component ?? message.source.plugin ?? "harness-core",
+        message.target && "component" in message.target ? message.target.component : "broadcast",
+      ].join(":");
+    });
     setStartupFailure(undefined);
     setSession({ harness, status: "starting" });
     // State set from a layout effect mounts children (and attaches their refs)
@@ -133,6 +150,10 @@ export function HarnessProvider({
     });
     return () => {
       active = false;
+      telemetry.unsubscribe();
+      telemetryRoot.dataset.seqstarHarnessTelemetrySubscriptions = String(
+        Math.max(0, Number(telemetryRoot.dataset.seqstarHarnessTelemetrySubscriptions ?? "1") - 1),
+      );
       // Invocation is deliberately synchronous during layout cleanup. The core
       // aborts routes/subscriptions before its first awaited component disposal.
       onDisposeStart?.({ harness, hosts });

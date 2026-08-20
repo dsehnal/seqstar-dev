@@ -38,6 +38,14 @@ run = "pnpm run check:fixtures"
 description = "Verify the P01 local Nightingale and single-Mol* dependency graph"
 run = "pnpm run check:dependencies"
 
+[tasks."check:p80"]
+description = "Run P80 dependency, fixture, license, schema, and boundary hardening audit"
+run = "pnpm run check:p80"
+
 [tasks."test:e2e:p01"]
 description = "Run the offline P01 Nightingale and Mol* browser feasibility proof"
 run = "pnpm run test:e2e:p01"
+
+[tasks."test:e2e:hardening"]
+description = "Run the bounded offline repeated-navigation hardening test"
+run = "pnpm run test:e2e:hardening"

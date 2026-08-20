@@ -518,6 +518,15 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     const viewer = this.viewer;
     const entries = this.applied.get(family)?.get(key);
     const owner = { id: `harness:${family}:${key}` };
+    const total = [...(this.applied.get(family)?.values() ?? [])].reduce(
+      (count, owned) => count + owned.size,
+      0,
+    );
+    const dataset = (this.element as { readonly dataset?: DOMStringMap }).dataset;
+    if (dataset !== undefined) {
+      if (family === "highlight") dataset.seqstarAppliedHighlights = String(total);
+      else dataset.seqstarAppliedSelections = String(total);
+    }
     if (viewer === undefined) return;
     if (entries === undefined || entries.size === 0) {
       if (family === "highlight") viewer.clearHighlight(owner);
@@ -541,6 +550,11 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     this.applied.clear();
     this.nativeLeases.clear();
     this.activeSpaces = [];
+    const dataset = (this.element as { readonly dataset?: DOMStringMap }).dataset;
+    if (dataset !== undefined) {
+      delete dataset.seqstarAppliedHighlights;
+      delete dataset.seqstarAppliedSelections;
+    }
     this.context?.reportCoordinateSpaces([]);
     this.context = undefined;
     this.viewer?.dispose();
