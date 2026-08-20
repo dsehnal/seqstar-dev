@@ -24,6 +24,18 @@ test("renders the offline P04637 portability case with one shared document", asy
   await expect(page.getByTestId("nightingale-fallback-status")).toContainText(
     "wrapper.nightingale.fallback.bars-heatmap",
   );
+  const hostHeights = async () =>
+    page.evaluate(() => ({
+      reference: document
+        .querySelector<HTMLElement>('[data-testid="base-sequence-host"]')
+        ?.getBoundingClientRect().height,
+      nightingale: document
+        .querySelector<HTMLElement>('[data-testid="nightingale-sequence-host"]')
+        ?.getBoundingClientRect().height,
+    }));
+  await expect.poll(hostHeights).toEqual({ reference: 288, nightingale: 288 });
+  await page.waitForTimeout(250);
+  expect(await hostHeights()).toEqual({ reference: 288, nightingale: 288 });
   await expect(page.getByTestId("renderer-portability-capabilities")).toContainText(
     "bars-to-heatmap fallback",
   );

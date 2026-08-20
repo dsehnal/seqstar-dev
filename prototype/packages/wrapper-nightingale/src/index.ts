@@ -47,6 +47,7 @@ type NativeElement = HTMLElement & {
   ): void;
   clearSeqstarInteraction(family: AppliedFamily, owner: string): void;
   activateSeqstarTrack(): void;
+  getXFromSeqPosition?(position: number): number;
 };
 
 const capabilities = Object.freeze([
@@ -329,7 +330,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       options.beforePromote?.();
       delete staging.root.dataset.seqstarNightingaleStaging;
       staging.root.dataset.seqstarNightingale = "root";
-      staging.root.style.position = "";
+      staging.root.style.position = "relative";
       staging.root.style.visibility = "";
       staging.root.style.pointerEvents = "";
       staging.root.style.insetInlineStart = "";
@@ -359,10 +360,70 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     const readiness: Promise<void>[] = [];
     const firstSpace = coordinateSpaces(options.document)[0];
     if (firstSpace === undefined) throw new Error("A SeqViewSpec needs a sequence space.");
+    const style = document.createElement("style");
+    style.textContent = `
+      .seqstar-nightingale-track-label {
+        box-sizing: border-box;
+        width: 100%;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        cursor: pointer;
+        border: 1px solid #cbd5e1;
+        border-radius: 0.375rem;
+        background: #f8fafc;
+        padding: 0.375rem 0.5rem;
+        color: #334155;
+        font: inherit;
+        font-weight: 600;
+        line-height: 1.25;
+        text-align: left;
+        transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
+      }
+      .seqstar-nightingale-track-label:hover {
+        border-color: #38bdf8;
+        background: #e0f2fe;
+        color: #0369a1;
+      }
+      .seqstar-nightingale-track-label:focus-visible {
+        outline: 2px solid #0ea5e9;
+        outline-offset: 2px;
+      }
+    `;
+    this.root.append(style);
+    const hoverColumn = document.createElement("div");
+    hoverColumn.dataset.seqstarHoverColumn = "true";
+    hoverColumn.setAttribute("aria-hidden", "true");
+    hoverColumn.style.position = "absolute";
+    hoverColumn.style.insetBlock = "0";
+    hoverColumn.style.insetInlineStart = "0";
+    hoverColumn.style.width = "2px";
+    hoverColumn.style.background = "#38bdf8";
+    hoverColumn.style.boxShadow = "0 0 0 1px rgb(56 189 248 / 25%)";
+    hoverColumn.style.pointerEvents = "none";
+    hoverColumn.style.zIndex = "20";
+    hoverColumn.style.display = "none";
+    this.root.append(hoverColumn);
     const normalized = (event: Event): void => {
       if (!(event instanceof CustomEvent)) return;
       const detail = event.detail as VendorInteractionDetail;
       if (detail.generation !== options.generation) return;
+      if (detail.kind === "hover") {
+        const region = detail.regions[0];
+        const native = event.target instanceof HTMLElement ? (event.target as NativeElement) : null;
+        if (detail.phase === "clear" || region === undefined || native === null) {
+          hoverColumn.style.display = "none";
+        } else {
+          const nativeX = native.getXFromSeqPosition?.(region.start);
+          if (nativeX !== undefined && Number.isFinite(nativeX)) {
+            const rootBounds = this.root.getBoundingClientRect();
+            const nativeBounds = native.getBoundingClientRect();
+            hoverColumn.style.transform = `translateX(${nativeBounds.left - rootBounds.left + nativeX}px)`;
+            hoverColumn.style.display = "block";
+          }
+        }
+      }
       const identity =
         (detail.featureId === undefined ? undefined : identities.getNative(detail.featureId)) ??
         identities
@@ -378,7 +439,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       const loci =
         detail.phase === "clear"
           ? []
-          : identity.itemId === undefined
+          : detail.kind === "hover" || identity.itemId === undefined
             ? detail.regions.map<CoordinateLocus>((region) =>
                 region.start === region.end
                   ? pointAt(space, region.start - 1)
@@ -407,12 +468,15 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         row.style.gridTemplateColumns = "10rem minmax(0, 1fr)";
         row.style.alignItems = "center";
         row.style.gap = "0.5rem";
+        row.style.minWidth = "0";
         const label = document.createElement("button");
         label.type = "button";
-        label.textContent = track.label ?? track.id;
+        const trackLabel = track.label ?? track.id;
+        label.textContent = trackLabel;
+        label.title = trackLabel;
+        label.setAttribute("aria-label", `Activate ${trackLabel}`);
         label.dataset.seqstarTrackActivate = track.id;
         label.className = "seqstar-nightingale-track-label";
-        label.style.textAlign = "left";
         row.append(label);
         const stack = document.createElement("div");
         stack.style.display = "grid";

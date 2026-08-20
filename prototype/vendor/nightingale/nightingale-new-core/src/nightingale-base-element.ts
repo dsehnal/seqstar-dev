@@ -45,6 +45,25 @@ const regionsFromDetail = (detail: Record<string, unknown>): readonly SeqstarReg
   }
   return [];
 };
+const hoverRegionFromPointer = (
+  detail: Record<string, unknown>,
+  element: HTMLElement,
+): readonly SeqstarRegion[] => {
+  const parentEvent = detail.parentEvent;
+  if (!(parentEvent instanceof MouseEvent)) return [];
+  const coordinate = element as HTMLElement & {
+    getSeqPositionFromX?(x: number): number | undefined;
+    length?: number;
+  };
+  if (coordinate.getSeqPositionFromX === undefined) return [];
+  const position = coordinate.getSeqPositionFromX(
+    parentEvent.clientX - element.getBoundingClientRect().left,
+  );
+  if (position === undefined || !Number.isFinite(position)) return [];
+  const rounded = Math.round(position);
+  const clamped = Math.max(1, Math.min(coordinate.length ?? rounded, rounded));
+  return [{ start: clamped, end: clamped }];
+};
 const externalFeatureId = (detail: Record<string, unknown>): string | undefined => {
   if (typeof detail.selectedId === "string") return detail.selectedId;
   const feature = detail.feature;
@@ -78,7 +97,14 @@ class NightingaleElement extends LitElement {
             ? "hover"
             : undefined;
     if (kind === undefined) return;
-    const regions = eventType === "mouseout" ? [] : regionsFromDetail(record);
+    const pointerRegions =
+      eventType === "mouseover" ? hoverRegionFromPointer(record, this) : [];
+    const regions =
+      eventType === "mouseout"
+        ? []
+        : pointerRegions.length > 0
+          ? pointerRegions
+          : regionsFromDetail(record);
     if (kind === "select" && regions.length === 0) return;
     this.emitSeqstarInteraction({
       kind,

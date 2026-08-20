@@ -265,6 +265,7 @@ describe("Mol* wrapper production boundary", () => {
     const highlight = vi.fn();
     const clearHighlights = vi.fn();
     const deselectAll = vi.fn();
+    const selectOnly = vi.fn();
     const select = vi.fn();
     const focusLoci = vi.fn();
     const requestCameraReset = vi.fn();
@@ -273,7 +274,7 @@ describe("Mol* wrapper production boundary", () => {
         managers: {
           interactivity: {
             lociHighlights: { highlightOnly, highlight, clearHighlights },
-            lociSelects: { deselectAll, select },
+            lociSelects: { deselectAll, selectOnly, select },
           },
           camera: { focusLoci },
         },
@@ -294,14 +295,18 @@ describe("Mol* wrapper production boundary", () => {
     >[number];
 
     driver.apply("highlight", [exactA, exactB]);
+    expect(clearHighlights).toHaveBeenCalledOnce();
+    expect(clearHighlights.mock.invocationCallOrder[0]).toBeLessThan(
+      highlightOnly.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+    );
     expect(highlightOnly).toHaveBeenCalledWith({ loci: exactA }, false);
     expect(highlight).toHaveBeenCalledWith({ loci: exactB }, false);
     driver.apply("select", [exactA, exactB]);
+    expect(selectOnly).toHaveBeenCalledWith({ loci: exactA }, false);
+    expect(select).toHaveBeenCalledWith({ loci: exactB }, false);
+    expect(deselectAll).not.toHaveBeenCalled();
+    driver.apply("select", []);
     expect(deselectAll).toHaveBeenCalledOnce();
-    expect(select.mock.calls.map(([argument]) => argument)).toEqual([
-      { loci: exactA },
-      { loci: exactB },
-    ]);
     driver.apply("focus", [exactA, exactB]);
     expect(focusLoci).toHaveBeenCalledWith([exactA, exactB]);
     driver.apply("focus", []);

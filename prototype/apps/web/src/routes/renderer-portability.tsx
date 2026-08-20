@@ -96,7 +96,7 @@ function RendererPanel({
       <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
       <section
         aria-label={`${title} renderer`}
-        className="mt-4 min-h-72 overflow-auto rounded border border-slate-200 p-2"
+        className="relative mt-4 h-72 overflow-auto rounded border border-slate-200 p-2"
         data-testid={`${id}-host`}
         ref={host}
       />

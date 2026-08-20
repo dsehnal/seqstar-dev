@@ -403,14 +403,19 @@ export class MolstarViewerDriver implements MolstarNativeDriver {
       const [first, ...rest] = loci;
       if (first === undefined) interactivity.lociHighlights.clearHighlights();
       else {
+        interactivity.lociHighlights.clearHighlights();
         interactivity.lociHighlights.highlightOnly({ loci: first }, false);
         for (const next of rest) interactivity.lociHighlights.highlight({ loci: next }, false);
       }
       return;
     }
     if (action === "select") {
-      interactivity.lociSelects.deselectAll();
-      for (const next of loci) interactivity.lociSelects.select({ loci: next }, false);
+      const [first, ...rest] = loci;
+      if (first === undefined) interactivity.lociSelects.deselectAll();
+      else {
+        interactivity.lociSelects.selectOnly({ loci: first }, false);
+        for (const next of rest) interactivity.lociSelects.select({ loci: next }, false);
+      }
       return;
     }
     if (loci.length > 0) camera.focusLoci([...loci]);

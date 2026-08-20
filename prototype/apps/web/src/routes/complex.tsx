@@ -78,7 +78,7 @@ function Panel({ id, title }: { readonly id: string; readonly title: string }) {
       <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
       <section
         aria-label={`${title} visualizer`}
-        className="mt-3 min-h-96 overflow-auto rounded border border-slate-200"
+        className="relative mt-3 h-96 overflow-auto rounded border border-slate-200"
         data-testid={`${id}-host`}
         ref={host}
       />

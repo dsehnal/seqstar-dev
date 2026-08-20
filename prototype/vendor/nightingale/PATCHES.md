@@ -61,6 +61,9 @@ leaf packages' narrow public declarations under `types/`.
   event retains the stable external item identity.
 - Added one bubbling `nightingale-interaction` event that normalizes native
   hover, selection, clear, and track activation across the selected renderers.
+  Pointer hover reports the current sequence residue when the renderer exposes
+  its zoom coordinate conversion, rather than expanding to the hovered
+  feature's complete interval; datum-derived regions remain the fallback.
   Feature/sequence clicks derive regions from the actual D3 datum even when
   click highlighting is disabled; linegraph clicks now expose their computed
   sequence position independently of hover/highlight configuration. An
