@@ -990,6 +990,19 @@ export class MolstarWrapper implements VisualizerWrapper {
   }
 
   private clear(family: AppliedFamily, command: InteractionClearCommand): void {
+    const nativeSelectionLease = this.nativeSelectionLease;
+    if (
+      family === "selection" &&
+      command.owner.sourceComponent === this.id &&
+      nativeSelectionLease !== undefined &&
+      nativeSelectionLease.interactionId === command.interactionId &&
+      nativeSelectionLease.correlationId === command.owner.correlationId
+    ) {
+      this.nativeState.set("selection", []);
+      this.nativeSelectionLease = undefined;
+      this.nativeLeases.delete("select");
+      this.renderApplied("selection");
+    }
     const byOwner = this.applied.get(family);
     if (byOwner === undefined) return;
     const key = ownerKey(command.owner);

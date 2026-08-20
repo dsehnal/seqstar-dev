@@ -6,20 +6,37 @@ import {
   useHarnessMessages,
 } from "@seq-star/harness-react";
 import { createCdsProteinPlugin } from "@seq-star/integration-plugins";
+import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+import {
+  CaseRendererChooser,
+  type RendererMode,
+  rendererSearch,
+} from "../components/case-renderer-chooser";
 
 const nucleotideComponent = "cds-nucleotide-view";
 const proteinComponent = "cds-protein-view";
-const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElement }) =>
+const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
+const rendererComponents = {
+  reference: [
+    { id: nucleotideComponent, type: "seqstar.reference-viewer" },
+    { id: proteinComponent, type: "seqstar.reference-viewer" },
+  ],
+  nightingale: [
+    { id: nucleotideComponent, type: "seqstar.nightingale" },
+    { id: proteinComponent, type: "seqstar.nightingale" },
+  ],
+} as const;
+const createPageHarness = (
+  hosts: { readonly require: (id: string) => HTMLElement },
+  mode: Exclude<RendererMode, "compare">,
+) =>
   createApplicationHarness(
     {
       id: "cds-protein",
-      components: [
-        { id: nucleotideComponent, type: "seqstar.reference-viewer" },
-        { id: proteinComponent, type: "seqstar.reference-viewer" },
-      ],
+      components: rendererComponents[mode],
       plugins: [{ id: "cds-protein", plugin: "seqstar.cds-protein" }],
       synchronization: [
         {
@@ -39,6 +56,7 @@ const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElemen
     {
       componentFactories: [
         createReferenceViewerWrapperFactory({ getHost: (id) => hosts.require(id) }),
+        createNightingaleWrapperFactory({ getHost: (id) => hosts.require(id) }),
       ],
       pluginFactories: [
         {
@@ -63,7 +81,13 @@ function Panel({ id, title }: { readonly id: string; readonly title: string }) {
     </section>
   );
 }
-function Content() {
+function Content({
+  initialMode,
+  onModeChange,
+}: {
+  readonly initialMode: RendererMode;
+  readonly onModeChange: (mode: RendererMode) => void;
+}) {
   const { status } = useHarness();
   const [mapping, setMapping] = useState<{
     direction?: string;
@@ -98,6 +122,13 @@ function Content() {
           Harness: {status} · local synthetic fixture · no runtime network required
         </p>
       </section>
+      <CaseRendererChooser
+        descriptor={{ caseId: "cds-protein", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {() => null}
+      </CaseRendererChooser>
       <section
         className="rounded border border-sky-200 bg-sky-50 p-3 text-sm text-slate-700"
         data-testid="p70-coordinate-convention"
@@ -135,18 +166,28 @@ function Content() {
   );
 }
 function CdsProteinPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const initialMode = rendererSearch(search.renderer, rendererModes, "reference");
+  const mountedMode = useRef(initialMode).current;
   const createHarness = useCallback(
     ({ hosts }: { readonly hosts: { readonly require: (id: string) => HTMLElement } }) =>
-      createPageHarness(hosts),
-    [],
+      createPageHarness(hosts, mountedMode as Exclude<RendererMode, "compare">),
+    [mountedMode],
   );
   return (
     <HarnessProvider
       createHarness={createHarness}
       fallback={<main className="p-8">Starting CDS/protein case…</main>}
     >
-      <Content />
+      <Content
+        initialMode={initialMode}
+        onModeChange={(renderer) => void navigate({ search: { renderer } })}
+      />
     </HarnessProvider>
   );
 }
-export const Route = createFileRoute("/cds-protein")({ component: CdsProteinPage });
+export const Route = createFileRoute("/cds-protein")({
+  validateSearch: (search: Record<string, unknown>) => ({ renderer: search.renderer }),
+  component: CdsProteinPage,
+});

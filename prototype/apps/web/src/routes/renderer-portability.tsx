@@ -1,5 +1,6 @@
 import { createApplicationHarness, type HarnessMessage } from "@seq-star/harness-core";
 import {
+  type ComponentInstanceSpec,
   HarnessProvider,
   useHarness,
   useHarnessHost,
@@ -13,19 +14,41 @@ import {
 import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  CaseRendererChooser,
+  type RendererMode,
+  rendererSearch,
+} from "../components/case-renderer-chooser";
 
 const referenceId = "base-sequence";
 const nightingaleId = "nightingale-sequence";
 
-const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElement }) =>
+const rendererModes = [
+  "compare",
+  "reference",
+  "nightingale",
+] as const satisfies readonly RendererMode[];
+const rendererComponents = {
+  reference: [{ id: referenceId, type: "seqstar.reference-viewer" }],
+  nightingale: [{ id: nightingaleId, type: "seqstar.nightingale" }],
+  compare: [
+    { id: referenceId, type: "seqstar.reference-viewer" },
+    { id: nightingaleId, type: "seqstar.nightingale" },
+  ],
+} as const satisfies Readonly<Record<RendererMode, readonly ComponentInstanceSpec[]>>;
+
+const createPageHarness = (
+  hosts: { readonly require: (id: string) => HTMLElement },
+  _mode: RendererMode,
+) =>
   createApplicationHarness(
     {
       id: "renderer-portability",
-      components: [
-        { id: referenceId, type: "seqstar.reference-viewer" },
-        { id: nightingaleId, type: "seqstar.nightingale" },
-      ],
+      // Both initial renderers establish one verified visible replay envelope.
+      // The chooser detects this committed mode and transactionally retires the
+      // inactive peer before exposing a deep-linked single-renderer mode.
+      components: rendererComponents.compare,
       plugins: [{ id: "renderer-portability", plugin: "seqstar.renderer-portability" }],
       synchronization: [
         {
@@ -80,10 +103,12 @@ const lifecycle = (message: HarnessMessage): Lifecycle | undefined => {
 function RendererPanel({
   id,
   title,
+  hidden = false,
   children,
 }: {
   readonly id: string;
   readonly title: string;
+  readonly hidden?: boolean;
   readonly children?: React.ReactNode;
 }) {
   const host = useHarnessHost(id);
@@ -92,6 +117,7 @@ function RendererPanel({
     <section
       className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
       data-testid={`visualizer-panel-${panelTestId}`}
+      hidden={hidden}
     >
       <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
       <section
@@ -105,7 +131,13 @@ function RendererPanel({
   );
 }
 
-function RendererPortabilityContent() {
+function RendererPortabilityContent({
+  initialMode,
+  onModeChange,
+}: {
+  readonly initialMode: RendererMode;
+  readonly onModeChange: (mode: RendererMode) => void;
+}) {
   const { status } = useHarness();
   const [digest, setDigest] = useState("Computing RFC 8785 digest…");
   const [events, setEvents] = useState<readonly Lifecycle[]>([]);
@@ -161,25 +193,44 @@ function RendererPortabilityContent() {
           to both components.
         </p>
       </section>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <RendererPanel id={referenceId} title="Seq* reference viewer">
-          <p className="mt-3 text-slate-600 text-sm" data-testid="base-sequence-lifecycle">
-            {byComponent.get(referenceId)?.status ?? "awaiting lifecycle"}
-          </p>
-        </RendererPanel>
-        <RendererPanel id={nightingaleId} title="Vendored Nightingale">
-          <p className="mt-3 text-slate-600 text-sm" data-testid="nightingale-sequence-lifecycle">
-            {byComponent.get(nightingaleId)?.status ?? "awaiting lifecycle"}
-          </p>
-          <p className="mt-1 text-amber-700 text-xs" data-testid="nightingale-fallback-status">
-            {byComponent
-              .get(nightingaleId)
-              ?.diagnostics?.map((entry) => entry.code)
-              .filter(Boolean)
-              .join(", ") ?? "awaiting fallback report"}
-          </p>
-        </RendererPanel>
-      </div>
+      <CaseRendererChooser
+        descriptor={{ caseId: "renderer-portability", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {(chooser) => (
+          <div className="grid gap-5 xl:grid-cols-2">
+            <RendererPanel
+              hidden={!chooser.mountedComponentIds.includes(referenceId)}
+              id={referenceId}
+              title="Seq* reference viewer"
+            >
+              <p className="mt-3 text-slate-600 text-sm" data-testid="base-sequence-lifecycle">
+                {byComponent.get(referenceId)?.status ?? "awaiting lifecycle"}
+              </p>
+            </RendererPanel>
+            <RendererPanel
+              hidden={!chooser.mountedComponentIds.includes(nightingaleId)}
+              id={nightingaleId}
+              title="Vendored Nightingale"
+            >
+              <p
+                className="mt-3 text-slate-600 text-sm"
+                data-testid="nightingale-sequence-lifecycle"
+              >
+                {byComponent.get(nightingaleId)?.status ?? "awaiting lifecycle"}
+              </p>
+              <p className="mt-1 text-amber-700 text-xs" data-testid="nightingale-fallback-status">
+                {byComponent
+                  .get(nightingaleId)
+                  ?.diagnostics?.map((entry) => entry.code)
+                  .filter(Boolean)
+                  .join(", ") ?? "awaiting fallback report"}
+              </p>
+            </RendererPanel>
+          </div>
+        )}
+      </CaseRendererChooser>
       <section
         className="rounded-lg bg-slate-950 p-5 text-slate-100"
         data-testid="renderer-portability-capabilities"
@@ -209,21 +260,29 @@ function RendererPortabilityContent() {
 }
 
 function RendererPortabilityPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const initialMode = rendererSearch(search.renderer, rendererModes, "compare");
+  const mountedMode = useRef(initialMode).current;
   const createHarness = useCallback(
     ({ hosts }: { readonly hosts: { readonly require: (id: string) => HTMLElement } }) =>
-      createPageHarness(hosts),
-    [],
+      createPageHarness(hosts, mountedMode),
+    [mountedMode],
   );
   return (
     <HarnessProvider
       createHarness={createHarness}
       fallback={<main className="p-8">Starting renderer portability case…</main>}
     >
-      <RendererPortabilityContent />
+      <RendererPortabilityContent
+        initialMode={initialMode}
+        onModeChange={(renderer) => void navigate({ search: { renderer } })}
+      />
     </HarnessProvider>
   );
 }
 
 export const Route = createFileRoute("/renderer-portability")({
+  validateSearch: (search: Record<string, unknown>) => ({ renderer: search.renderer }),
   component: RendererPortabilityPage,
 });

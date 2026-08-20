@@ -20,6 +20,7 @@ function OverviewPage() {
       </p>
       <Link
         className="mt-8 inline-flex rounded bg-sky-700 px-4 py-2 font-semibold text-white"
+        search={{ renderer: undefined }}
         to="/renderer-portability"
       >
         Explore case shells

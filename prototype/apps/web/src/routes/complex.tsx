@@ -2,9 +2,10 @@ import { createApplicationHarness } from "@seq-star/harness-core";
 import { HarnessProvider, useHarness, useHarnessHost } from "@seq-star/harness-react";
 import { createComplexPlugin } from "@seq-star/integration-plugins";
 import { createMolstarWrapperFactory } from "@seq-star/wrapper-molstar";
+import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import confidenceTsv from "../../../../fixtures/complex/expected/synthetic-confidence.tsv?raw";
 import structureUrl from "../../../../fixtures/complex/input/1BRS.cif?url";
 import barnaseFasta from "../../../../fixtures/complex/input/P00648.fasta?raw";
@@ -12,18 +13,31 @@ import barstarFasta from "../../../../fixtures/complex/input/P11540.fasta?raw";
 import contactsTsv from "../../../../fixtures/complex/mappings/1BRS-chain-A-D-heavy-atom-contacts.tsv?raw";
 import barnaseMappingTsv from "../../../../fixtures/complex/mappings/P00648-1BRS-chain-A.tsv?raw";
 import barstarMappingTsv from "../../../../fixtures/complex/mappings/P11540-1BRS-chain-D.tsv?raw";
+import {
+  CaseRendererChooser,
+  type RendererMode,
+  rendererSearch,
+} from "../components/case-renderer-chooser";
 import { InspectPanel, useInspectPanelState } from "../inspect-panel";
 
 const sequenceComponent = "complex-sequence";
 const structureComponent = "complex-structure";
 const fasta = (source: string) => source.split(/\r?\n/u).slice(1).join("").trim();
 
-const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElement }) =>
+const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
+const rendererComponents = {
+  reference: [{ id: sequenceComponent, type: "seqstar.reference-viewer" }],
+  nightingale: [{ id: sequenceComponent, type: "seqstar.nightingale" }],
+} as const;
+const createPageHarness = (
+  hosts: { readonly require: (id: string) => HTMLElement },
+  mode: Exclude<RendererMode, "compare">,
+) =>
   createApplicationHarness(
     {
       id: "complex",
       components: [
-        { id: sequenceComponent, type: "seqstar.reference-viewer" },
+        ...rendererComponents[mode],
         { id: structureComponent, type: "seqstar.molstar-mvs" },
       ],
       plugins: [{ id: "complex-mvs", plugin: "seqstar.complex-mvs" }],
@@ -45,6 +59,7 @@ const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElemen
     {
       componentFactories: [
         createReferenceViewerWrapperFactory({ getHost: (id) => hosts.require(id) }),
+        createNightingaleWrapperFactory({ getHost: (id) => hosts.require(id) }),
         createMolstarWrapperFactory({ getHost: (id) => hosts.require(id) }),
       ],
       pluginFactories: [
@@ -82,7 +97,13 @@ function Panel({ id, title }: { readonly id: string; readonly title: string }) {
   );
 }
 
-function ComplexContent() {
+function ComplexContent({
+  initialMode,
+  onModeChange,
+}: {
+  readonly initialMode: RendererMode;
+  readonly onModeChange: (mode: RendererMode) => void;
+}) {
   const { status } = useHarness();
   const inspect = useInspectPanelState({ sequenceComponent, structureComponent });
   return (
@@ -100,6 +121,13 @@ function ComplexContent() {
           Harness: {status} · local 1BRS fixture only
         </p>
       </section>
+      <CaseRendererChooser
+        descriptor={{ caseId: "complex", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {() => null}
+      </CaseRendererChooser>
       <p
         className="rounded border border-amber-300 bg-amber-50 p-3 text-amber-950 text-sm"
         data-testid="p50-synthetic-label"
@@ -130,19 +158,29 @@ function ComplexContent() {
 }
 
 function ComplexPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const initialMode = rendererSearch(search.renderer, rendererModes, "reference");
+  const mountedMode = useRef(initialMode).current;
   const createHarness = useCallback(
     ({ hosts }: { readonly hosts: { readonly require: (id: string) => HTMLElement } }) =>
-      createPageHarness(hosts),
-    [],
+      createPageHarness(hosts, mountedMode as Exclude<RendererMode, "compare">),
+    [mountedMode],
   );
   return (
     <HarnessProvider
       createHarness={createHarness}
       fallback={<main className="p-8">Starting offline 1BRS complex…</main>}
     >
-      <ComplexContent />
+      <ComplexContent
+        initialMode={initialMode}
+        onModeChange={(renderer) => void navigate({ search: { renderer } })}
+      />
     </HarnessProvider>
   );
 }
 
-export const Route = createFileRoute("/complex")({ component: ComplexPage });
+export const Route = createFileRoute("/complex")({
+  validateSearch: (search: Record<string, unknown>) => ({ renderer: search.renderer }),
+  component: ComplexPage,
+});

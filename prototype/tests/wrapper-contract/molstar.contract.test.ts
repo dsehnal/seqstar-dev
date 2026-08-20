@@ -1133,6 +1133,55 @@ describe("Mol* wrapper production boundary", () => {
       harness.messages.filter((event) => event.type === "interaction.native")[beforeRepeat - 1]
         ?.payload.interactionId,
     );
+    const unrelatedOwner = { correlationId: uuid(), sourceComponent: "unrelated-owner" };
+    harness.fabric.publish(
+      message(
+        "interaction.selection.apply",
+        {
+          interactionId: "unrelated-selection",
+          owner: unrelatedOwner,
+          mode: "replace",
+          loci: [residueLocus(sameLabelsOtherModel)],
+        },
+        { component: "molstar" },
+      ),
+    );
+    driver.emit({ kind: "selection-add", residues: [residue] });
+    expect(driver.calls.at(-1)).toMatchObject({
+      action: "select",
+      schemas: 2,
+      targets: ["structure-a", "structure-b"],
+    });
+    const nativeSet = harness.messages
+      .filter((event) => event.type === "interaction.native")
+      .at(-1);
+    if (nativeSet === undefined) throw new Error("Expected a native selection lease.");
+    const nativeInteractionId = (nativeSet.payload as { readonly interactionId: string })
+      .interactionId;
+    const beforeOwnerClear = harness.messages.filter(
+      (event) => event.type === "interaction.native",
+    ).length;
+    harness.fabric.publish(
+      message(
+        "interaction.selection.clear",
+        {
+          interactionId: nativeInteractionId,
+          owner: {
+            correlationId: nativeSet.correlationId,
+            sourceComponent: "molstar",
+          },
+        },
+        { component: "molstar" },
+      ),
+    );
+    expect(driver.calls.at(-1)).toMatchObject({
+      action: "select",
+      schemas: 1,
+      targets: ["structure-b"],
+    });
+    expect(harness.messages.filter((event) => event.type === "interaction.native")).toHaveLength(
+      beforeOwnerClear,
+    );
     await wrapper.dispose();
   });
 

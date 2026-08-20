@@ -2,12 +2,13 @@ import type { CoordinateSpace, CoordinateTranslator } from "@seq-star/seq-coords
 import { createTableTranslator } from "@seq-star/seq-coords";
 import { Type } from "typebox";
 import { describe, expect, it, vi } from "vitest";
-import type { HarnessMessage } from "./index.js";
+import type { ComponentInstanceSpec, HarnessMessage } from "./index.js";
 import {
   createApplicationHarness,
   createEventFabric,
   createMessageSchemaRegistry,
   createTranslatorRegistry,
+  InteractionEventSchema,
   installCoreMessageSchemas,
   payloadSchema,
 } from "./index.js";
@@ -361,6 +362,77 @@ describe("harness runtime", () => {
     harness.dispose();
   });
 
+  it("lets disposal win a deferred initial start without ready or plugin resurrection", async () => {
+    let release: (() => void) | undefined;
+    let capturedContext: import("./index.js").ComponentContext | undefined;
+    let pluginSetups = 0;
+    let disposals = 0;
+    const states: string[] = [];
+    const harness = createApplicationHarness(
+      {
+        id: "initial-disposal-race",
+        components: [{ id: "slow", type: "slow" }],
+        plugins: [{ id: "must-not-start", plugin: "must-not-start" }],
+      },
+      {
+        componentFactories: [
+          {
+            type: "slow",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                capturedContext = context;
+                await new Promise<void>((resolve) => {
+                  release = resolve;
+                });
+              },
+              dispose() {
+                disposals += 1;
+              },
+            }),
+          },
+        ],
+        pluginFactories: [
+          {
+            plugin: "must-not-start",
+            create: () => ({
+              id: "must-not-start",
+              setup() {
+                pluginSetups += 1;
+              },
+            }),
+          },
+        ],
+      },
+    );
+    harness.components.changes.subscribe((change) => states.push(change.component.status));
+    const received: HarnessMessage[] = [];
+    harness.fabric.observe().subscribe((entry) => received.push(entry));
+    const startup = harness.start();
+    await vi.waitFor(() => expect(capturedContext).toBeDefined());
+    await harness.disposeAsync();
+    const receivedAtDisposal = received.length;
+    capturedContext?.reportCapabilities(["late:capability"]);
+    capturedContext?.fabric.publish(
+      message("lifecycle.visualization", {
+        requestId: "late",
+        generation: 1,
+        componentId: "slow",
+        status: "rendered",
+        visibleRequestId: "late",
+        diagnostics: [],
+      }),
+    );
+    release?.();
+    await expect(startup).rejects.toThrow("Harness disposal interrupted startup");
+    expect(states).not.toContain("ready");
+    expect(harness.components.get("slow")).toBeUndefined();
+    expect(pluginSetups).toBe(0);
+    expect(disposals).toBe(1);
+    expect(received).toHaveLength(receivedAtDisposal);
+  });
+
   it("rolls back every registration made by a failing plugin setup", async () => {
     const source: CoordinateSpace = { id: "source", kind: "index" };
     const target: CoordinateSpace = { id: "target", kind: "index" };
@@ -563,6 +635,377 @@ describe("harness runtime", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(commands).toEqual(["b:interaction.selection.apply", "a:interaction.selection.apply"]);
     harness.dispose();
+  });
+
+  it("replaces components serially without restarting installed plugins", async () => {
+    const log: string[] = [];
+    let pluginSetups = 0;
+    const factory = (type: string) => ({
+      type,
+      create: ({ id }: { id: string }) => ({
+        id,
+        capabilities: [],
+        async start() {
+          log.push(`start:${type}:${id}`);
+        },
+        async dispose() {
+          log.push(`dispose:${type}:${id}`);
+        },
+      }),
+    });
+    const harness = createApplicationHarness(
+      {
+        id: "app",
+        components: [{ id: "sequence", type: "reference" }],
+        plugins: [{ id: "stable", plugin: "stable" }],
+      },
+      {
+        componentFactories: [factory("reference"), factory("nightingale"), factory("latest")],
+        pluginFactories: [
+          {
+            plugin: "stable",
+            create: () => ({
+              id: "stable",
+              setup() {
+                pluginSetups += 1;
+              },
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    const outdated = harness.replaceComponents([{ id: "sequence", type: "nightingale" }]);
+    const latest = harness.replaceComponents([{ id: "sequence", type: "latest" }]);
+    await Promise.all([outdated, latest]);
+    expect(log).toEqual([
+      "start:reference:sequence",
+      "dispose:reference:sequence",
+      "start:latest:sequence",
+    ]);
+    expect(pluginSetups).toBe(1);
+    expect(harness.components.get("sequence")).toMatchObject({ type: "latest", status: "ready" });
+    await harness.disposeAsync();
+  });
+
+  it("rejects malformed replacement descriptors before touching the active component", async () => {
+    const log: string[] = [];
+    const harness = createApplicationHarness(
+      { id: "app", components: [{ id: "sequence", type: "reference" }] },
+      {
+        componentFactories: [
+          {
+            type: "reference",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start() {
+                log.push("start:reference");
+              },
+              dispose() {
+                log.push("dispose:reference");
+              },
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    const malformed = Object.assign(Object.create(null) as object, {
+      id: "sequence",
+      type: "reference",
+    });
+    await expect(
+      harness.replaceComponents([malformed as unknown as ComponentInstanceSpec]),
+    ).rejects.toThrow("Invalid replacement component specification");
+    await expect(
+      harness.replaceComponents([
+        { id: "sequence", type: "reference", extra: true } as unknown as ComponentInstanceSpec,
+      ]),
+    ).rejects.toThrow("Invalid replacement component specification");
+    expect(log).toEqual(["start:reference"]);
+    expect(harness.components.get("sequence")).toMatchObject({ status: "ready" });
+    await harness.disposeAsync();
+  });
+
+  it("retires the whole outgoing batch and starts nothing when one disposal fails", async () => {
+    const log: string[] = [];
+    const factory = (type: string, failDispose = false) => ({
+      type,
+      create: ({ id }: { id: string }) => ({
+        id,
+        capabilities: [],
+        async start() {
+          log.push(`start:${type}:${id}`);
+        },
+        dispose() {
+          log.push(`dispose:${type}:${id}`);
+          if (failDispose) throw new Error(`dispose failed:${id}`);
+        },
+      }),
+    });
+    const harness = createApplicationHarness(
+      {
+        id: "app",
+        components: [
+          { id: "left", type: "broken-dispose" },
+          { id: "right", type: "reference" },
+        ],
+      },
+      {
+        componentFactories: [
+          factory("broken-dispose", true),
+          factory("reference"),
+          factory("nightingale"),
+        ],
+      },
+    );
+    await harness.start();
+    await expect(
+      harness.replaceComponents([
+        { id: "left", type: "nightingale" },
+        { id: "right", type: "nightingale" },
+      ]),
+    ).rejects.toThrow("replacement was not started");
+    expect(log).toEqual([
+      "start:broken-dispose:left",
+      "start:reference:right",
+      "dispose:broken-dispose:left",
+      "dispose:reference:right",
+    ]);
+    expect(harness.components.get("left")).toBeUndefined();
+    expect(harness.components.get("right")).toBeUndefined();
+    await harness.disposeAsync();
+  });
+
+  it("cleans every partially started batch member when a later replacement start fails", async () => {
+    const log: string[] = [];
+    const factory = (type: string, failStart = false) => ({
+      type,
+      create: ({ id }: { id: string }) => ({
+        id,
+        capabilities: [],
+        async start() {
+          log.push(`start:${type}:${id}`);
+          if (failStart) throw new Error(`start failed:${id}`);
+        },
+        dispose() {
+          log.push(`dispose:${type}:${id}`);
+        },
+      }),
+    });
+    const harness = createApplicationHarness(
+      { id: "app", components: [] },
+      {
+        componentFactories: [factory("good"), factory("broken", true)],
+      },
+    );
+    await harness.start();
+    await expect(
+      harness.replaceComponents([
+        { id: "left", type: "good" },
+        { id: "right", type: "broken" },
+      ]),
+    ).rejects.toThrow("Component replacement failed");
+    expect(log).toEqual([
+      "start:good:left",
+      "start:broken:right",
+      "dispose:broken:right",
+      "dispose:good:left",
+    ]);
+    expect(harness.components.get("left")).toBeUndefined();
+    expect(harness.components.get("right")).toBeUndefined();
+    await harness.disposeAsync();
+  });
+
+  it("never reports a replacement ready when harness disposal races its start", async () => {
+    let release: (() => void) | undefined;
+    const log: string[] = [];
+    const harness = createApplicationHarness(
+      { id: "app", components: [] },
+      {
+        componentFactories: [
+          {
+            type: "slow",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start() {
+                log.push("start");
+                await new Promise<void>((resolve) => {
+                  release = resolve;
+                });
+                log.push("start-resolved");
+              },
+              dispose() {
+                log.push("dispose");
+              },
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    const states: string[] = [];
+    harness.components.changes.subscribe((change) => states.push(change.component.status));
+    const replacement = harness.replaceComponents([{ id: "sequence", type: "slow" }]);
+    await vi.waitFor(() => expect(log).toContain("start"));
+    const disposal = harness.disposeAsync();
+    release?.();
+    await expect(replacement).rejects.toThrow("Component replacement failed");
+    await disposal;
+    expect(states).not.toContain("ready");
+    expect(log).toEqual(["start", "start-resolved", "dispose"]);
+  });
+
+  it("clears only reflected selection ownership when its source is replaced", async () => {
+    const space: CoordinateSpace = { id: "shared", kind: "index", length: 6 };
+    const commands: string[] = [];
+    const harness = createApplicationHarness(
+      {
+        id: "app",
+        components: [
+          { id: "source", type: "mock" },
+          { id: "peer", type: "mock" },
+        ],
+        synchronization: [{ id: "select", interaction: "select", between: ["source", "peer"] }],
+      },
+      {
+        componentFactories: [
+          {
+            type: "mock",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                context.reportCoordinateSpaces([space]);
+                context.fabric
+                  .observe({ targetComponent: id })
+                  .subscribe((entry) => commands.push(`${id}:${entry.type}`));
+              },
+              dispose() {},
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    harness.fabric.publish(
+      message("interaction.native", {
+        interactionId: "selection-source",
+        interaction: "select",
+        phase: "set",
+        origin: { componentId: "source" },
+        loci: [{ kind: "point", space, position: { kind: "index", value: 1 } }],
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    await harness.replaceComponents([{ id: "source", type: "mock" }]);
+    expect(commands).toEqual([
+      "peer:interaction.selection.apply",
+      "peer:interaction.selection.clear",
+    ]);
+    await harness.disposeAsync();
+  });
+
+  it("retires an exact selection lease when its reflected destination is replaced", async () => {
+    const space: CoordinateSpace = { id: "shared", kind: "index", length: 6 };
+    const applied = new Map<string, Set<string>>();
+    const nativeSelected = new Map([
+      ["source", true],
+      ["other-source", true],
+    ]);
+    const clears: Array<{ readonly target: string; readonly owner: string }> = [];
+    let nativeMessages = 0;
+    const ownerKey = (owner: {
+      readonly correlationId: string;
+      readonly sourceComponent: string;
+    }) => `${owner.sourceComponent}:${owner.correlationId}`;
+    const harness = createApplicationHarness(
+      {
+        id: "destination-retirement",
+        components: [
+          { id: "source", type: "mock" },
+          { id: "destination", type: "mock" },
+          { id: "peer", type: "mock" },
+          { id: "other-source", type: "mock" },
+        ],
+        synchronization: [
+          {
+            id: "main-selection",
+            interaction: "select",
+            between: ["source", "destination", "peer"],
+          },
+          {
+            id: "unrelated-selection",
+            interaction: "select",
+            between: ["other-source", "peer"],
+          },
+        ],
+      },
+      {
+        componentFactories: [
+          {
+            type: "mock",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                context.reportCoordinateSpaces([space]);
+                context.fabric.observe({ targetComponent: id }).subscribe((entry) => {
+                  const payload = entry.payload as unknown as {
+                    readonly interactionId?: string;
+                    readonly owner?: {
+                      readonly correlationId: string;
+                      readonly sourceComponent: string;
+                    };
+                  };
+                  if (payload.owner === undefined) return;
+                  const key = ownerKey(payload.owner);
+                  const owners = applied.get(id) ?? new Set<string>();
+                  if (entry.type === "interaction.selection.apply") owners.add(key);
+                  if (entry.type === "interaction.selection.clear") {
+                    owners.delete(key);
+                    clears.push({ target: id, owner: key });
+                    if (payload.owner.sourceComponent === id) nativeSelected.set(id, false);
+                  }
+                  applied.set(id, owners);
+                });
+              },
+              dispose() {},
+            }),
+          },
+        ],
+      },
+    );
+    harness.fabric
+      .messages("interaction.native", payloadSchema(InteractionEventSchema))
+      .subscribe(() => nativeMessages++);
+    await harness.start();
+    const publishNativeSelection = (source: string, interactionId: string): void =>
+      harness.fabric.publish(
+        message("interaction.native", {
+          interactionId,
+          interaction: "select",
+          phase: "set",
+          origin: { componentId: source },
+          loci: [{ kind: "point", space, position: { kind: "index", value: 1 } }],
+        }),
+      );
+    publishNativeSelection("other-source", "unrelated");
+    publishNativeSelection("source", "main");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const unrelatedOwner = [...(applied.get("peer") ?? [])].find((key) =>
+      key.startsWith("other-source:"),
+    );
+    expect(unrelatedOwner).toBeDefined();
+    await harness.replaceComponents([{ id: "destination", type: "mock" }]);
+    expect(nativeSelected.get("source")).toBe(false);
+    expect(nativeSelected.get("other-source")).toBe(true);
+    expect(applied.get("peer")).toEqual(new Set([unrelatedOwner]));
+    expect(clears.map((entry) => entry.target).sort()).toEqual(["peer", "source"]);
+    expect(nativeMessages).toBe(2);
+    await harness.disposeAsync();
   });
 
   it("retains only the newest visualization request while a component is starting", async () => {

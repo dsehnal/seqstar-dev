@@ -120,6 +120,7 @@ export type RendererChoice = "reference" | "nightingale" | "compare";
 export function RendererChooser({
   value,
   onChange,
+  disabled = false,
   choices = [
     { value: "reference", label: "Reference" },
     { value: "nightingale", label: "Nightingale" },
@@ -128,6 +129,7 @@ export function RendererChooser({
 }: {
   readonly value: RendererChoice;
   readonly onChange: (value: RendererChoice) => void;
+  readonly disabled?: boolean;
   readonly choices?: readonly { value: RendererChoice; label: string }[];
   readonly label?: string;
 }) {
@@ -138,6 +140,7 @@ export function RendererChooser({
         <select
           aria-label={label}
           className="renderer-chooser__select"
+          disabled={disabled}
           onChange={(event) => onChange(event.target.value as RendererChoice)}
           value={value}
         >

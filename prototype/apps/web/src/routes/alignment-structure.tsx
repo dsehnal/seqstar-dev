@@ -7,24 +7,38 @@ import {
 } from "@seq-star/harness-react";
 import { createAlignmentStructurePlugin } from "@seq-star/integration-plugins";
 import { createMolstarWrapperFactory } from "@seq-star/wrapper-molstar";
+import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import alignmentAfa from "../../../../fixtures/alignment-structure/expected/PF00042.29-32rows.query-centric.afa?raw";
 import structureUrl from "../../../../fixtures/alignment-structure/input/1A3N.cif?url";
 import p69905Fasta from "../../../../fixtures/alignment-structure/input/P69905.fasta?raw";
 import structureMappingTsv from "../../../../fixtures/alignment-structure/mappings/P69905-1A3N-chain-A.tsv?raw";
 import alignmentMappingTsv from "../../../../fixtures/alignment-structure/mappings/P69905-PF00042-1A3N-chain-A.tsv?raw";
+import {
+  CaseRendererChooser,
+  type RendererMode,
+  rendererSearch,
+} from "../components/case-renderer-chooser";
 
 const alignmentComponent = "pf00042-alignment";
 const structureComponent = "p69905-structure";
 
-const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElement }) =>
+const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
+const rendererComponents = {
+  reference: [{ id: alignmentComponent, type: "seqstar.reference-viewer" }],
+  nightingale: [{ id: alignmentComponent, type: "seqstar.nightingale" }],
+} as const;
+const createPageHarness = (
+  hosts: { readonly require: (id: string) => HTMLElement },
+  mode: Exclude<RendererMode, "compare">,
+) =>
   createApplicationHarness(
     {
       id: "alignment-structure",
       components: [
-        { id: alignmentComponent, type: "seqstar.reference-viewer" },
+        ...rendererComponents[mode],
         { id: structureComponent, type: "seqstar.molstar-mvs" },
       ],
       plugins: [{ id: "alignment-structure", plugin: "seqstar.alignment-structure" }],
@@ -32,6 +46,7 @@ const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElemen
     {
       componentFactories: [
         createReferenceViewerWrapperFactory({ getHost: (id) => hosts.require(id) }),
+        createNightingaleWrapperFactory({ getHost: (id) => hosts.require(id) }),
         createMolstarWrapperFactory({ getHost: (id) => hosts.require(id) }),
       ],
       pluginFactories: [
@@ -94,7 +109,13 @@ type MappingSummary = {
   readonly alignmentId: string;
 };
 
-function AlignmentStructureContent() {
+function AlignmentStructureContent({
+  initialMode,
+  onModeChange,
+}: {
+  readonly initialMode: RendererMode;
+  readonly onModeChange: (mode: RendererMode) => void;
+}) {
   const { status } = useHarness();
   const [ready, setReady] = useState<ReadySummary>();
   const [paths, setPaths] = useState<readonly string[]>([]);
@@ -132,6 +153,13 @@ function AlignmentStructureContent() {
           Harness: {status} · local checked fixture only
         </p>
       </section>
+      <CaseRendererChooser
+        descriptor={{ caseId: "alignment-structure", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {() => null}
+      </CaseRendererChooser>
       <div className="grid gap-5 xl:grid-cols-2">
         <ViewerPanel
           id={alignmentComponent}
@@ -176,19 +204,29 @@ function AlignmentStructureContent() {
 }
 
 function AlignmentStructurePage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const initialMode = rendererSearch(search.renderer, rendererModes, "reference");
+  const mountedMode = useRef(initialMode).current;
   const createHarness = useCallback(
     ({ hosts }: { readonly hosts: { readonly require: (id: string) => HTMLElement } }) =>
-      createPageHarness(hosts),
-    [],
+      createPageHarness(hosts, mountedMode as Exclude<RendererMode, "compare">),
+    [mountedMode],
   );
   return (
     <HarnessProvider
       createHarness={createHarness}
       fallback={<main className="p-8">Starting offline PF00042.29 / 1A3N case…</main>}
     >
-      <AlignmentStructureContent />
+      <AlignmentStructureContent
+        initialMode={initialMode}
+        onModeChange={(renderer) => void navigate({ search: { renderer } })}
+      />
     </HarnessProvider>
   );
 }
 
-export const Route = createFileRoute("/alignment-structure")({ component: AlignmentStructurePage });
+export const Route = createFileRoute("/alignment-structure")({
+  validateSearch: (search: Record<string, unknown>) => ({ renderer: search.renderer }),
+  component: AlignmentStructurePage,
+});

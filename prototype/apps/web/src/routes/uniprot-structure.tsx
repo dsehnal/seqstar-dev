@@ -7,8 +7,9 @@ import {
 } from "@seq-star/integration-plugins";
 import { createMolstarWrapperFactory } from "@seq-star/wrapper-molstar";
 import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
+import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
 import alignmentAfa from "../../../../fixtures/alignment-structure/expected/PF00042.29-32rows.query-centric.afa?raw";
 import alignmentStructureUrl from "../../../../fixtures/alignment-structure/input/1A3N.cif?url";
 import p69905Fasta from "../../../../fixtures/alignment-structure/input/P69905.fasta?raw";
@@ -21,6 +22,11 @@ import complexContacts from "../../../../fixtures/complex/mappings/1BRS-chain-A-
 import p00648Mapping from "../../../../fixtures/complex/mappings/P00648-1BRS-chain-A.tsv?raw";
 import p53StructureUrl from "../../../../fixtures/uniprot-structure/input/1TUP.cif?url";
 import p04637Mapping from "../../../../fixtures/uniprot-structure/mappings/P04637-1TUP-chain-A.tsv?raw";
+import {
+  CaseRendererChooser,
+  type RendererMode,
+  rendererSearch,
+} from "../components/case-renderer-chooser";
 import { InspectPanel, useInspectPanelState } from "../inspect-panel";
 
 const sequenceComponent = "uniprot-tracks";
@@ -44,12 +50,20 @@ const assets: UniProtDatasetAssetBundle = {
   },
 };
 
-const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElement }) =>
+const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
+const rendererComponents = {
+  reference: [{ id: sequenceComponent, type: "seqstar.reference-viewer" }],
+  nightingale: [{ id: sequenceComponent, type: "seqstar.nightingale" }],
+} as const;
+const createPageHarness = (
+  hosts: { readonly require: (id: string) => HTMLElement },
+  mode: Exclude<RendererMode, "compare">,
+) =>
   createApplicationHarness(
     {
       id: "uniprot-structure-datasets",
       components: [
-        { id: sequenceComponent, type: "seqstar.nightingale" },
+        ...rendererComponents[mode],
         { id: structureComponent, type: "seqstar.molstar-mvs" },
       ],
       plugins: [{ id: "uniprot-datasets", plugin: "seqstar.uniprot-datasets" }],
@@ -71,6 +85,7 @@ const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElemen
     {
       componentFactories: [
         createNightingaleWrapperFactory({ getHost: (id) => hosts.require(id) }),
+        createReferenceViewerWrapperFactory({ getHost: (id) => hosts.require(id) }),
         createMolstarWrapperFactory({ getHost: (id) => hosts.require(id) }),
       ],
       pluginFactories: [
@@ -98,7 +113,13 @@ function ViewerPanel({ id, title }: { readonly id: string; readonly title: strin
   );
 }
 
-function UniProtStructureContent() {
+function UniProtStructureContent({
+  initialMode,
+  onModeChange,
+}: {
+  readonly initialMode: RendererMode;
+  readonly onModeChange: (mode: RendererMode) => void;
+}) {
   const { harness, status } = useHarness();
   const inspect = useInspectPanelState({ sequenceComponent, structureComponent });
   const transition = inspect.datasetStatus;
@@ -144,6 +165,13 @@ function UniProtStructureContent() {
           Harness: {status} · no runtime network required
         </p>
       </section>
+      <CaseRendererChooser
+        descriptor={{ caseId: "uniprot-structure", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {() => null}
+      </CaseRendererChooser>
       <section className="flex flex-wrap items-end gap-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
         <label className="grid gap-1 font-medium text-slate-800 text-sm" htmlFor="dataset-select">
           Protein and structure dataset
@@ -198,19 +226,29 @@ function UniProtStructureContent() {
 }
 
 function UniProtStructurePage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const initialMode = rendererSearch(search.renderer, rendererModes, "nightingale");
+  const mountedMode = useRef(initialMode).current;
   const createHarness = useCallback(
     ({ hosts }: { readonly hosts: { readonly require: (id: string) => HTMLElement } }) =>
-      createPageHarness(hosts),
-    [],
+      createPageHarness(hosts, mountedMode as Exclude<RendererMode, "compare">),
+    [mountedMode],
   );
   return (
     <HarnessProvider
       createHarness={createHarness}
       fallback={<main className="p-8">Starting checked offline protein datasets…</main>}
     >
-      <UniProtStructureContent />
+      <UniProtStructureContent
+        initialMode={initialMode}
+        onModeChange={(renderer) => void navigate({ search: { renderer } })}
+      />
     </HarnessProvider>
   );
 }
 
-export const Route = createFileRoute("/uniprot-structure")({ component: UniProtStructurePage });
+export const Route = createFileRoute("/uniprot-structure")({
+  validateSearch: (search: Record<string, unknown>) => ({ renderer: search.renderer }),
+  component: UniProtStructurePage,
+});

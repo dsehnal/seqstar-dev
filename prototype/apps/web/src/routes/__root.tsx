@@ -35,19 +35,39 @@ function RootLayout() {
             <span>Mol* Harness Prototype</span>
           </Link>
           <nav aria-label="Case studies" className="app-nav">
-            <Link activeProps={{ "aria-current": "page" }} to="/renderer-portability">
+            <Link
+              activeProps={{ "aria-current": "page" }}
+              search={{ renderer: undefined }}
+              to="/renderer-portability"
+            >
               Renderer comparison
             </Link>
-            <Link activeProps={{ "aria-current": "page" }} to="/uniprot-structure">
+            <Link
+              activeProps={{ "aria-current": "page" }}
+              search={{ renderer: undefined }}
+              to="/uniprot-structure"
+            >
               Protein + structure
             </Link>
-            <Link activeProps={{ "aria-current": "page" }} to="/complex">
+            <Link
+              activeProps={{ "aria-current": "page" }}
+              search={{ renderer: undefined }}
+              to="/complex"
+            >
               Protein complex
             </Link>
-            <Link activeProps={{ "aria-current": "page" }} to="/alignment-structure">
+            <Link
+              activeProps={{ "aria-current": "page" }}
+              search={{ renderer: undefined }}
+              to="/alignment-structure"
+            >
               Alignment ensemble
             </Link>
-            <Link activeProps={{ "aria-current": "page" }} to="/cds-protein">
+            <Link
+              activeProps={{ "aria-current": "page" }}
+              search={{ renderer: undefined }}
+              to="/cds-protein"
+            >
               CDS translation
             </Link>
             <Link activeProps={{ "aria-current": "page" }} to="/p01-feasibility">

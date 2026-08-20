@@ -14,6 +14,7 @@ import {
   type Capability,
   type ComponentDescriptor,
   type ComponentFactory,
+  type ComponentInstanceSpec,
   type ComponentRegistryChange,
   type ComponentRegistryView,
   type Disposable,
@@ -517,6 +518,15 @@ export interface ApplicationHarness extends Disposable {
   readonly components: ComponentRegistryView;
   readonly policies: Readonly<Required<HarnessPolicies>>;
   start(): Promise<void>;
+  /**
+   * Replace one or more mounted components without restarting plugins, routes,
+   * translators, or the event fabric.  Component ids remain stable so existing
+   * plugin targets continue to address the newly-mounted instance.
+   */
+  replaceComponents(
+    components: readonly ComponentInstanceSpec[],
+    retireIds?: readonly string[],
+  ): Promise<void>;
   disposeAsync(): Promise<void>;
 }
 export interface ApplicationHarnessHost {
@@ -583,6 +593,16 @@ export const createApplicationHarness = (
   };
   const hoverSynchronizationLeases = new Map<string, HoverSynchronizationLease>();
   const hoverSynchronizationControllers = new Map<string, Set<AbortController>>();
+  type ReflectedInteractionLease = {
+    readonly ruleId: string;
+    readonly interaction: "hover" | "select" | "focus";
+    readonly sourceComponent: string;
+    readonly destination: string;
+    readonly interactionId: string;
+    readonly owner: { readonly correlationId: string; readonly sourceComponent: string };
+  };
+  const reflectedInteractionLeases = new Map<string, ReflectedInteractionLease>();
+  const synchronizationParticipants = new Map<string, readonly [string, string]>();
   const reflections = new Set<string>();
   const policies = {
     partialRendering: spec.policies?.partialRendering ?? "reject",
@@ -591,14 +611,19 @@ export const createApplicationHarness = (
   };
   let started = false;
   let disposed = false;
+  let disposalRequested = false;
   let disposePromise: Promise<void> | undefined;
   let synchronizationGeneration = 0;
+  const assertRuntimeActive = (): void => {
+    if (disposed || disposalRequested) throw new Error("Harness disposal interrupted startup.");
+  };
   const context: HarnessPluginContext = {
     fabric,
     translators,
     components: registry,
     messageSchemas: schemas,
     addProcessor(processor) {
+      assertRuntimeActive();
       if (processors.has(processor.id)) throw new Error(`Duplicate processor '${processor.id}'.`);
       const entry = { processor, abort: new AbortController() };
       processors.set(processor.id, entry);
@@ -608,6 +633,7 @@ export const createApplicationHarness = (
       });
     },
     addRoute(route) {
+      assertRuntimeActive();
       return addRoute(route);
     },
   };
@@ -627,6 +653,7 @@ export const createApplicationHarness = (
     });
   };
   const deliver = (message: HarnessMessage, target: EventRouteSpec["to"]): void => {
+    if (disposed || disposalRequested) return;
     const targets =
       "component" in target
         ? [registry.get(target.component)].filter(
@@ -704,6 +731,7 @@ export const createApplicationHarness = (
     ...context,
     translators: {
       register(translator) {
+        assertRuntimeActive();
         const registration = translators.register(translator);
         owned.push(registration);
         return registration;
@@ -717,6 +745,7 @@ export const createApplicationHarness = (
         schemaVersion: string,
         schema: PayloadSchema<Value>,
       ): Disposable {
+        assertRuntimeActive();
         const registration = schemas.register(type, schemaVersion, schema);
         owned.push(registration);
         return registration;
@@ -724,11 +753,13 @@ export const createApplicationHarness = (
       get: schemas.get,
     },
     addProcessor(processor) {
+      assertRuntimeActive();
       const registration = context.addProcessor(processor);
       owned.push(registration);
       return registration;
     },
     addRoute(route) {
+      assertRuntimeActive();
       const registration = addRoute(route);
       owned.push(registration);
       return registration;
@@ -754,6 +785,76 @@ export const createApplicationHarness = (
         payload: { interactionId: lease.interactionId, owner: lease.owner },
       });
     hoverSynchronizationLeases.delete(ruleId);
+  };
+  const reflectionLeaseKey = (
+    ruleId: string,
+    interaction: "hover" | "select" | "focus",
+    source: string,
+    destination: string,
+  ): string => `${ruleId}\u0000${interaction}\u0000${source}\u0000${destination}`;
+  const publishReflectedClear = (lease: ReflectedInteractionLease, target: string): void =>
+    fabric.publish({
+      id: newId(),
+      type: `interaction.${commandFamily(lease.interaction)}.clear`,
+      version,
+      source: { plugin: "harness-core" },
+      target: { component: target },
+      correlationId: lease.owner.correlationId,
+      timestamp: now(),
+      payload: { interactionId: lease.interactionId, owner: lease.owner },
+    });
+  const clearReflectedInteractions = (componentId: string): void => {
+    for (const [key, lease] of reflectedInteractionLeases) {
+      if (lease.sourceComponent !== componentId && lease.destination !== componentId) continue;
+      if (
+        lease.interaction === "select" &&
+        lease.destination === componentId &&
+        lease.sourceComponent !== componentId
+      ) {
+        // Replacing a reflected destination intentionally retires the complete
+        // native selection lease. Clear its persistent source and every other
+        // reflected destination for this exact rule/owner, without touching
+        // selections owned by another rule or native interaction.
+        const related = [...reflectedInteractionLeases].filter(
+          ([, candidate]) =>
+            candidate.ruleId === lease.ruleId &&
+            candidate.interaction === lease.interaction &&
+            candidate.sourceComponent === lease.sourceComponent &&
+            candidate.interactionId === lease.interactionId &&
+            candidate.owner.correlationId === lease.owner.correlationId &&
+            candidate.owner.sourceComponent === lease.owner.sourceComponent,
+        );
+        const targets = new Set<string>([lease.sourceComponent]);
+        for (const [relatedKey, candidate] of related) {
+          if (candidate.destination !== componentId) targets.add(candidate.destination);
+          reflectedInteractionLeases.delete(relatedKey);
+        }
+        for (const target of targets) publishReflectedClear(lease, target);
+        continue;
+      }
+      // A destination being disposed clears its own native state.  A source
+      // retirement must actively clear the reflected owner on still-live peers.
+      if (lease.sourceComponent === componentId && lease.destination !== componentId)
+        publishReflectedClear(lease, lease.destination);
+      reflectedInteractionLeases.delete(key);
+    }
+    for (const [ruleId, lease] of hoverSynchronizationLeases) {
+      if (lease.sourceComponent !== componentId) {
+        lease.destinations.delete(componentId);
+        continue;
+      }
+      // The generic reflected-leases loop above clears the same destinations.
+      hoverSynchronizationLeases.delete(ruleId);
+      abortHoverSynchronization(ruleId);
+    }
+  };
+  const abortSynchronizationsFor = (componentId: string): void => {
+    for (const [key, participants] of synchronizationParticipants)
+      if (participants.includes(componentId)) {
+        synchronizationControllers.get(key)?.abort();
+        synchronizationControllers.delete(key);
+        synchronizationParticipants.delete(key);
+      }
   };
   const setupSync = (rule: InteractionSyncRule): Disposable => {
     const subscription = fabric
@@ -844,6 +945,11 @@ export const createApplicationHarness = (
               synchronizationControllers.set(controllerKey, controller);
             } else if (event.phase === "set")
               synchronizationControllers.set(controllerKey, new AbortController());
+            if (synchronizationControllers.has(controllerKey))
+              synchronizationParticipants.set(controllerKey, [
+                event.origin.componentId,
+                destination,
+              ]);
             const signal = synchronizationControllers.get(controllerKey)?.signal;
             if (event.phase === "clear") {
               fabric.publish({
@@ -854,6 +960,14 @@ export const createApplicationHarness = (
                 type: `interaction.${commandFamily(event.interaction)}.clear`,
                 payload: { interactionId, owner },
               });
+              reflectedInteractionLeases.delete(
+                reflectionLeaseKey(
+                  rule.id,
+                  rule.interaction,
+                  event.origin.componentId,
+                  destination,
+                ),
+              );
               reflections.delete(reflection);
               continue;
             }
@@ -913,8 +1027,17 @@ export const createApplicationHarness = (
                   type: `interaction.${commandFamily(event.interaction)}.clear`,
                   payload: { interactionId, owner },
                 });
+                reflectedInteractionLeases.delete(
+                  reflectionLeaseKey(
+                    rule.id,
+                    rule.interaction,
+                    event.origin.componentId,
+                    destination,
+                  ),
+                );
               }
               synchronizationControllers.delete(controllerKey);
+              synchronizationParticipants.delete(controllerKey);
               if (event.interaction === "hover") {
                 const controllers = hoverSynchronizationControllers.get(rule.id);
                 for (const controller of controllers ?? [])
@@ -970,6 +1093,14 @@ export const createApplicationHarness = (
                     type: `interaction.${commandFamily(event.interaction)}.clear`,
                     payload: { interactionId, owner },
                   });
+                  reflectedInteractionLeases.delete(
+                    reflectionLeaseKey(
+                      rule.id,
+                      rule.interaction,
+                      event.origin.componentId,
+                      destination,
+                    ),
+                  );
                   return;
                 }
                 if (loci.length > 0)
@@ -991,6 +1122,23 @@ export const createApplicationHarness = (
                         : { semanticTarget: event.semanticTarget }),
                     } as unknown as JsonObject,
                   });
+                if (loci.length > 0)
+                  reflectedInteractionLeases.set(
+                    reflectionLeaseKey(
+                      rule.id,
+                      rule.interaction,
+                      event.origin.componentId,
+                      destination,
+                    ),
+                    {
+                      ruleId: rule.id,
+                      interaction: rule.interaction,
+                      sourceComponent: event.origin.componentId,
+                      destination,
+                      interactionId,
+                      owner,
+                    },
+                  );
               })
               .catch(() => {
                 if (signal?.aborted || disposed) return;
@@ -1010,6 +1158,7 @@ export const createApplicationHarness = (
               .finally(() => {
                 if (synchronizationControllers.get(controllerKey)?.signal === signal)
                   synchronizationControllers.delete(controllerKey);
+                synchronizationParticipants.delete(controllerKey);
                 if (event.interaction === "hover") {
                   const controllers = hoverSynchronizationControllers.get(rule.id);
                   for (const controller of controllers ?? [])
@@ -1023,39 +1172,251 @@ export const createApplicationHarness = (
       });
     return disposable(() => subscription.unsubscribe());
   };
+  const startReplacementComponent = async (
+    item: ComponentInstanceSpec,
+    factory: ComponentFactory,
+  ): Promise<void> => {
+    if (disposed || disposalRequested)
+      throw new Error("Cannot start a replacement in a disposed harness.");
+    const instance = factory.create({
+      id: item.id,
+      ...(item.config === undefined ? {} : { config: item.config }),
+    });
+    const abort = new AbortController();
+    components.set(item.id, { instance, abort });
+    let descriptor: ComponentDescriptor = {
+      id: item.id,
+      type: item.type,
+      capabilities: [...instance.capabilities],
+      coordinateSpaces: [],
+      status: "registered",
+    };
+    registry.set(descriptor, "registered");
+    descriptor = { ...descriptor, status: "starting" };
+    registry.set(descriptor, "updated");
+    try {
+      await instance.start({
+        fabric,
+        translators,
+        signal: abort.signal,
+        reportCapabilities: (capabilities) => {
+          if (abort.signal.aborted || components.get(item.id)?.instance !== instance) return;
+          descriptor = { ...descriptor, capabilities: [...capabilities] };
+          registry.set(descriptor, "updated");
+        },
+        reportCoordinateSpaces: (coordinateSpaces) => {
+          if (abort.signal.aborted || components.get(item.id)?.instance !== instance) return;
+          descriptor = { ...descriptor, coordinateSpaces: [...coordinateSpaces] };
+          registry.set(descriptor, "updated");
+        },
+      });
+      if (abort.signal.aborted || disposed || disposalRequested)
+        throw new Error(`Component '${item.id}' replacement was aborted.`);
+      descriptor = { ...descriptor, status: "ready" };
+      registry.set(descriptor, "ready");
+      const pending = pendingVisualization.get(item.id);
+      if (pending !== undefined) {
+        pendingVisualization.delete(item.id);
+        fabric.publish({
+          ...pending,
+          id: newId(),
+          causationId: pending.id,
+          target: { component: item.id },
+        });
+      }
+    } catch (reason) {
+      if (!disposed && !disposalRequested) {
+        descriptor = { ...descriptor, status: "failed" };
+        registry.set(descriptor, "updated");
+      }
+      abort.abort();
+      let cleanupError: unknown;
+      try {
+        await instance.dispose();
+      } catch (error) {
+        cleanupError = error;
+      }
+      if (components.get(item.id)?.instance === instance) components.delete(item.id);
+      registry.remove(item.id);
+      if (cleanupError !== undefined)
+        throw new AggregateError(
+          [reason, cleanupError],
+          `Component '${item.id}' failed to start and dispose.`,
+        );
+      throw reason;
+    }
+  };
+  const retireComponent = async (id: string): Promise<void> => {
+    const current = components.get(id);
+    if (current === undefined) return;
+    const descriptor = registry.get(id);
+    if (descriptor !== undefined) registry.set({ ...descriptor, status: "disposing" }, "updated");
+    abortSynchronizationsFor(id);
+    clearReflectedInteractions(id);
+    pendingVisualization.delete(id);
+    current.abort.abort();
+    try {
+      await current.instance.dispose();
+    } finally {
+      if (components.get(id) === current) components.delete(id);
+      if (components.get(id) === undefined) registry.remove(id);
+    }
+  };
+  const validReplacementSpec = (item: unknown): item is ComponentInstanceSpec => {
+    if (
+      item === null ||
+      typeof item !== "object" ||
+      Object.getPrototypeOf(item) !== Object.prototype
+    )
+      return false;
+    const record = item as Record<string, unknown>;
+    const keys = Object.keys(record).sort();
+    if (
+      keys.some((key) => key !== "config" && key !== "id" && key !== "type") ||
+      !keys.includes("id") ||
+      !keys.includes("type")
+    )
+      return false;
+    return (
+      typeof record.id === "string" &&
+      record.id.trim().length > 0 &&
+      typeof record.type === "string" &&
+      record.type.trim().length > 0 &&
+      (record.config === undefined ||
+        (isJsonSafeValue(record.config) &&
+          record.config !== null &&
+          !Array.isArray(record.config) &&
+          Object.getPrototypeOf(record.config) === Object.prototype))
+    );
+  };
+  let replacementSerial = Promise.resolve();
+  let replacementGeneration = 0;
+  const replaceComponents = (
+    requested: readonly ComponentInstanceSpec[],
+    retireIds: readonly string[] = [],
+  ): Promise<void> => {
+    let items: readonly ComponentInstanceSpec[];
+    let retiring: readonly string[];
+    let factories: readonly ComponentFactory[];
+    try {
+      if (!Array.isArray(requested) || !Array.isArray(retireIds))
+        throw new Error("Replacement components and retire IDs must be arrays.");
+      items = [...requested];
+      retiring = [...retireIds];
+      if (items.length === 0 && retiring.length === 0)
+        throw new Error("A replacement transaction must contain at least one component.");
+      if (items.some((item) => !validReplacementSpec(item)))
+        throw new Error("Invalid replacement component specification.");
+      if (retiring.some((id) => typeof id !== "string" || id.trim().length === 0))
+        throw new Error("Invalid replacement component retirement ID.");
+      const ids = [...items.map((item) => item.id), ...retiring];
+      if (new Set(ids).size !== ids.length) throw new Error("Duplicate replacement component ID.");
+      factories = items.map((item) => {
+        const factory = componentFactories.get(item.type);
+        if (factory === undefined) throw new Error(`Unknown component factory '${item.type}'.`);
+        return factory;
+      });
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    const generation = ++replacementGeneration;
+    const task = replacementSerial
+      .catch(() => undefined)
+      .then(async () => {
+        if (disposed || disposalRequested)
+          throw new Error("Cannot replace a component in a disposed harness.");
+        if (!started) throw new Error("Cannot replace a component before the harness starts.");
+        // A request superseded while it was queued performs no work. Once a
+        // retirement has begun it completes before the latest request mounts.
+        if (generation !== replacementGeneration) return;
+        const failures: unknown[] = [];
+        for (const id of [...retiring, ...items.map((item) => item.id)]) {
+          try {
+            await retireComponent(id);
+          } catch (error) {
+            failures.push(error);
+          }
+        }
+        if (failures.length > 0)
+          throw new AggregateError(
+            failures,
+            "Component retirement failed; replacement was not started.",
+          );
+        if (disposed || disposalRequested)
+          throw new Error("Component replacement was cancelled by harness disposal.");
+        if (generation !== replacementGeneration) return;
+        for (const [index, item] of items.entries()) {
+          if (disposed || disposalRequested)
+            throw new Error("Component replacement was cancelled by harness disposal.");
+          if (generation !== replacementGeneration) return;
+          try {
+            const factory = factories[index];
+            if (factory === undefined) throw new Error(`Missing factory for '${item.type}'.`);
+            await startReplacementComponent(item, factory);
+          } catch (error) {
+            failures.push(error);
+            diagnosis(`Component '${item.id}' replacement failed: ${String(error)}.`);
+            break;
+          }
+        }
+        if (failures.length > 0) {
+          for (const item of items) {
+            const current = components.get(item.id);
+            if (current !== undefined) {
+              try {
+                await retireComponent(item.id);
+              } catch (error) {
+                failures.push(error);
+              }
+            }
+          }
+        }
+        if (failures.length > 0)
+          throw new AggregateError(failures, "Component replacement failed.");
+      });
+    replacementSerial = task;
+    return task;
+  };
   const disposeAsync = (): Promise<void> => {
     if (disposePromise !== undefined) return disposePromise;
     disposed = true;
-    disposePromise = (async () => {
-      const failures: unknown[] = [];
-      for (const entry of processors.values()) entry.abort.abort();
-      for (const controller of synchronizationControllers.values()) controller.abort();
-      for (const controllers of hoverSynchronizationControllers.values())
-        for (const controller of controllers) controller.abort();
-      hoverSynchronizationControllers.clear();
-      hoverSynchronizationLeases.clear();
-      for (const cleanup of cleanups.splice(0).reverse()) {
-        try {
-          cleanup.dispose();
-        } catch (error) {
-          failures.push(error);
+    disposalRequested = true;
+    replacementGeneration += 1;
+    disposePromise = replacementSerial
+      .catch(() => undefined)
+      .then(async () => {
+        const failures: unknown[] = [];
+        for (const entry of processors.values()) entry.abort.abort();
+        for (const controller of synchronizationControllers.values()) controller.abort();
+        synchronizationParticipants.clear();
+        for (const controllers of hoverSynchronizationControllers.values())
+          for (const controller of controllers) controller.abort();
+        hoverSynchronizationControllers.clear();
+        hoverSynchronizationLeases.clear();
+        reflectedInteractionLeases.clear();
+        pendingVisualization.clear();
+        for (const cleanup of cleanups.splice(0).reverse()) {
+          try {
+            cleanup.dispose();
+          } catch (error) {
+            failures.push(error);
+          }
         }
-      }
-      for (const component of [...components.values()].reverse()) {
-        component.abort.abort();
-        try {
-          await component.instance.dispose();
-        } catch (error) {
-          failures.push(error);
+        for (const component of [...components.values()].reverse()) {
+          component.abort.abort();
+          try {
+            await component.instance.dispose();
+          } catch (error) {
+            failures.push(error);
+          }
+          registry.remove(component.instance.id);
         }
-        registry.remove(component.instance.id);
-      }
-      components.clear();
-      for (const registration of coreSchemas) registration.dispose();
-      registry.complete();
-      fabric.dispose();
-      if (failures.length > 0) throw new AggregateError(failures, "Harness teardown failed.");
-    })();
+        components.clear();
+        for (const registration of coreSchemas) registration.dispose();
+        registry.complete();
+        fabric.dispose();
+        if (failures.length > 0) throw new AggregateError(failures, "Harness teardown failed.");
+      });
     return disposePromise;
   };
   const dispose = (): void => {
@@ -1070,6 +1431,7 @@ export const createApplicationHarness = (
       if (started) return;
       started = true;
       try {
+        assertRuntimeActive();
         const componentIds = new Set(spec.components.map((item) => item.id));
         if (componentIds.size !== spec.components.length)
           throw new Error("Duplicate component instance ID.");
@@ -1090,6 +1452,7 @@ export const createApplicationHarness = (
         for (const route of spec.routes ?? []) cleanups.push(addRoute(route));
         const seen = new Set<string>();
         for (const item of spec.components) {
+          assertRuntimeActive();
           if (seen.has(item.id)) throw new Error(`Duplicate component instance '${item.id}'.`);
           seen.add(item.id);
           const factory = componentFactories.get(item.type);
@@ -1115,14 +1478,31 @@ export const createApplicationHarness = (
             translators,
             signal: abort.signal,
             reportCapabilities: (capabilities) => {
+              if (
+                disposed ||
+                disposalRequested ||
+                abort.signal.aborted ||
+                components.get(item.id)?.instance !== instance
+              )
+                return;
               descriptor = { ...descriptor, capabilities: [...capabilities] };
               registry.set(descriptor, "updated");
             },
             reportCoordinateSpaces: (coordinateSpaces) => {
+              if (
+                disposed ||
+                disposalRequested ||
+                abort.signal.aborted ||
+                components.get(item.id)?.instance !== instance
+              )
+                return;
               descriptor = { ...descriptor, coordinateSpaces: [...coordinateSpaces] };
               registry.set(descriptor, "updated");
             },
           });
+          assertRuntimeActive();
+          if (abort.signal.aborted || components.get(item.id)?.instance !== instance)
+            throw new Error(`Component '${item.id}' startup was aborted.`);
           descriptor = { ...descriptor, status: "ready" };
           registry.set(descriptor, "ready");
           const pending = pendingVisualization.get(item.id);
@@ -1136,7 +1516,9 @@ export const createApplicationHarness = (
             });
           }
         }
+        assertRuntimeActive();
         for (const rule of spec.synchronization ?? []) cleanups.push(setupSync(rule));
+        assertRuntimeActive();
         const processorSubscription = fabric.observe().subscribe((message) => {
           for (const entry of processors.values())
             if (entry.processor.types.includes(message.type))
@@ -1148,6 +1530,7 @@ export const createApplicationHarness = (
                 });
         });
         cleanups.push(disposable(() => processorSubscription.unsubscribe()));
+        assertRuntimeActive();
         const pendingPlugins = (spec.plugins ?? []).map((item) => {
           const factory = pluginFactories.get(item.plugin);
           if (factory === undefined) throw new Error(`Unknown plugin factory '${item.plugin}'.`);
@@ -1158,6 +1541,7 @@ export const createApplicationHarness = (
         );
         const installedIds = new Set<string>();
         while (pendingPlugins.length > 0) {
+          assertRuntimeActive();
           const index = pendingPlugins.findIndex(
             ({ item, plugin }) =>
               !installedIds.has(item.id) &&
@@ -1178,8 +1562,14 @@ export const createApplicationHarness = (
               candidate.item.config ?? ({} as JsonObject),
             );
             if (result !== undefined) pluginCleanups.push(result);
+            assertRuntimeActive();
           } catch (error) {
-            for (const cleanup of pluginCleanups.reverse()) cleanup.dispose();
+            for (const cleanup of pluginCleanups.reverse())
+              try {
+                cleanup.dispose();
+              } catch {
+                // Preserve the startup/disposal failure as the primary error.
+              }
             throw error;
           }
           cleanups.push(...pluginCleanups);
@@ -1187,12 +1577,14 @@ export const createApplicationHarness = (
           for (const capability of candidate.plugin.provides ?? [])
             installedCapabilities.add(capability);
         }
+        assertRuntimeActive();
         for (const route of spec.routes ?? [])
           if ("capability" in route.to && !installedCapabilities.has(route.to.capability))
             throw new Error(
               `Route '${route.id}' targets unsupported capability '${route.to.capability}'.`,
             );
         if (policies.unhandledMessage === "diagnostic") {
+          assertRuntimeActive();
           const handled = new Set([
             ...(spec.routes ?? []).map((route) => route.type),
             ...(spec.synchronization ?? []).map(() => "interaction.native"),
@@ -1216,6 +1608,7 @@ export const createApplicationHarness = (
       }
     },
     dispose,
+    replaceComponents,
     disposeAsync,
   };
 };

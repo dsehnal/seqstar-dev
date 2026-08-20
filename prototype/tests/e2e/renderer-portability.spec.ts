@@ -42,6 +42,84 @@ test("renders the offline P04637 portability case with one shared document", asy
   expect(external).toEqual([]);
 });
 
+test("deep-links and repeatedly replaces the active renderer without changing the document", async ({
+  page,
+}) => {
+  await page.goto("/#/renderer-portability?renderer=reference");
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText("ready");
+  const digest = await page.getByTestId("renderer-document-digest").textContent();
+  await expect(page.getByTestId("base-sequence-host")).toBeVisible();
+  const status = page.getByTestId("renderer-chooser-status");
+  const choice = page.getByLabel("Sequence renderer");
+  const visiblePanels = page.locator('[data-testid^="visualizer-panel-"]:visible');
+  const expectedPanels = new Map([
+    ["reference", 1],
+    ["nightingale", 1],
+    ["compare", 2],
+  ]);
+  for (const mode of ["nightingale", "compare", "reference", "nightingale", "reference"]) {
+    await choice.selectOption(mode);
+    await expect(page).toHaveURL(new RegExp(`renderer=${mode}`, "u"));
+    await expect(status).toContainText("ready");
+    await expect(visiblePanels).toHaveCount(expectedPanels.get(mode) ?? 0);
+    await expect(page.getByTestId("renderer-document-digest")).toHaveText(digest ?? "");
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-seqstar-harness-telemetry-subscriptions",
+      "1",
+    );
+  }
+  await expect(page.getByTestId("renderer-portability-lifecycle")).toContainText(
+    "P04637-reference-initial",
+  );
+  const settledMessages = await page.evaluate(
+    () => document.documentElement.dataset.seqstarHarnessMessageCount,
+  );
+  await page.waitForTimeout(250);
+  expect(
+    await page.evaluate(() => document.documentElement.dataset.seqstarHarnessMessageCount),
+  ).toBe(settledMessages);
+  await page.reload();
+  await expect(status).toContainText("ready");
+  await expect(page.getByTestId("renderer-document-digest")).toHaveText(digest ?? "");
+  await expect(page.getByTestId("base-sequence-host")).toBeVisible();
+});
+
+test("reports an exact incoming renderer failure without a false ready mode", async ({ page }) => {
+  await page.goto("/#/renderer-portability?renderer=reference");
+  const status = page.getByTestId("renderer-chooser-status");
+  await expect(status).toContainText("ready");
+  await page.evaluate(() => {
+    for (const tag of [
+      "nightingale-sequence",
+      "nightingale-track",
+      "nightingale-linegraph-track",
+    ]) {
+      const element = customElements.get(tag) as
+        | (CustomElementConstructor & {
+            prototype: { waitForSeqstarFirstRender?: () => Promise<void> };
+          })
+        | undefined;
+      if (element !== undefined)
+        element.prototype.waitForSeqstarFirstRender = () =>
+          Promise.reject(new Error("forced readiness failure"));
+    }
+  });
+  await page.getByLabel("Sequence renderer").selectOption("nightingale");
+  await expect(status).toHaveRole("alert");
+  await expect(status).toContainText("Renderer switch failed: Renderer request failed.");
+  await expect(status).not.toContainText("renderer ready");
+  await expect(page.getByTestId("renderer-portability-lifecycle")).toContainText(
+    "P04637-nightingale-initial — failed",
+  );
+  await expect(
+    page.getByTestId("nightingale-sequence-host").locator('[data-seqstar-nightingale="root"]'),
+  ).toHaveCount(0);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-seqstar-harness-telemetry-subscriptions",
+    "1",
+  );
+});
+
 test("exposes deterministic generic Nightingale readiness, identity, interaction, and owner state", async ({
   page,
 }) => {
