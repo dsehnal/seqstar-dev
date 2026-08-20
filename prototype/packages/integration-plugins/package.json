@@ -18,6 +18,7 @@
   "dependencies": {
     "@seq-star/harness-core": "workspace:*",
     "@seq-star/seq-coords": "workspace:*",
+    "@seq-star/seq-core": "workspace:*",
     "@seq-star/seq-view-spec": "workspace:*",
     "molstar": "5.11.0"
   }

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlignmentStructureRouteImport } from './routes/alignment-structure'
 import { Route as ComplexRouteImport } from './routes/complex'
+import { Route as HarnessDiagnosticsRouteImport } from './routes/harness-diagnostics'
 import { Route as P01FeasibilityRouteImport } from './routes/p01-feasibility'
 import { Route as ReferenceViewerRouteImport } from './routes/reference-viewer'
 import { Route as RendererPortabilityRouteImport } from './routes/renderer-portability'
@@ -30,6 +31,11 @@ const AlignmentStructureRoute = AlignmentStructureRouteImport.update({
 const ComplexRoute = ComplexRouteImport.update({
   id: '/complex',
   path: '/complex',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HarnessDiagnosticsRoute = HarnessDiagnosticsRouteImport.update({
+  id: '/harness-diagnostics',
+  path: '/harness-diagnostics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const P01FeasibilityRoute = P01FeasibilityRouteImport.update({
@@ -57,6 +63,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alignment-structure': typeof AlignmentStructureRoute
   '/complex': typeof ComplexRoute
+  '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
   '/reference-viewer': typeof ReferenceViewerRoute
   '/renderer-portability': typeof RendererPortabilityRoute
@@ -66,6 +73,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alignment-structure': typeof AlignmentStructureRoute
   '/complex': typeof ComplexRoute
+  '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
   '/reference-viewer': typeof ReferenceViewerRoute
   '/renderer-portability': typeof RendererPortabilityRoute
@@ -76,6 +84,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/alignment-structure': typeof AlignmentStructureRoute
   '/complex': typeof ComplexRoute
+  '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
   '/reference-viewer': typeof ReferenceViewerRoute
   '/renderer-portability': typeof RendererPortabilityRoute
@@ -87,6 +96,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alignment-structure'
     | '/complex'
+    | '/harness-diagnostics'
     | '/p01-feasibility'
     | '/reference-viewer'
     | '/renderer-portability'
@@ -96,6 +106,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alignment-structure'
     | '/complex'
+    | '/harness-diagnostics'
     | '/p01-feasibility'
     | '/reference-viewer'
     | '/renderer-portability'
@@ -105,6 +116,7 @@ export interface FileRouteTypes {
     | '/'
     | '/alignment-structure'
     | '/complex'
+    | '/harness-diagnostics'
     | '/p01-feasibility'
     | '/reference-viewer'
     | '/renderer-portability'
@@ -115,6 +127,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlignmentStructureRoute: typeof AlignmentStructureRoute
   ComplexRoute: typeof ComplexRoute
+  HarnessDiagnosticsRoute: typeof HarnessDiagnosticsRoute
   P01FeasibilityRoute: typeof P01FeasibilityRoute
   ReferenceViewerRoute: typeof ReferenceViewerRoute
   RendererPortabilityRoute: typeof RendererPortabilityRoute
@@ -142,6 +155,13 @@ declare module '@tanstack/react-router' {
       path: '/complex'
       fullPath: '/complex'
       preLoaderRoute: typeof ComplexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/harness-diagnostics': {
+      id: '/harness-diagnostics'
+      path: '/harness-diagnostics'
+      fullPath: '/harness-diagnostics'
+      preLoaderRoute: typeof HarnessDiagnosticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/p01-feasibility': {
@@ -179,6 +199,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlignmentStructureRoute: AlignmentStructureRoute,
   ComplexRoute: ComplexRoute,
+  HarnessDiagnosticsRoute: HarnessDiagnosticsRoute,
   P01FeasibilityRoute: P01FeasibilityRoute,
   ReferenceViewerRoute: ReferenceViewerRoute,
   RendererPortabilityRoute: RendererPortabilityRoute,

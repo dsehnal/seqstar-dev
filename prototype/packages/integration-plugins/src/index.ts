@@ -224,6 +224,40 @@ export interface IntegrationPluginsPackageBoundary {
 }
 
 export {
+  type AlignmentStructureColumnRow,
+  type AlignmentStructureData,
+  type AlignmentStructurePluginOptions,
+  type AlignmentStructureTranslators,
+  alignmentColumnSpace,
+  createAlignmentStructurePlugin,
+  createAlignmentStructureSeqViewSpec,
+  createAlignmentStructureTranslators,
+  createNeutral1A3nMvs,
+  type P69905StructureRow,
+  p69905SequenceSpace,
+  p69905StructureSpace,
+  parseAlignmentStructureMappingTsv,
+  parseP69905StructureMappingTsv,
+} from "./alignment-structure.js";
+export {
+  barnaseSequenceSpace,
+  barnaseStructureSpace,
+  barstarSequenceSpace,
+  barstarStructureSpace,
+  type ComplexContact,
+  type ComplexMappingRow,
+  type ComplexMvsGeneration,
+  type ComplexPluginOptions,
+  createComplexMappingTranslators,
+  createComplexPlugin,
+  createComplexSeqViewSpec,
+  generateComplexMvs,
+  parseComplexContactsTsv,
+  parseComplexMappingTsv,
+  parseSyntheticConfidenceTsv,
+  type SyntheticConfidenceRow,
+} from "./complex.js";
+export {
   createRendererPortabilityPlugin,
   type RendererPortabilityPluginOptions,
   rendererPortabilityDocument,

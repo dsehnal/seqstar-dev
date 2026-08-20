@@ -8,6 +8,7 @@
   "references": [
     { "path": "../harness-core" },
     { "path": "../seq-coords" },
+    { "path": "../seq-core" },
     { "path": "../seq-view-spec" }
   ]
 }

@@ -31,9 +31,9 @@ test("disposes connected hosts and remounts a fresh StrictMode-safe harness", as
       events.push((event as CustomEvent).detail);
     });
   });
-  await page.goto("/#/complex");
+  await page.goto("/#/harness-diagnostics");
   await expect(page.getByTestId("page-harness-status")).toContainText("ready");
-  await expect(page.getByTestId("visualizer-panel-complex-sequence")).toHaveAttribute(
+  await expect(page.getByTestId("visualizer-panel-diagnostic-sequence")).toHaveAttribute(
     "data-harness-component",
     "ready",
   );
@@ -53,7 +53,7 @@ test("disposes connected hosts and remounts a fresh StrictMode-safe harness", as
   await expect(drawer).toContainText("[redacted]");
   await expect(drawer).not.toContainText("never-render-this");
   await drawer
-    .getByRole("button", { name: "seqviewspec: diagnostic-probe-complex" })
+    .getByRole("button", { name: "seqviewspec: diagnostic-probe-harness-diagnostics" })
     .click();
   const inspector = drawer.getByTestId("document-inspector");
   await expect(inspector).toContainText("[redacted]");
@@ -73,10 +73,12 @@ test("disposes connected hosts and remounts a fresh StrictMode-safe harness", as
         ).__seqstarDisposeEvents,
     ),
   ).toEqual([
-    { componentId: "complex-sequence", hostConnected: true },
-    { componentId: "complex-structure", hostConnected: true },
+    { componentId: "diagnostic-sequence", hostConnected: true },
+    { componentId: "diagnostic-structure", hostConnected: true },
   ]);
-  await page.getByRole("link", { name: "Complex" }).click();
+  await page.evaluate(() => {
+    window.location.hash = "/harness-diagnostics";
+  });
   await expect(page.getByTestId("page-harness-status")).toContainText("ready");
   expect(
     await page.evaluate(() => Number(document.documentElement.dataset.harnessStartCount)),
@@ -90,10 +92,10 @@ test("disposes connected hosts and remounts a fresh StrictMode-safe harness", as
   await page.getByRole("button", { name: "Test harness startup recovery" }).click();
   const startupFailure = page.getByRole("alert");
   await expect(startupFailure).toContainText("Harness startup failed");
-  await expect(startupFailure).toContainText("complex");
+  await expect(startupFailure).toContainText("harness-diagnostics");
   await startupFailure.getByRole("button", { name: "Retry harness startup" }).click();
   await expect(page.getByTestId("page-harness-status")).toContainText("ready");
-  await expect(page.getByTestId("visualizer-panel-complex-sequence")).toHaveAttribute(
+  await expect(page.getByTestId("visualizer-panel-diagnostic-sequence")).toHaveAttribute(
     "data-harness-component",
     "ready",
   );

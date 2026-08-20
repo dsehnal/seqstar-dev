@@ -157,6 +157,9 @@ importers:
       '@seq-star/seq-coords':
         specifier: workspace:*
         version: link:../seq-coords
+      '@seq-star/seq-core':
+        specifier: workspace:*
+        version: link:../seq-core
       '@seq-star/seq-view-spec':
         specifier: workspace:*
         version: link:../seq-view-spec
