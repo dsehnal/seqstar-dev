@@ -7,7 +7,9 @@ import {
 } from "@seq-star/harness-react";
 import {
   CRYOET_LIVE_INDEX,
+  CRYOET_PP7_PARTICLE_SETS,
   type CryoEtLiveMetadata,
+  type CryoEtPp7ParticleSetId,
   createCryoEtTomogramPlugin,
 } from "@seq-star/integration-plugins";
 import { createMolstarWrapperFactory } from "@seq-star/wrapper-molstar";
@@ -42,6 +44,7 @@ const rendererComponents = {
 const createPageHarness = (
   hosts: { readonly require: (id: string) => HTMLElement },
   mode: Exclude<RendererMode, "compare">,
+  particleSetId: CryoEtPp7ParticleSetId,
 ) =>
   createApplicationHarness(
     {
@@ -86,6 +89,7 @@ const createPageHarness = (
               tomogramComponent,
               sequenceComponent,
               structureComponent,
+              particleSetId,
             }),
         },
       ],
@@ -101,10 +105,14 @@ type SelectedParticle = {
 
 function CryoEtContent({
   initialMode,
+  particleSetId,
   onModeChange,
+  onParticleSetChange,
 }: {
   readonly initialMode: RendererMode;
+  readonly particleSetId: CryoEtPp7ParticleSetId;
   readonly onModeChange: (mode: RendererMode) => void;
+  readonly onParticleSetChange: (particleSetId: CryoEtPp7ParticleSetId) => void;
 }) {
   const { harness } = useHarness();
   const tomogramHost = useHarnessHost(tomogramComponent);
@@ -171,13 +179,45 @@ function CryoEtContent({
           </>
         }
       />
-      <CaseRendererChooser
-        descriptor={{ caseId: "cryoet-tomogram", modes: rendererModes, initialMode }}
-        modeComponents={rendererComponents}
-        onModeChange={onModeChange}
-      >
-        {() => null}
-      </CaseRendererChooser>
+      <section className="case-control-panel">
+        <CaseRendererChooser
+          descriptor={{ caseId: "cryoet-tomogram", modes: rendererModes, initialMode }}
+          modeComponents={rendererComponents}
+          onModeChange={onModeChange}
+        >
+          {() => null}
+        </CaseRendererChooser>
+        <div className="case-control-panel__dataset">
+          <label
+            className="grid gap-1 font-medium text-slate-800 text-sm"
+            htmlFor="cryoet-dataset-select"
+          >
+            Live dataset and particle class
+            <select
+              className="min-w-80 rounded border border-slate-400 bg-white px-3 py-2 text-slate-950"
+              data-testid="cryoet-dataset-selector"
+              id="cryoet-dataset-select"
+              value={particleSetId}
+              onChange={(event) =>
+                onParticleSetChange(event.currentTarget.value as CryoEtPp7ParticleSetId)
+              }
+            >
+              {Object.values(CRYOET_PP7_PARTICLE_SETS).map((particleSet) => (
+                <option key={particleSet.id} value={particleSet.id}>
+                  {particleSet.label}
+                </option>
+              ))}
+              <option disabled value="groel">
+                DS-10493 · GroEL · no class-linked average
+              </option>
+            </select>
+          </label>
+          <p className="text-slate-600 text-sm">
+            Switch between two live PP7 annotation sets. This run also contains GroEL, but its
+            Portal record does not provide the class-linked deposited average required here.
+          </p>
+        </div>
+      </section>
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.75fr)]">
         <VisualizationCard
           className="visualization-card--flush"
@@ -204,7 +244,9 @@ function CryoEtContent({
                 <strong>{particle?.particleId ?? "Choose a PP7 particle"}</strong>
                 <span>
                   {particle === undefined
-                    ? "128 live oriented-point annotations"
+                    ? metadata === undefined
+                      ? "Loading live particle annotations"
+                      : `${metadata.particleCount} live ${metadata.particleSet.shape === "point" ? "point" : "oriented-point"} annotations`
                     : `x ${particle.location[0].toFixed(1)} · y ${particle.location[1].toFixed(1)} · z ${particle.location[2].toFixed(1)}`}
                 </span>
               </div>
@@ -313,7 +355,7 @@ function CryoEtContent({
       </div>
       <div className="grid gap-5 xl:grid-cols-2">
         <ViewerPanel
-          description="Live P03630 sequence, regions, binding/disulfide sites, and mutagenesis evidence."
+          description="Live P03630 sequence and UniProt features, plus an explicitly synthetic structure-fit quality track."
           hostRef={sequenceHost}
           id={sequenceComponent}
           title="Protein annotations"
@@ -341,15 +383,22 @@ function CryoEtContent({
   );
 }
 
-function CryoEtPage() {
-  const search = Route.useSearch();
-  const navigate = Route.useNavigate();
-  const initialMode = rendererSearch(search.renderer, rendererModes, "reference");
+function CryoEtHarnessPage({
+  initialMode,
+  particleSetId,
+  onModeChange,
+  onParticleSetChange,
+}: {
+  readonly initialMode: RendererMode;
+  readonly particleSetId: CryoEtPp7ParticleSetId;
+  readonly onModeChange: (mode: RendererMode) => void;
+  readonly onParticleSetChange: (particleSetId: CryoEtPp7ParticleSetId) => void;
+}) {
   const mountedMode = useRef(initialMode).current;
   const createHarness = useCallback(
     ({ hosts }: { readonly hosts: { readonly require: (id: string) => HTMLElement } }) =>
-      createPageHarness(hosts, mountedMode as Exclude<RendererMode, "compare">),
-    [mountedMode],
+      createPageHarness(hosts, mountedMode as Exclude<RendererMode, "compare">, particleSetId),
+    [mountedMode, particleSetId],
   );
   return (
     <HarnessProvider
@@ -360,13 +409,39 @@ function CryoEtPage() {
     >
       <CryoEtContent
         initialMode={initialMode}
-        onModeChange={(renderer) => void navigate({ search: { renderer } })}
+        particleSetId={particleSetId}
+        onModeChange={onModeChange}
+        onParticleSetChange={onParticleSetChange}
       />
     </HarnessProvider>
   );
 }
 
+function CryoEtPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const initialMode = rendererSearch(search.renderer, rendererModes, "reference");
+  const particleSetId: CryoEtPp7ParticleSetId =
+    search.particleSet === "points" ? "points" : "oriented";
+  return (
+    <CryoEtHarnessPage
+      key={particleSetId}
+      initialMode={initialMode}
+      particleSetId={particleSetId}
+      onModeChange={(renderer) =>
+        void navigate({ search: { renderer, particleSet: particleSetId } })
+      }
+      onParticleSetChange={(particleSet) =>
+        void navigate({ search: { renderer: initialMode, particleSet } })
+      }
+    />
+  );
+}
+
 export const Route = createFileRoute("/cryoet-tomogram")({
-  validateSearch: (search: Record<string, unknown>) => ({ renderer: search.renderer }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    renderer: search.renderer,
+    particleSet: search.particleSet,
+  }),
   component: CryoEtPage,
 });

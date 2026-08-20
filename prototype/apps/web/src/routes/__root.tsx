@@ -65,7 +65,7 @@ function RootLayout() {
             </Link>
             <Link
               activeProps={{ "aria-current": "page" }}
-              search={{ renderer: undefined }}
+              search={{ renderer: undefined, particleSet: undefined }}
               to="/cryoet-tomogram"
             >
               Cryo-ET story

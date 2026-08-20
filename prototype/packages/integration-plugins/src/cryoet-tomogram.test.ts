@@ -1,7 +1,14 @@
+import {
+  type ComponentFactory,
+  createApplicationHarness,
+  type HarnessMessage,
+} from "@seq-star/harness-core";
+import type { CoordinateLocus } from "@seq-star/seq-coords";
 import { MVSData } from "molstar/lib/extensions/mvs/index.js";
 import { describe, expect, it } from "vitest";
 import {
   CRYOET_LIVE_INDEX,
+  CRYOET_PP7_PARTICLE_SETS,
   CryoEtReadySchema,
   createPp7DensityMvs,
   createPp7SeqViewSpec,
@@ -27,6 +34,12 @@ const particles = Array.from({ length: 128 }, (_, index) =>
       [0, 1, 0],
       [0, 0, 1],
     ],
+  }),
+).join("\n");
+const pointParticles = Array.from({ length: 140 }, (_, index) =>
+  JSON.stringify({
+    type: "point",
+    location: { x: index + 1, y: index + 2, z: index + 3 },
   }),
 ).join("\n");
 
@@ -97,6 +110,19 @@ describe("live cryo-ET adapters", () => {
     expect(Object.isFrozen(parsed)).toBe(true);
   });
 
+  it("parses the second verified live PP7 point set without inventing orientations", () => {
+    const parsed = parseCryoEtParticleNdjson(pointParticles, "points");
+    expect(parsed).toHaveLength(140);
+    expect(parsed[0]).toEqual({
+      id: "AN-134661:0001",
+      classId: "pp7-capsid",
+      location: [1, 2, 3],
+    });
+    expect(CRYOET_PP7_PARTICLE_SETS.points.annotationUrl).toContain(
+      "/Annotations/101/pseudomonas_phage_pp7_vlp-1.0_point.ndjson",
+    );
+  });
+
   it("builds the live UniProt tracks and the two honest MolViewSpec presentations", () => {
     const sequence = createPp7SeqViewSpec(uniprot);
     expect(sequence.sequences[0]?.residues).toHaveLength(128);
@@ -105,6 +131,7 @@ describe("live cryo-ET adapters", () => {
       "P03630-regions-track",
       "P03630-sites-track",
       "P03630-mutagenesis-track",
+      "P03630-fit-quality-track",
     ]);
     const density = createPp7DensityMvs("Live PP7 average", 0.0231, 3.7, 4.9976);
     const structure = createPp7StructureMvs();
@@ -125,7 +152,8 @@ describe("live cryo-ET adapters", () => {
     const regions = createPp7TrackStructureMvs(uniprot, "regions");
     const sites = createPp7TrackStructureMvs(uniprot, "sites");
     const mutagenesis = createPp7TrackStructureMvs(uniprot, "mutagenesis");
-    for (const document of [neutral, regions, sites, mutagenesis]) {
+    const fitQuality = createPp7TrackStructureMvs(uniprot, "fit-quality");
+    for (const document of [neutral, regions, sites, mutagenesis, fitQuality]) {
       expect(MVSData.validationIssues(document, { noExtra: true })).toBeUndefined();
       expect(countMvsRepresentationTypes(document).cartoon).toBe(1);
     }
@@ -143,6 +171,12 @@ describe("live cryo-ET adapters", () => {
     expect(JSON.stringify(queryMvsTree(sites, "color"))).toContain('"color":"#D97706"');
     expect(JSON.stringify(queryMvsTree(mutagenesis, "component"))).toContain('"label_seq_id":45');
     expect(JSON.stringify(queryMvsTree(mutagenesis, "color"))).toContain('"color":"#E11D48"');
+    expect(countMvsRepresentationTypes(fitQuality)).toEqual({ cartoon: 1 });
+    const fitColors = JSON.stringify(queryMvsTree(fitQuality, "color"));
+    expect(fitColors).toContain('"color":"#DC2626"');
+    expect(fitColors).toContain('"color":"#F59E0B"');
+    expect(fitColors).toContain('"color":"#059669"');
+    expect(fitColors).not.toContain("ball_and_stick");
   });
 
   it("loads every scientific record from its official live URL while keeping only the join index local", async () => {
@@ -214,14 +248,20 @@ describe("live cryo-ET adapters", () => {
     const dynamicStructure = {
       id: "structure-residue",
       kind: "structure-residue",
-      authority: "pdb",
+      authority: "molstar",
       context: {
-        entry_id: "1DWN",
-        entity_id: "1",
-        label_asym_id: "A",
-        auth_asym_id: "A",
-        model_id: "model-1",
-        unit_id: "unit-7",
+        entry: "1DWN",
+        structure: "structure-1",
+        model: "model-1",
+        "model-index": "0",
+        "model-number": "1",
+        entity: "1",
+        "label-asym": "A",
+        "auth-asym": "A",
+        unit: "unit-7",
+        operator: "1_555",
+        instance: "1",
+        numbering: "label-auth",
       },
     } as const;
     const mapped = await forward.map(
@@ -239,7 +279,7 @@ describe("live cryo-ET adapters", () => {
     );
     expect(mapped.associations[0]?.targets[0]).toMatchObject({
       space: dynamicStructure,
-      position: { kind: "label", value: 39 },
+      position: { kind: "label", value: "label:39|auth:40" },
     });
     const roundTrip = await reverse.map(
       { loci: mapped.associations[0]?.targets ?? [], target: pp7SequenceSpace },
@@ -250,5 +290,125 @@ describe("live cryo-ET adapters", () => {
       space: pp7SequenceSpace,
       position: { kind: "index", value: 39 },
     });
+  });
+
+  it("reflects hover in both directions through actual production-shaped coordinate spaces", async () => {
+    const dynamicStructure = {
+      id: "structure-residue",
+      kind: "structure-residue",
+      authority: "molstar",
+      context: {
+        entry: "1DWN",
+        structure: "structure-1",
+        model: "model-1",
+        "model-index": "0",
+        "model-number": "1",
+        entity: "1",
+        "label-asym": "A",
+        "auth-asym": "A",
+        unit: "unit-7",
+        operator: "1_555",
+        instance: "1",
+        numbering: "label-auth",
+      },
+    } as const;
+    const received: HarnessMessage[] = [];
+    const factory: ComponentFactory = {
+      type: "cryoet.test",
+      create({ id }) {
+        return {
+          id,
+          capabilities: [],
+          async start(context) {
+            context.reportCoordinateSpaces([
+              id === "sequence" ? pp7SequenceSpace : dynamicStructure,
+            ]);
+            if (id === "sequence")
+              for (const translator of createPp7StructureTranslators())
+                context.translators.register(translator);
+            context.fabric.observe({ targetComponent: id }).subscribe((message) => {
+              if (message.type === "interaction.highlight.apply") received.push(message);
+            });
+          },
+          dispose() {},
+        };
+      },
+    };
+    const harness = createApplicationHarness(
+      {
+        id: "cryoet-hover-contract",
+        components: [
+          { id: "sequence", type: factory.type },
+          { id: "structure", type: factory.type },
+        ],
+        synchronization: [
+          {
+            id: "cryoet-hover",
+            interaction: "hover",
+            between: ["sequence", "structure"],
+            unmapped: "clear",
+          },
+        ],
+      },
+      { componentFactories: [factory], pluginFactories: [] },
+    );
+    await harness.start();
+    const publish = (component: "sequence" | "structure", locus: CoordinateLocus) => {
+      const id = crypto.randomUUID();
+      harness.fabric.publish({
+        id,
+        type: "interaction.native",
+        version: "0.1.0",
+        source: { component },
+        correlationId: id,
+        timestamp: new Date().toISOString(),
+        payload: {
+          interactionId: `hover-${component}`,
+          interaction: "hover",
+          phase: "set",
+          origin: { componentId: component },
+          loci: [locus],
+        },
+      });
+    };
+    publish("sequence", {
+      kind: "point",
+      space: pp7SequenceSpace,
+      position: { kind: "index", value: 39 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    publish("structure", {
+      kind: "point",
+      space: dynamicStructure,
+      position: { kind: "label", value: "label:67|auth:68" },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(
+      received.map((message) => ({
+        target:
+          message.target !== undefined && "component" in message.target
+            ? message.target.component
+            : undefined,
+        locus: (message.payload as { loci: readonly unknown[] }).loci[0],
+      })),
+    ).toEqual([
+      {
+        target: "structure",
+        locus: {
+          kind: "point",
+          space: dynamicStructure,
+          position: { kind: "label", value: "label:39|auth:40" },
+        },
+      },
+      {
+        target: "sequence",
+        locus: {
+          kind: "point",
+          space: pp7SequenceSpace,
+          position: { kind: "index", value: 67 },
+        },
+      },
+    ]);
+    await harness.disposeAsync();
   });
 });

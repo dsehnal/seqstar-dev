@@ -14,6 +14,12 @@ const particles = Array.from({ length: 128 }, (_, index) =>
     ],
   }),
 ).join("\n");
+const pointParticles = Array.from({ length: 140 }, (_, index) =>
+  JSON.stringify({
+    type: "point",
+    location: { x: (index * 83) % 1230, y: (index * 47) % 1230, z: (index * 19) % 480 },
+  }),
+).join("\n");
 const uniprot = {
   primaryAccession: "P03630",
   proteinDescription: { recommendedName: { fullName: { value: "Capsid protein" } } },
@@ -78,7 +84,10 @@ test("links a live-shaped tomogram particle to density, representative structure
     const url = route.request().url();
     seen.add(url);
     if (url.endsWith(".ndjson"))
-      await route.fulfill({ body: particles, contentType: "application/x-ndjson" });
+      await route.fulfill({
+        body: url.includes("/Annotations/101/") ? pointParticles : particles,
+        contentType: "application/x-ndjson",
+      });
     else if (url.endsWith(".png")) await route.fulfill({ body: image, contentType: "image/png" });
     else await route.abort();
   });
@@ -179,11 +188,34 @@ test("links a live-shaped tomogram particle to density, representative structure
   await expect(page.getByTestId("inspect-mvs-json")).toContainText('"label_seq_id": 39');
   await page.getByTestId("inspect-tab-summary").click();
 
+  await page
+    .getByRole("button", { name: "Activate track Synthetic structure fit quality" })
+    .click();
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "cryoet-structure-fit-quality-",
+  );
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
+    timeout: 20_000,
+  });
+  await page.getByTestId("inspect-tab-mvs").click();
+  await expect(page.getByTestId("inspect-mvs-json")).toContainText("#DC2626");
+  await expect(page.getByTestId("inspect-mvs-json")).toContainText("#059669");
+  await expect(page.getByTestId("inspect-mvs-json")).not.toContainText("ball_and_stick");
+  await page.getByTestId("inspect-tab-summary").click();
+
   await page.getByLabel("Sequence renderer").selectOption("nightingale");
   await expect(page.getByText("nightingale renderer ready")).toBeVisible({ timeout: 20_000 });
   await expect(
     page.getByTestId("cryoet-sequence-host").locator('[data-seqstar-nightingale="root"]'),
   ).toBeVisible();
+  await page.getByTestId("cryoet-dataset-selector").selectOption("points");
+  await expect(page.getByTestId("cryoet-tomogram-host").locator(".tomogram-particle")).toHaveCount(
+    140,
+    { timeout: 20_000 },
+  );
+  await expect(page.getByTestId("cryoet-selected-object")).toContainText(
+    "140 live point annotations",
+  );
   expect([...seen]).toEqual(
     expect.arrayContaining([
       expect.stringContaining("pseudomonas_phage_pp7_vlp-1.0_orientedpoint.ndjson"),

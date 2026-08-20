@@ -9,9 +9,11 @@ import {
 import type {
   CoordinateLocus,
   CoordinateSpace,
+  CoordinateSpacePattern,
   CoordinateTranslator,
   MappingAssociation,
 } from "@seq-star/seq-coords";
+import { coordinateSpaceEquals, coordinateSpaceMatches } from "@seq-star/seq-coords";
 import { type SeqViewSpec, validateSeqViewSpec } from "@seq-star/seq-view-spec";
 import { MVSData } from "molstar/lib/extensions/mvs/index.js";
 import type { MVSData as MvsDocument } from "molstar/lib/extensions/mvs/mvs-data.js";
@@ -38,6 +40,16 @@ export const CRYOET_LIVE_INDEX = Object.freeze({
     annotationUrl:
       "https://files.cryoetdataportal.cziscience.com/10493/25oct20a_Position_10/Reconstructions/VoxelSpacing4.995/Annotations/100/pseudomonas_phage_pp7_vlp-1.0_orientedpoint.ndjson",
   },
+  otherLiveParticleClasses: [
+    {
+      id: "groel",
+      name: "Chaperonin GroEL",
+      annotationId: "AN-134662",
+      objectId: "UniProtKB:P0A6F5",
+      objectCount: 1,
+      molecularBundleStatus: "missing-class-linked-average",
+    },
+  ],
   emdb: {
     id: "EMD-77085",
     displayRelativeIsovalue: 3.7,
@@ -58,6 +70,27 @@ export const CRYOET_LIVE_INDEX = Object.freeze({
   },
 } as const);
 
+export const CRYOET_PP7_PARTICLE_SETS = Object.freeze({
+  oriented: Object.freeze({
+    id: "oriented",
+    annotationId: "AN-134660",
+    objectCount: 128,
+    shape: "orientedPoint" as const,
+    label: "DS-10493 · PP7 capsids · 128 oriented points",
+    annotationUrl: CRYOET_LIVE_INDEX.particleClass.annotationUrl,
+  }),
+  points: Object.freeze({
+    id: "points",
+    annotationId: "AN-134661",
+    objectCount: 140,
+    shape: "point" as const,
+    label: "DS-10493 · PP7 capsids · 140 points",
+    annotationUrl:
+      "https://files.cryoetdataportal.cziscience.com/10493/25oct20a_Position_10/Reconstructions/VoxelSpacing4.995/Annotations/101/pseudomonas_phage_pp7_vlp-1.0_point.ndjson",
+  }),
+});
+export type CryoEtPp7ParticleSetId = keyof typeof CRYOET_PP7_PARTICLE_SETS;
+
 export const pp7SequenceSpace: CoordinateSpace = Object.freeze({
   id: "uniprot-P03630-sequence",
   kind: "sequence",
@@ -67,19 +100,19 @@ export const pp7SequenceSpace: CoordinateSpace = Object.freeze({
 export const pp7StructureSpace: CoordinateSpace = Object.freeze({
   id: "structure-residue",
   kind: "structure-residue",
-  authority: "pdb",
+  authority: "molstar",
   context: {
-    entry_id: "1DWN",
-    entity_id: "1",
-    label_asym_id: "A",
-    auth_asym_id: "A",
+    entry: "1DWN",
+    entity: "1",
+    "label-asym": "A",
+    "auth-asym": "A",
   },
 });
-const pp7StructureContext = Object.freeze({
-  entry_id: "1DWN",
-  entity_id: "1",
-  label_asym_id: "A",
-  auth_asym_id: "A",
+const pp7StructurePattern: CoordinateSpacePattern = Object.freeze({
+  id: "structure-residue",
+  kind: "structure-residue",
+  authority: "molstar",
+  context: { entry: "1DWN", entity: "1", "label-asym": "A", "auth-asym": "A" },
 });
 
 export const pp7ParticleSpace: CoordinateSpace = Object.freeze({
@@ -89,12 +122,26 @@ export const pp7ParticleSpace: CoordinateSpace = Object.freeze({
   authority: "cryoet-data-portal",
   context: { dataset_id: "DS-10493", run_id: "RN-34483", annotation_id: "AN-134660" },
 });
+const pp7ParticleSpaceFor = (particleSetId: CryoEtPp7ParticleSetId): CoordinateSpace => {
+  const particleSet = CRYOET_PP7_PARTICLE_SETS[particleSetId];
+  return Object.freeze({
+    id: `cryoet-${particleSet.annotationId}-particles`,
+    kind: "spatial-particle",
+    length: particleSet.objectCount,
+    authority: "cryoet-data-portal",
+    context: {
+      dataset_id: "DS-10493",
+      run_id: "RN-34483",
+      annotation_id: particleSet.annotationId,
+    },
+  });
+};
 
 export interface CryoEtParticle {
   readonly id: string;
   readonly classId: "pp7-capsid";
   readonly location: readonly [number, number, number];
-  readonly orientation: readonly [
+  readonly orientation?: readonly [
     readonly [number, number, number],
     readonly [number, number, number],
     readonly [number, number, number],
@@ -102,6 +149,12 @@ export interface CryoEtParticle {
 }
 
 export interface CryoEtLiveMetadata {
+  readonly particleSet: {
+    readonly id: CryoEtPp7ParticleSetId;
+    readonly annotationId: string;
+    readonly shape: "orientedPoint" | "point";
+    readonly label: string;
+  };
   readonly emdb: {
     readonly id: "EMD-77085";
     readonly title: string;
@@ -136,13 +189,19 @@ export interface CryoEtLiveBundle {
   readonly tomogramDocument: Record<string, unknown>;
 }
 
-export type Pp7StructureTrackProfile = "neutral" | "regions" | "sites" | "mutagenesis";
+export type Pp7StructureTrackProfile =
+  | "neutral"
+  | "regions"
+  | "sites"
+  | "mutagenesis"
+  | "fit-quality";
 
 const structureProfileByTrack: Readonly<Record<string, Pp7StructureTrackProfile>> = Object.freeze({
   "P03630-sequence": "neutral",
   "P03630-regions-track": "regions",
   "P03630-sites-track": "sites",
   "P03630-mutagenesis-track": "mutagenesis",
+  "P03630-fit-quality-track": "fit-quality",
 });
 
 type FetchLike = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
@@ -163,6 +222,13 @@ type UniProtPayload = {
   readonly sequence: { readonly length: number; readonly value: string };
   readonly features: readonly UniProtFeature[];
 };
+
+const syntheticFitQuality = (length: number): readonly number[] =>
+  Object.freeze(
+    Array.from({ length }, (_, index) =>
+      Number((0.35 + ((index * 47 + 11) % 66) / 100).toFixed(2)),
+    ),
+  );
 
 const asRecord = (value: unknown, label: string): Record<string, unknown> => {
   if (value === null || typeof value !== "object" || Array.isArray(value))
@@ -189,39 +255,50 @@ const fetchJson = async (
   return response.json();
 };
 
-export const parseCryoEtParticleNdjson = (source: string): readonly CryoEtParticle[] => {
+export const parseCryoEtParticleNdjson = (
+  source: string,
+  particleSetId: CryoEtPp7ParticleSetId = "oriented",
+): readonly CryoEtParticle[] => {
+  const particleSet = CRYOET_PP7_PARTICLE_SETS[particleSetId];
   const result = source
     .split(/\r?\n/u)
     .filter((line) => line.trim().length > 0)
     .map((line, index) => {
       const value = asRecord(JSON.parse(line) as unknown, `particle ${index + 1}`);
-      if (value.type !== "orientedPoint")
-        throw new Error(`Particle ${index + 1} is not an orientedPoint.`);
+      if (value.type !== particleSet.shape)
+        throw new Error(`Particle ${index + 1} is not a ${particleSet.shape}.`);
       const location = asRecord(value.location, `particle ${index + 1} location`);
       const matrix = value.xyz_rotation_matrix;
       if (
-        !Array.isArray(matrix) ||
-        matrix.length !== 3 ||
-        !matrix.every((row) => Array.isArray(row) && row.length === 3)
+        particleSet.shape === "orientedPoint" &&
+        (!Array.isArray(matrix) ||
+          matrix.length !== 3 ||
+          !matrix.every((row) => Array.isArray(row) && row.length === 3))
       )
         throw new Error(`Particle ${index + 1} has an invalid orientation matrix.`);
       return Object.freeze({
-        id: `AN-134660:${String(index + 1).padStart(4, "0")}`,
+        id: `${particleSet.annotationId}:${String(index + 1).padStart(4, "0")}`,
         classId: "pp7-capsid" as const,
         location: Object.freeze([
           asNumber(location.x, "particle x"),
           asNumber(location.y, "particle y"),
           asNumber(location.z, "particle z"),
         ]) as readonly [number, number, number],
-        orientation: Object.freeze(
-          matrix.map((row) =>
-            Object.freeze((row as unknown[]).map((item) => asNumber(item, "orientation"))),
-          ) as unknown as CryoEtParticle["orientation"],
-        ),
+        ...(particleSet.shape === "orientedPoint" && Array.isArray(matrix)
+          ? {
+              orientation: Object.freeze(
+                matrix.map((row) =>
+                  Object.freeze((row as unknown[]).map((item) => asNumber(item, "orientation"))),
+                ) as unknown as NonNullable<CryoEtParticle["orientation"]>,
+              ),
+            }
+          : {}),
       });
     });
-  if (result.length !== 128)
-    throw new Error(`Expected 128 live PP7 particles, received ${result.length}.`);
+  if (result.length !== particleSet.objectCount)
+    throw new Error(
+      `Expected ${particleSet.objectCount} live PP7 particles, received ${result.length}.`,
+    );
   return Object.freeze(result);
 };
 
@@ -252,6 +329,7 @@ const featurePointLocus = (feature: UniProtFeature) => ({
 
 export const createPp7SeqViewSpec = (payloadValue: unknown): SeqViewSpec => {
   const payload = parseUniProt(payloadValue);
+  const fitQuality = syntheticFitQuality(payload.sequence.length);
   const regions = payload.features.filter((feature) =>
     ["Chain", "Sequence conflict"].includes(feature.type),
   );
@@ -307,6 +385,18 @@ export const createPp7SeqViewSpec = (payloadValue: unknown): SeqViewSpec => {
           value: feature.description ?? "Mutagenesis",
           loci: [featurePointLocus(feature)],
         })),
+      },
+      {
+        id: "P03630-synthetic-fit-quality",
+        kind: "values",
+        semanticType: "seqstar.synthetic.structure-fit-quality",
+        space: pp7SequenceSpace.id,
+        valueType: "number",
+        values: { encoding: "dense", data: fitQuality },
+        provenance: {
+          label: "Explicitly synthetic deterministic fit-quality demonstration",
+          generatedBy: "@seq-star/integration-plugins",
+        },
       },
     ],
     views: [
@@ -365,6 +455,25 @@ export const createPp7SeqViewSpec = (payloadValue: unknown): SeqViewSpec => {
                     representation: "markers",
                     annotation: "P03630-mutagenesis",
                     color: { kind: "fixed", color: "#E11D48" },
+                  },
+                ],
+              },
+              {
+                id: "P03630-fit-quality-track",
+                label: "Synthetic structure fit quality",
+                layers: [
+                  {
+                    id: "P03630-fit-quality-layer",
+                    representation: "heatmap",
+                    annotation: "P03630-synthetic-fit-quality",
+                    color: {
+                      kind: "continuous",
+                      field: "value",
+                      domain: [0.35, 1],
+                      range: ["#DC2626", "#059669"],
+                      clamp: true,
+                      missing: "#CBD5E1",
+                    },
                   },
                 ],
               },
@@ -478,6 +587,7 @@ export const createPp7TrackStructureMvs = (
     regions: { types: ["Chain", "Sequence conflict"], color: "#2563EB", detail: false },
     sites: { types: ["Binding site", "Disulfide bond"], color: "#D97706", detail: true },
     mutagenesis: { types: ["Mutagenesis"], color: "#E11D48", detail: true },
+    "fit-quality": { types: [] as readonly string[], color: "#059669", detail: false },
   } as const satisfies Readonly<
     Record<
       Pp7StructureTrackProfile,
@@ -502,7 +612,28 @@ export const createPp7TrackStructureMvs = (
   const chain = structure.component({ selector: pp7StructureSelector });
   const cartoon = chain.representation({ type: "cartoon" });
   cartoon.color({ color: "#94A3B8" });
-  for (const selector of selectors) cartoon.color({ selector, color: selected.color });
+  if (profile === "fit-quality") {
+    const groups = new Map<
+      `#${string}`,
+      Array<typeof pp7StructureSelector & { readonly label_seq_id: number }>
+    >([
+      ["#DC2626", []],
+      ["#F59E0B", []],
+      ["#059669", []],
+    ]);
+    syntheticFitQuality(payload.sequence.length).forEach((score, index) => {
+      if (index < 1 || index > 127) return;
+      const color = score < 0.57 ? "#DC2626" : score < 0.79 ? "#F59E0B" : "#059669";
+      groups.get(color)?.push({ ...pp7StructureSelector, label_seq_id: index });
+    });
+    for (const [color, group] of groups)
+      cartoon.color({
+        selector: group,
+        color,
+      });
+  } else {
+    for (const selector of selectors) cartoon.color({ selector, color: selected.color });
+  }
   if (selected.detail && selectors.length > 0)
     structure
       .component({ selector: selectors })
@@ -594,16 +725,18 @@ const siftsMetadata = (value: unknown) => {
 export const loadCryoEtLiveBundle = async (
   fetcher: FetchLike = fetch,
   signal = new AbortController().signal,
+  particleSetId: CryoEtPp7ParticleSetId = "oriented",
 ): Promise<CryoEtLiveBundle> => {
+  const particleSet = CRYOET_PP7_PARTICLE_SETS[particleSetId];
   const [particlesResponse, emdbValue, uniprotValue, siftsValue] = await Promise.all([
-    fetcher(CRYOET_LIVE_INDEX.particleClass.annotationUrl, { signal }),
+    fetcher(particleSet.annotationUrl, { signal }),
     fetchJson(fetcher, CRYOET_LIVE_INDEX.emdb.metadataUrl, signal),
     fetchJson(fetcher, CRYOET_LIVE_INDEX.uniprot.url, signal),
     fetchJson(fetcher, CRYOET_LIVE_INDEX.structure.siftsUrl, signal),
   ]);
   if (!particlesResponse.ok)
     throw new Error(`Particle annotation returned HTTP ${particlesResponse.status}.`);
-  const particles = parseCryoEtParticleNdjson(await particlesResponse.text());
+  const particles = parseCryoEtParticleNdjson(await particlesResponse.text(), particleSetId);
   const emdb = emdbMetadata(emdbValue);
   const uniprot = parseUniProt(uniprotValue);
   const sifts = siftsMetadata(siftsValue);
@@ -619,10 +752,17 @@ export const loadCryoEtLiveBundle = async (
     regions: createPp7TrackStructureMvs(uniprotValue, "regions"),
     sites: createPp7TrackStructureMvs(uniprotValue, "sites"),
     mutagenesis: createPp7TrackStructureMvs(uniprotValue, "mutagenesis"),
+    "fit-quality": createPp7TrackStructureMvs(uniprotValue, "fit-quality"),
   });
   return Object.freeze({
     particles,
     metadata: Object.freeze({
+      particleSet: Object.freeze({
+        id: particleSet.id,
+        annotationId: particleSet.annotationId,
+        shape: particleSet.shape,
+        label: particleSet.label,
+      }),
       emdb: Object.freeze({ id: "EMD-77085" as const, ...emdb }),
       structure: Object.freeze({
         id: "1DWN" as const,
@@ -637,7 +777,7 @@ export const loadCryoEtLiveBundle = async (
       }),
       particleCount: particles.length,
       sources: Object.freeze([
-        CRYOET_LIVE_INDEX.particleClass.annotationUrl,
+        particleSet.annotationUrl,
         CRYOET_LIVE_INDEX.emdb.metadataUrl,
         CRYOET_LIVE_INDEX.uniprot.url,
         CRYOET_LIVE_INDEX.structure.siftsUrl,
@@ -650,7 +790,7 @@ export const loadCryoEtLiveBundle = async (
     tomogramDocument: Object.freeze({
       kind: "tomogram-particle-view",
       version: "0.1.0",
-      id: "DS-10493-RN-34483-PP7-particles",
+      id: `DS-10493-RN-34483-PP7-${particleSet.id}`,
       title: "PP7 particles in an E. coli tomogram",
       description:
         "Live XY particle projection; z and orientation are retained per particle. The complete tomogram opens in an external read-only Neuroglancer.",
@@ -662,11 +802,11 @@ export const loadCryoEtLiveBundle = async (
       sourceUrl: CRYOET_LIVE_INDEX.tomogram.portalUrl,
       dimensions: CRYOET_LIVE_INDEX.tomogram.dimensions,
       voxelSpacingAngstrom: CRYOET_LIVE_INDEX.tomogram.voxelSpacingAngstrom,
-      coordinateSpace: pp7ParticleSpace,
+      coordinateSpace: pp7ParticleSpaceFor(particleSetId),
       particleClass: Object.freeze({
         id: CRYOET_LIVE_INDEX.particleClass.id,
         name: CRYOET_LIVE_INDEX.particleClass.name,
-        annotationId: CRYOET_LIVE_INDEX.particleClass.annotationId,
+        annotationId: particleSet.annotationId,
         objectId: CRYOET_LIVE_INDEX.particleClass.objectId,
       }),
       particles,
@@ -686,23 +826,17 @@ const exactAssociation = (
 const sequenceToStructure = (): CoordinateTranslator => ({
   id: "cryoet.P03630-to-1DWN-A",
   source: { id: pp7SequenceSpace.id, kind: "sequence" },
-  target: {
-    id: pp7StructureSpace.id,
-    kind: "structure-residue",
-    authority: "pdb",
-    context: pp7StructureContext,
-  },
+  target: pp7StructurePattern,
   async map(request) {
     const target =
-      request.target?.id === pp7StructureSpace.id &&
-      request.target.kind === pp7StructureSpace.kind &&
-      request.target.authority === pp7StructureSpace.authority
+      request.target !== undefined && coordinateSpaceMatches(pp7StructurePattern, request.target)
         ? request.target
         : pp7StructureSpace;
     return {
       translatorIds: [this.id],
       associations: request.loci.map((source) => {
-        if (source.space.id !== pp7SequenceSpace.id) return exactAssociation(source, []);
+        if (!coordinateSpaceEquals(source.space, pp7SequenceSpace))
+          return exactAssociation(source, []);
         const positions =
           source.kind === "point" && source.position.kind === "index"
             ? [source.position.value]
@@ -721,7 +855,10 @@ const sequenceToStructure = (): CoordinateTranslator => ({
                   {
                     kind: "point" as const,
                     space: target,
-                    position: { kind: "label" as const, value: index },
+                    position: {
+                      kind: "label" as const,
+                      value: `label:${index}|auth:${index + 1}`,
+                    },
                   },
                 ],
           ),
@@ -733,32 +870,30 @@ const sequenceToStructure = (): CoordinateTranslator => ({
 });
 const structureToSequence = (): CoordinateTranslator => ({
   id: "cryoet.1DWN-A-to-P03630",
-  source: {
-    id: pp7StructureSpace.id,
-    kind: "structure-residue",
-    authority: "pdb",
-    context: pp7StructureContext,
-  },
+  source: pp7StructurePattern,
   target: { id: pp7SequenceSpace.id, kind: "sequence" },
   async map(request) {
     const target =
-      request.target?.id === pp7SequenceSpace.id && request.target.kind === pp7SequenceSpace.kind
+      request.target !== undefined && coordinateSpaceEquals(request.target, pp7SequenceSpace)
         ? request.target
         : pp7SequenceSpace;
     return {
       translatorIds: [this.id],
       associations: request.loci.map((source) => {
-        const value =
+        const match =
+          coordinateSpaceMatches(pp7StructurePattern, source.space) &&
           source.kind === "point" &&
           source.position.kind === "label" &&
-          typeof source.position.value === "number"
-            ? source.position.value
-            : undefined;
+          typeof source.position.value === "string"
+            ? /^label:(-?\d+)\|auth:(-?\d+)$/u.exec(source.position.value)
+            : null;
+        const label = match === null ? undefined : Number(match[1]);
+        const auth = match === null ? undefined : Number(match[2]);
         return exactAssociation(
           source,
-          value === undefined || value < 1 || value > 127
+          label === undefined || auth !== label + 1 || label < 1 || label > 127
             ? []
-            : [{ kind: "point", space: target, position: { kind: "index", value } }],
+            : [{ kind: "point", space: target, position: { kind: "index", value: label } }],
         );
       }),
       diagnostics: [],
@@ -773,6 +908,7 @@ export interface CryoEtTomogramPluginOptions {
   readonly tomogramComponent: string;
   readonly sequenceComponent: string;
   readonly structureComponent: string;
+  readonly particleSetId?: CryoEtPp7ParticleSetId;
   readonly fetcher?: FetchLike;
 }
 export interface CryoEtPresentationIntent {
@@ -791,6 +927,15 @@ export const CryoEtPresentationIntentSchema = checkedSchema<CryoEtPresentationIn
 export const CryoEtReadySchema = checkedSchema<CryoEtLiveMetadata>(
   objectSchema(
     {
+      particleSet: objectSchema(
+        {
+          id: { anyOf: [{ const: "oriented" }, { const: "points" }] },
+          annotationId: { type: "string", minLength: 1 },
+          shape: { anyOf: [{ const: "orientedPoint" }, { const: "point" }] },
+          label: { type: "string", minLength: 1 },
+        },
+        ["id", "annotationId", "shape", "label"],
+      ),
       emdb: objectSchema(
         {
           id: { const: "EMD-77085" },
@@ -833,7 +978,7 @@ export const CryoEtReadySchema = checkedSchema<CryoEtLiveMetadata>(
         uniqueItems: true,
       },
     },
-    ["emdb", "structure", "protein", "particleCount", "sources"],
+    ["particleSet", "emdb", "structure", "protein", "particleCount", "sources"],
   ),
 );
 export const CryoEtParticleSelectionSchema = checkedSchema<{
@@ -994,7 +1139,11 @@ export const createCryoEtTomogramPlugin = (
       },
     });
     disposables.push(processor);
-    void loadCryoEtLiveBundle(options.fetcher, controller.signal).then(
+    void loadCryoEtLiveBundle(
+      options.fetcher,
+      controller.signal,
+      options.particleSetId ?? "oriented",
+    ).then(
       (loaded) => {
         if (controller.signal.aborted) return;
         bundle = loaded;
