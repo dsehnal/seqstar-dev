@@ -24,6 +24,8 @@ checked evidence artifact.
 | React / React DOM | `19.2.8` | MIT | `pnpm-workspace.yaml` catalog |
 | TanStack Router / plugin | `1.170.31` / `1.168.34` | MIT | catalog |
 | Tailwind CSS / Vite plugin | `4.3.3` | MIT | catalog |
+| Lucide React | `1.33.0`, one physical lockfile resolution | ISC, with retained Feather MIT notice | web manifest/catalog; `audit-p80-hardening.mjs` |
+| Lucide DOM | `1.33.0`, one physical lockfile resolution | ISC, with retained Feather MIT notice | Seq*/Nightingale manifests/catalog; `audit-p80-hardening.mjs` |
 | RxJS | `7.8.2` | Apache-2.0 | harness/viewer manifests |
 | TypeBox | `1.3.7` | MIT | schema/core manifests |
 | Mol* (including MVS) | `5.11.0`, one physical lockfile resolution | MIT | wrapper and plugin manifests; `audit-p80-hardening.mjs` |

@@ -4,6 +4,12 @@ import { readdir, readFile, stat } from "node:fs/promises";
 import { relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
+import ts from "typescript";
+import { Box as LucideReactBox } from "../apps/web/node_modules/lucide-react/dist/esm/lucide-react.mjs";
+import {
+  createElement as createLucideElement,
+  Box as LucideBox,
+} from "../packages/seq-viewer/node_modules/lucide/dist/esm/lucide.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = resolve(fileURLToPath(new URL("../", import.meta.url)));
@@ -351,6 +357,47 @@ assert(
   "registry Nightingale resolution found",
 );
 
+const lucideRequirements = new Map([
+  ["lucide", { consumers: ["@seq-star/seq-viewer", "@seq-star/wrapper-nightingale"] }],
+  ["lucide-react", { consumers: ["@seq-star/prototype-web"] }],
+]);
+for (const [name, { consumers }] of lucideRequirements) {
+  assert(catalogVersions.get(name) === "1.33.0", `${name} catalog pin is not exactly 1.33.0`);
+  const resolutions = lockEntries.filter((entry) => entry.name === name);
+  assert(
+    resolutions.length === 1 && resolutions[0].version === "1.33.0",
+    `${name} must have exactly one 1.33.0 lockfile resolution`,
+  );
+  const record = evidenceRecords[evidenceResolutions[resolutions[0].key].evidence];
+  assert(record.license === "ISC", `${name}@1.33.0 license is not ISC`);
+  const packagePath =
+    name === "lucide"
+      ? "packages/seq-viewer/node_modules/lucide/package.json"
+      : "apps/web/node_modules/lucide-react/package.json";
+  const packageJson = await json(packagePath);
+  assert(
+    packageJson.name === name &&
+      packageJson.version === "1.33.0" &&
+      packageJson.sideEffects === false &&
+      typeof packageJson.module === "string" &&
+      Object.keys(packageJson.dependencies ?? {}).length === 0,
+    `${name}@1.33.0 package metadata does not prove the zero-runtime-dependency ESM freeze`,
+  );
+  const actualConsumers = packages
+    .filter(({ value }) => value.dependencies?.[name] === "catalog:")
+    .map(({ value }) => value.name)
+    .sort();
+  assert(
+    JSON.stringify(actualConsumers) === JSON.stringify(consumers),
+    `unexpected ${name} consumers: ${actualConsumers.join(", ")}`,
+  );
+}
+assert(
+  LucideBox !== undefined && createLucideElement !== undefined,
+  "lucide static named DOM exports are unavailable",
+);
+assert(LucideReactBox !== undefined, "lucide-react static named exports are unavailable");
+
 const graph = new Map([...packageByName.keys()].map((name) => [name, []]));
 const directDependencies = [];
 for (const [name, entry] of packageByName) {
@@ -438,11 +485,125 @@ const moduleReferences = (source) =>
       /(?:\b(?:import|export)\s*(?:type\s*)?(?:[^"']*?\sfrom\s*)?|\bimport\s*\()\s*["']([^"']+)["']/gu,
     ),
   ].map((match) => match[1]);
+
+const lucidePackage = (specifier) =>
+  specifier === "lucide" ||
+  specifier === "lucide-react" ||
+  specifier.startsWith("lucide/") ||
+  specifier.startsWith("lucide-react/");
+const lucideStaticImportAllowed = (display, specifier) =>
+  (specifier === "lucide" &&
+    (display.startsWith("packages/seq-viewer/") ||
+      display.startsWith("packages/wrapper-nightingale/"))) ||
+  (specifier === "lucide-react" && display.startsWith("apps/web/src/"));
+const lucidePolicyViolations = (source, display) => {
+  const sourceFile = ts.createSourceFile(display, source, ts.ScriptTarget.Latest, true);
+  const violations = [];
+  const report = (message) => violations.push(`${display} ${message}`);
+  const checkSpecifier = (specifier, kind) => {
+    if (!lucidePackage(specifier)) return false;
+    if (kind === "import") {
+      if (!lucideStaticImportAllowed(display, specifier))
+        report(`imports ${specifier} outside its allowed boundary`);
+      if (specifier !== "lucide" && specifier !== "lucide-react")
+        report(`imports unsupported Lucide subpath ${specifier}`);
+    }
+    return true;
+  };
+  const visit = (node) => {
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const specifier = node.moduleSpecifier.text;
+      if (checkSpecifier(specifier, "import")) {
+        const clause = node.importClause;
+        if (
+          clause === undefined ||
+          clause.name !== undefined ||
+          clause.namedBindings === undefined ||
+          !ts.isNamedImports(clause.namedBindings) ||
+          clause.namedBindings.elements.length === 0
+        )
+          report(`must use a non-empty named static import from ${specifier}`);
+      }
+    } else if (
+      ts.isExportDeclaration(node) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      if (lucidePackage(node.moduleSpecifier.text))
+        report(`may not re-export ${node.moduleSpecifier.text}`);
+    } else if (
+      ts.isImportEqualsDeclaration(node) &&
+      ts.isExternalModuleReference(node.moduleReference) &&
+      node.moduleReference.expression &&
+      ts.isStringLiteral(node.moduleReference.expression) &&
+      lucidePackage(node.moduleReference.expression.text)
+    )
+      report(`may not use import-equals for ${node.moduleReference.expression.text}`);
+    else if (ts.isCallExpression(node) && node.expression.kind === ts.SyntaxKind.ImportKeyword) {
+      const [specifier] = node.arguments;
+      if (!specifier || !ts.isStringLiteral(specifier)) report("uses a nonliteral dynamic import");
+      else if (lucidePackage(specifier.text)) report(`dynamically imports ${specifier.text}`);
+    } else if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "require"
+    ) {
+      const [specifier] = node.arguments;
+      if (node.arguments.length !== 1 || !specifier || !ts.isStringLiteral(specifier))
+        report("uses a nonliteral require");
+      else if (lucidePackage(specifier.text)) report(`may not require ${specifier.text}`);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(sourceFile);
+  return violations;
+};
+if (process.argv.includes("--self-test")) {
+  assert(
+    lucidePolicyViolations(
+      'import { Box as NativeBox, createElement } from "lucide";',
+      "packages/seq-viewer/src/navigation.ts",
+    ).length === 0,
+    "Lucide import-policy self-test rejected a named native import",
+  );
+  assert(
+    lucidePolicyViolations(
+      'import { Box as ReactBox } from "lucide-react";',
+      "apps/web/src/icon-button.tsx",
+    ).length === 0,
+    "Lucide import-policy self-test rejected a named React import",
+  );
+  for (const source of [
+    'import Lucide from "lucide";',
+    'import * as Lucide from "lucide";',
+    'export * from "lucide";',
+    'export { Box } from "lucide";',
+    'import { Box } from "lucide/icons";',
+    'const Lucide = import("lucide");',
+    'const packageName = "lucide"; const Lucide = import(packageName);',
+    'import Lucide = require("lucide");',
+    'const Lucide = require("lucide");',
+    'const packageName = "lucide"; const Lucide = require(packageName);',
+    'const Lucide = require("lucide" + "");',
+  ])
+    assert(
+      lucidePolicyViolations(source, "packages/seq-viewer/src/adversarial.ts").length > 0,
+      `Lucide import-policy self-test accepted ${source}`,
+    );
+  assert(
+    lucidePolicyViolations(
+      'const viewer = require("molstar");',
+      "packages/wrapper-molstar/src/test.ts",
+    ).length === 0,
+    "Lucide import-policy self-test rejected an unrelated literal require",
+  );
+}
 for (const file of [...imports, ...appFiles]) {
   if (!/\.(?:[cm]?[jt]sx?|css)$/u.test(file)) continue;
   const source = await readFile(file, "utf8");
   const display = relative(root, file);
   const references = moduleReferences(source);
+  for (const violation of lucidePolicyViolations(source, display)) assert(false, violation);
   assert(
     !references.some((reference) => reference.includes("legacy/")),
     `${display} imports legacy/`,
@@ -483,6 +644,11 @@ for (const file of [...imports, ...appFiles]) {
     !display.startsWith("apps/web/src/routes/")
   )
     assert(!references.includes("molstar"), `${display} imports Mol* outside its allowed boundary`);
+  if (references.some((reference) => lucidePackage(reference)))
+    assert(
+      !/\b(?:createIcons|DynamicIcon|icons|iconsAndAliases)\b/u.test(source),
+      `${display} uses a Lucide registry API`,
+    );
 }
 for (const file of appFiles.filter((path) => path.includes(`${sep}routes${sep}`))) {
   const source = await readFile(file, "utf8");
@@ -507,6 +673,7 @@ assert(
 for (const [path, requiredText] of [
   ["README.md", "mise exec -- pnpm install --offline --frozen-lockfile"],
   ["THIRD_PARTY_LICENSES.md", "Mol* (including MVS)"],
+  ["THIRD_PARTY_LICENSES.md", "Lucide React"],
   ["TRACEABILITY.md", "P80 reviewed checkpoint: REVIEWED"],
 ]) {
   assert((await text(path)).includes(requiredText), `${path} is incomplete`);
@@ -729,6 +896,13 @@ console.log(
       fixtureBytes,
       molstar: "5.11.0",
       molstarConsumers,
+      lucide: {
+        version: "1.33.0",
+        resolutions: 2,
+        consumers: Object.fromEntries(
+          [...lucideRequirements].map(([name, { consumers }]) => [name, consumers]),
+        ),
+      },
       nightingale: "local workspace only",
       directDependencies: directDependencies.sort(),
       dependencyResolutionCount: dependencyResolutionKeys.length,

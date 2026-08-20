@@ -19,6 +19,7 @@
     "@seq-star/seq-coords": "workspace:*",
     "@seq-star/seq-core": "workspace:*",
     "@seq-star/seq-view-spec": "workspace:*",
+    "lucide": "catalog:",
     "rxjs": "7.8.2"
   }
 }

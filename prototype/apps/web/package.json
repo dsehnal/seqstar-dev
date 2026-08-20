@@ -17,6 +17,7 @@
     "@seq-star/wrapper-molstar": "workspace:*",
     "@seq-star/wrapper-nightingale": "workspace:*",
     "@tanstack/react-router": "catalog:",
+    "lucide-react": "catalog:",
     "molstar": "5.11.0",
     "react": "catalog:",
     "react-dom": "catalog:"
