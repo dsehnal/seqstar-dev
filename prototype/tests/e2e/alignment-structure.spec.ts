@@ -96,7 +96,7 @@ test("keeps the query member identity stable while its row scrolls out and back 
     paths.locator("li").filter({
       hasText: /PF00042\.29 · HBA_HUMAN-27-137:member .* hover · exact/u,
     }),
-  ).toHaveCount(2);
+  ).toHaveCount(3);
   expect(external).toEqual([]);
 });
 
@@ -110,6 +110,7 @@ test("renders the checked 32×118 fixture faithfully in Nightingale mode", async
   await page.goto("/#/alignment-structure?renderer=nightingale");
   await expect(page.getByTestId("renderer-chooser-status")).toContainText(
     "nightingale renderer ready",
+    { timeout: 20_000 },
   );
   await expect(page.getByTestId("p60-harness-status")).toContainText("ready");
 
@@ -123,9 +124,15 @@ test("renders the checked 32×118 fixture faithfully in Nightingale mode", async
   await expect(root.locator("section[data-seqstar-alignment-member]")).toHaveCount(32);
   await expect(query).toHaveCount(1);
   await expect(nonQuery).toHaveCount(1);
-  await expect(query.getByRole("button", { name: "Show query structure" })).toHaveCount(1);
-  await expect(nonQuery.getByRole("button", { name: "Show query structure" })).toHaveCount(0);
-  await expect(root.getByRole("button", { name: "Show query structure" })).toHaveCount(1);
+  await expect(query.getByRole("button", { name: "Show P69905 / 1A3N chain A in 3D" })).toHaveCount(
+    1,
+  );
+  await expect(nonQuery.getByRole("button", { name: /Show .* in 3D/u })).toHaveCount(0);
+  await expect(
+    root
+      .locator("section[data-seqstar-alignment-member]")
+      .getByRole("button", { name: /Show .* in 3D/u }),
+  ).toHaveCount(4);
 
   const rows = await root
     .locator("nightingale-sequence[data-seqstar-alignment]")
@@ -177,6 +184,123 @@ test("renders the checked 32×118 fixture faithfully in Nightingale mode", async
   await emit(nonQuery, 1);
   await expect(paths).toContainText(
     "A0A010R001_9PEZI-27-134:member · alignment-to-structure · hover · unmapped · 0 targets",
+  );
+  expect(external).toEqual([]);
+});
+
+test("profile tracks, member actions, and show-all publish checked local structure states", async ({
+  page,
+}) => {
+  const external: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.protocol !== "data:" && !["127.0.0.1", "localhost"].includes(url.hostname))
+      external.push(request.url());
+  });
+  await page.goto("/#/alignment-structure");
+  await expect(page.getByTestId("p60-harness-status")).toContainText("ready");
+  const referenceHost = page.getByTestId("pf00042-alignment-host");
+  await expect(
+    referenceHost.locator("button[data-seq-viewer-alignment-member]:not(:disabled)"),
+  ).toHaveCount(4);
+  await expect(
+    referenceHost.locator("button[data-seq-viewer-alignment-member]:disabled"),
+  ).toHaveCount(28);
+  const referenceMemberAction = referenceHost.getByRole("button", {
+    name: "Show P02197 AlphaFold DB v6 in 3D",
+  });
+  await expect(referenceMemberAction).toHaveAttribute(
+    "data-seq-viewer-alignment-member",
+    "MYG_CHICK-27-143:member",
+  );
+  await referenceMemberAction.click();
+  await expect(page.getByTestId("m50-action-payload")).toHaveText(
+    '{"kind":"member","memberId":"MYG_CHICK-27-143:member","requestId":"M50-member-1"}',
+  );
+  await expect(page.getByTestId("m50-structure-state")).toHaveText("M50-member-1");
+  const profile = page.getByRole("button", { name: "Activate track Consensus" });
+  await profile.click();
+  await expect(page.getByTestId("m50-action-summary")).toHaveText("Profile: consensus");
+  await expect(page.getByTestId("m50-structure-state")).toHaveText("M50-profile-2");
+  await page.getByRole("button", { name: "Activate track Conservation" }).click();
+  await expect(page.getByTestId("m50-action-summary")).toHaveText("Profile: conservation");
+  await expect(page.getByTestId("m50-structure-state")).toHaveText("M50-profile-3");
+  await page.getByRole("button", { name: "Activate track Subgroup annotations" }).click();
+  await expect(page.getByTestId("m50-action-summary")).toHaveText("Profile: subgroup");
+  await expect(page.getByTestId("m50-structure-state")).toHaveText("M50-profile-4");
+  await page.getByRole("button", { name: "Show all checked structures" }).click();
+  await expect(page.getByTestId("m50-action-summary")).toHaveText("All four checked structures");
+  await expect(page.getByTestId("m50-structure-state")).toHaveText("M50-show-all-5");
+  expect(external).toEqual([]);
+});
+
+test("Nightingale member interactions fail closed, then target the loaded predicted model", async ({
+  page,
+}) => {
+  const external: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.protocol !== "data:" && !["127.0.0.1", "localhost"].includes(url.hostname))
+      external.push(request.url());
+  });
+  await page.goto("/#/alignment-structure?renderer=nightingale");
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText(
+    "nightingale renderer ready",
+    { timeout: 20_000 },
+  );
+  const predictedRow = page
+    .getByTestId("pf00042-alignment-host")
+    .locator(
+      'section[data-seqstar-alignment-member="MYG_CHICK-27-143:member"] nightingale-sequence',
+    );
+  const emitPredicted = async (kind: "hover" | "select", phase: "set" | "clear", start: number) =>
+    predictedRow.evaluate(
+      (element, interaction) =>
+        (
+          element as HTMLElement & {
+            emitSeqstarInteraction(value: {
+              kind: "hover" | "select";
+              phase: "set" | "clear";
+              regions: readonly { start: number; end: number }[];
+            }): void;
+          }
+        ).emitSeqstarInteraction({
+          kind: interaction.kind,
+          phase: interaction.phase,
+          regions:
+            interaction.phase === "clear"
+              ? []
+              : [{ start: interaction.start, end: interaction.start }],
+        }),
+      { kind, phase, start },
+    );
+  await emitPredicted("hover", "set", 2);
+  await expect(page.getByTestId("p60-composed-paths")).toContainText(
+    "MYG_CHICK-27-143:member · alignment-to-structure · hover · unmapped · 0 targets",
+  );
+  await page.getByRole("button", { name: "Show P02197 AlphaFold DB v6 in 3D" }).click();
+  await expect(page.getByTestId("m50-action-summary")).toHaveText(
+    "Member: MYG_CHICK-27-143:member",
+  );
+  await expect(page.getByTestId("m50-action-payload")).toHaveText(
+    '{"kind":"member","memberId":"MYG_CHICK-27-143:member","requestId":"M50-member-1"}',
+  );
+  await expect(page.getByTestId("m50-structure-state")).toHaveText("M50-member-1");
+  await emitPredicted("hover", "set", 2);
+  await expect(page.getByTestId("p60-composed-paths")).toContainText(
+    "MYG_CHICK-27-143:member · alignment-to-structure · hover · exact",
+  );
+  await emitPredicted("select", "set", 2);
+  await expect(page.getByTestId("p60-composed-paths")).toContainText(
+    "MYG_CHICK-27-143:member · alignment-to-structure · select · exact · 1 targets",
+  );
+  await emitPredicted("select", "clear", 2);
+  await expect(page.getByTestId("p60-composed-paths")).toContainText(
+    "MYG_CHICK-27-143:member · alignment-to-structure · select · exact · 0 targets",
+  );
+  await emitPredicted("hover", "set", 1);
+  await expect(page.getByTestId("p60-composed-paths")).toContainText(
+    "MYG_CHICK-27-143:member · alignment-to-structure · hover · unmapped · 0 targets",
   );
   expect(external).toEqual([]);
 });

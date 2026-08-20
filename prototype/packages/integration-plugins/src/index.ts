@@ -258,11 +258,14 @@ export interface IntegrationPluginsPackageBoundary {
 }
 
 export {
+  type AlignmentEnsembleMember,
+  type AlignmentProfile,
   type AlignmentStructureColumnRow,
   type AlignmentStructureData,
   type AlignmentStructurePluginOptions,
   type AlignmentStructureTranslators,
   alignmentColumnSpace,
+  createAlignmentEnsembleMvs,
   createAlignmentStructurePlugin,
   createAlignmentStructureSeqViewSpec,
   createAlignmentStructureTranslators,

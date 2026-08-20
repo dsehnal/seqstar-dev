@@ -13,9 +13,18 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useRef, useState } from "react";
 import alignmentAfa from "../../../../fixtures/alignment-structure/expected/PF00042.29-32rows.query-centric.afa?raw";
 import structureUrl from "../../../../fixtures/alignment-structure/input/1A3N.cif?url";
+import a0a2y9dez0Url from "../../../../fixtures/alignment-structure/input/AF-A0A2Y9DEZ0-F1-model_v6.cif?url";
+import a0a5e4c8d4Url from "../../../../fixtures/alignment-structure/input/AF-A0A5E4C8D4-F1-model_v6.cif?url";
+import p02197Url from "../../../../fixtures/alignment-structure/input/AF-P02197-F1-model_v6.cif?url";
 import p69905Fasta from "../../../../fixtures/alignment-structure/input/P69905.fasta?raw";
 import structureMappingTsv from "../../../../fixtures/alignment-structure/mappings/P69905-1A3N-chain-A.tsv?raw";
 import alignmentMappingTsv from "../../../../fixtures/alignment-structure/mappings/P69905-PF00042-1A3N-chain-A.tsv?raw";
+import a0a2y9dez0Mapping from "../../../../fixtures/alignment-structure/mappings/PF00042.29-A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-model_v6.tsv?raw";
+import a0a5e4c8d4Mapping from "../../../../fixtures/alignment-structure/mappings/PF00042.29-A0A5E4C8D4-AF-A0A5E4C8D4-F1-model_v6.tsv?raw";
+import p02197Mapping from "../../../../fixtures/alignment-structure/mappings/PF00042.29-P02197-AF-P02197-F1-model_v6.tsv?raw";
+import a0a2y9dez0Transform from "../../../../fixtures/alignment-structure/transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.transform.json?raw";
+import a0a5e4c8d4Transform from "../../../../fixtures/alignment-structure/transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.transform.json?raw";
+import p02197Transform from "../../../../fixtures/alignment-structure/transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.transform.json?raw";
 import {
   CaseRendererChooser,
   type RendererMode,
@@ -26,8 +35,106 @@ const alignmentComponent = "pf00042-alignment";
 const structureComponent = "p69905-structure";
 
 const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
+const ensembleId = "PF00042.29-P69905-1A3N-plus-AFDB-v6-3";
+const transformMatrix = (source: string): readonly number[] => {
+  const parsed = JSON.parse(source) as { readonly matrix?: { readonly values?: unknown } };
+  const values = parsed.matrix?.values;
+  if (
+    !Array.isArray(values) ||
+    values.length !== 16 ||
+    values.some((value) => typeof value !== "number")
+  )
+    throw new Error("Checked alignment transform must be a 16-value matrix.");
+  return Object.freeze([...values]);
+};
+const ensemble = [
+  {
+    id: "P69905-1A3N",
+    memberId: "HBA_HUMAN-27-137:member",
+    label: "P69905 / 1A3N chain A",
+    provenanceLabel: "Experimental PDB 1A3N chain A",
+    url: structureUrl,
+    color: "#2563EB",
+    predicted: false,
+    mappingTsv: alignmentMappingTsv,
+  },
+  {
+    id: "P02197-AFDB-v6",
+    memberId: "MYG_CHICK-27-143:member",
+    label: "P02197 AlphaFold DB v6",
+    provenanceLabel: "AlphaFold DB v6 predicted model — theoretical; not experimental",
+    url: p02197Url,
+    color: "#F97316",
+    predicted: true,
+    mappingTsv: p02197Mapping,
+    transform: transformMatrix(p02197Transform),
+  },
+  {
+    id: "A0A5E4C8D4-AFDB-v6",
+    memberId: "A0A5E4C8D4_MARMO-27-137:member",
+    label: "A0A5E4C8D4 AlphaFold DB v6",
+    provenanceLabel: "AlphaFold DB v6 predicted model — theoretical; not experimental",
+    url: a0a5e4c8d4Url,
+    color: "#10B981",
+    predicted: true,
+    mappingTsv: a0a5e4c8d4Mapping,
+    transform: transformMatrix(a0a5e4c8d4Transform),
+  },
+  {
+    id: "A0A2Y9DEZ0-AFDB-v6",
+    memberId: "A0A2Y9DEZ0_TRIMA-27-137:member",
+    label: "A0A2Y9DEZ0 AlphaFold DB v6",
+    provenanceLabel: "AlphaFold DB v6 predicted model — theoretical; not experimental",
+    url: a0a2y9dez0Url,
+    color: "#A855F7",
+    predicted: true,
+    mappingTsv: a0a2y9dez0Mapping,
+    transform: transformMatrix(a0a2y9dez0Transform),
+  },
+] as const;
+const profileTracks = [
+  {
+    trackId: "consensus",
+    action: {
+      kind: "structure-profile",
+      icon: "box",
+      accessibleName: "Show consensus in 3D",
+      tooltip: "Show consensus identity and mismatch colors in 3D",
+    },
+  },
+  {
+    trackId: "conservation",
+    action: {
+      kind: "structure-profile",
+      icon: "box",
+      accessibleName: "Show conservation in 3D",
+      tooltip: "Show deterministic conservation colors in 3D",
+    },
+  },
+  {
+    trackId: "subgroups",
+    action: {
+      kind: "structure-profile",
+      icon: "box",
+      accessibleName: "Show subgroup annotations in 3D",
+      tooltip: "Show frozen subgroup categories in 3D",
+    },
+  },
+] as const;
+const alignmentMemberActions = ensemble.map((member) => ({
+  alignmentId: "PF00042.29",
+  memberId: member.memberId,
+  label: `Show ${member.label} in 3D`,
+  kind: "structure" as const,
+}));
 const rendererComponents = {
-  reference: [{ id: alignmentComponent, type: "seqstar.reference-viewer" }],
+  reference: [
+    {
+      id: alignmentComponent,
+      type: "seqstar.reference-viewer",
+      config: { presentation: { tracks: profileTracks, alignmentMemberActions } },
+    },
+  ],
   nightingale: [
     {
       id: alignmentComponent,
@@ -36,14 +143,12 @@ const rendererComponents = {
       // member identity; it neither contains nor derives a structure mapping.
       config: {
         presentation: {
-          alignmentMemberActions: [
-            {
-              alignmentId: "PF00042.29",
-              memberId: "HBA_HUMAN-27-137:member",
-              label: "Show query structure",
-              kind: "structure",
-            },
-          ],
+          trackActions: profileTracks.map(({ trackId, action }) => ({
+            trackId,
+            label: action.accessibleName,
+            kind: "structure",
+          })),
+          alignmentMemberActions,
         },
       },
     },
@@ -80,6 +185,8 @@ const createPageHarness = (
               alignmentMappingTsv,
               structureMappingTsv,
               structureUrl,
+              ensemble,
+              ensembleId,
             }),
         },
       ],
@@ -127,6 +234,10 @@ type MappingSummary = {
   readonly sourceMemberId?: string;
   readonly alignmentId: string;
 };
+type ActionSummary =
+  | { readonly kind: "profile"; readonly profile: string; readonly requestId: string }
+  | { readonly kind: "member"; readonly memberId: string; readonly requestId: string }
+  | { readonly kind: "show-all"; readonly ensembleId: string; readonly requestId: string };
 
 function AlignmentStructureContent({
   initialMode,
@@ -135,9 +246,23 @@ function AlignmentStructureContent({
   readonly initialMode: RendererMode;
   readonly onModeChange: (mode: RendererMode) => void;
 }) {
-  const { status } = useHarness();
+  const { harness, status } = useHarness();
   const [ready, setReady] = useState<ReadySummary>();
   const [paths, setPaths] = useState<readonly string[]>([]);
+  const [action, setAction] = useState<ActionSummary>();
+  const [renderedRequest, setRenderedRequest] = useState<string>();
+  const showAll = useCallback(() => {
+    const requestId = crypto.randomUUID();
+    harness.fabric.publish({
+      id: requestId,
+      type: "alignment.structure.show-all",
+      version: "0.1.0",
+      source: { component: alignmentComponent },
+      correlationId: requestId,
+      timestamp: new Date().toISOString(),
+      payload: { ensembleId } as never,
+    });
+  }, [harness]);
   useHarnessMessages(
     useCallback((message: HarnessMessage) => {
       if (message.type === "alignment-structure.ready")
@@ -154,6 +279,16 @@ function AlignmentStructureContent({
           ].slice(-4),
         );
       }
+      if (message.type === "alignment-structure.action")
+        setAction(message.payload as unknown as ActionSummary);
+      if (
+        message.type === "lifecycle.visualization" &&
+        message.source.component === structureComponent
+      ) {
+        const lifecycle = message.payload as unknown as { status?: string; requestId?: string };
+        if (lifecycle.status === "rendered" && lifecycle.requestId?.startsWith("M50-"))
+          setRenderedRequest(lifecycle.requestId);
+      }
     }, []),
   );
   return (
@@ -164,9 +299,9 @@ function AlignmentStructureContent({
           Alignment to sequence to structure
         </h1>
         <p className="mt-3 max-w-4xl text-lg text-slate-600">
-          The checked PF00042.29 alignment is normalized into one 32-member alignment. A query cell
-          travels through its P69905 member sequence before 1A3N chain A; a gap has no invented
-          sequence or structure position.
+          The checked PF00042.29 alignment has one experimental 1A3N structure and three clearly
+          labeled AlphaFold DB v6 predictions. This is a comparative display, not a biological
+          ensemble; all models and transforms are local checked fixtures.
         </p>
         <p className="mt-2 text-slate-500 text-sm" data-testid="p60-harness-status">
           Harness: {status} · local checked fixture only
@@ -179,6 +314,18 @@ function AlignmentStructureContent({
       >
         {() => null}
       </CaseRendererChooser>
+      <section
+        className="flex flex-wrap items-center gap-2"
+        aria-label="Alignment structure actions"
+      >
+        <button className="toolbar-button" onClick={showAll} type="button">
+          Show all checked structures
+        </button>
+        <span className="text-slate-600 text-sm">
+          Click Consensus, Conservation, or Subgroup annotations to color every mapped checked
+          structure. A member cube shows that member alone.
+        </span>
+      </section>
       <div className="grid gap-5 xl:grid-cols-2">
         <ViewerPanel
           id={alignmentComponent}
@@ -187,8 +334,8 @@ function AlignmentStructureContent({
         />
         <ViewerPanel
           id={structureComponent}
-          title="Mol* / 1A3N chain A"
-          detail="Local neutral MVS; mapped P69905 residues only"
+          title="Mol* comparative structure view"
+          detail="Experimental 1A3N plus clearly labeled local AlphaFold DB v6 predictions"
         />
       </div>
       <section
@@ -202,9 +349,24 @@ function AlignmentStructureContent({
             : `${ready.rowCount} stable rows · ${ready.columnCount} columns · ${ready.queryGapColumns} query gaps`}
         </p>
         <p className="mt-2 text-slate-300 text-sm">
-          Hover or select a non-gap query cell to inspect the explicit two-step translator path. Gap
-          columns retain their alignment locus and clear the structure mark.
+          Hover or select a non-gap structured-member cell to inspect its explicit mapping path. Gap
+          columns retain their alignment locus and never invent a sequence or structure position.
         </p>
+        <p className="mt-2 text-emerald-200 text-sm" data-testid="m50-action-summary">
+          {action === undefined
+            ? "Neutral experimental structure"
+            : action.kind === "profile"
+              ? `Profile: ${action.profile}`
+              : action.kind === "member"
+                ? `Member: ${action.memberId}`
+                : "All four checked structures"}
+        </p>
+        <p className="sr-only" data-testid="m50-structure-state">
+          {renderedRequest ?? "waiting for structure frame"}
+        </p>
+        <pre className="sr-only" data-testid="m50-action-payload">
+          {action === undefined ? "{}" : JSON.stringify(action)}
+        </pre>
         <ul className="mt-3 grid gap-1 text-slate-300 text-xs" data-testid="p60-translator-ids">
           {(ready?.translatorIds ?? [])
             .filter((id) => id.includes("HBA_HUMAN") || id.includes("P69905.sequence"))

@@ -1,4 +1,5 @@
 import {
+  type ComponentContext,
   type ComponentFactory,
   createApplicationHarness,
   createTranslatorRegistry,
@@ -17,8 +18,22 @@ import alignmentAfa from "../../../fixtures/alignment-structure/expected/PF00042
 import p69905Fasta from "../../../fixtures/alignment-structure/input/P69905.fasta?raw";
 import structureMappingTsv from "../../../fixtures/alignment-structure/mappings/P69905-1A3N-chain-A.tsv?raw";
 import alignmentMappingTsv from "../../../fixtures/alignment-structure/mappings/P69905-PF00042-1A3N-chain-A.tsv?raw";
+import a0a2y9dez0Mapping from "../../../fixtures/alignment-structure/mappings/PF00042.29-A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-model_v6.tsv?raw";
+import a0a5e4c8d4Mapping from "../../../fixtures/alignment-structure/mappings/PF00042.29-A0A5E4C8D4-AF-A0A5E4C8D4-F1-model_v6.tsv?raw";
+import p02197Mapping from "../../../fixtures/alignment-structure/mappings/PF00042.29-P02197-AF-P02197-F1-model_v6.tsv?raw";
+import a0a2y9dez0Transform from "../../../fixtures/alignment-structure/transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.transform.json" with {
+  type: "json",
+};
+import a0a5e4c8d4Transform from "../../../fixtures/alignment-structure/transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.transform.json" with {
+  type: "json",
+};
+import p02197Transform from "../../../fixtures/alignment-structure/transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.transform.json" with {
+  type: "json",
+};
 import {
+  type AlignmentEnsembleMember,
   alignmentColumnSpace,
+  createAlignmentEnsembleMvs,
   createAlignmentStructurePlugin,
   createAlignmentStructureSeqViewSpec,
   createAlignmentStructureTranslators,
@@ -35,6 +50,54 @@ const source = {
   alignmentMappingTsv,
   structureMappingTsv,
 };
+const matrix = (source: {
+  readonly matrix: { readonly values: readonly number[] };
+}): readonly number[] => source.matrix.values;
+const approvedEnsemble: readonly AlignmentEnsembleMember[] = [
+  {
+    id: "P69905-1A3N",
+    memberId: "HBA_HUMAN-27-137:member",
+    label: "P69905 / 1A3N",
+    provenanceLabel: "experimental test fixture",
+    url: "/input/1A3N.cif",
+    color: "#2563EB",
+    predicted: false,
+    mappingTsv: alignmentMappingTsv,
+  },
+  {
+    id: "P02197-AFDB-v6",
+    memberId: "MYG_CHICK-27-143:member",
+    label: "P02197 AlphaFold DB v6",
+    provenanceLabel: "AlphaFold DB v6 predicted model — theoretical; not experimental",
+    url: "/input/AF-P02197-F1-model_v6.cif",
+    color: "#F97316",
+    predicted: true,
+    mappingTsv: p02197Mapping,
+    transform: matrix(p02197Transform),
+  },
+  {
+    id: "A0A5E4C8D4-AFDB-v6",
+    memberId: "A0A5E4C8D4_MARMO-27-137:member",
+    label: "A0A5E4C8D4 AlphaFold DB v6",
+    provenanceLabel: "AlphaFold DB v6 predicted model — theoretical; not experimental",
+    url: "/input/AF-A0A5E4C8D4-F1-model_v6.cif",
+    color: "#10B981",
+    predicted: true,
+    mappingTsv: a0a5e4c8d4Mapping,
+    transform: matrix(a0a5e4c8d4Transform),
+  },
+  {
+    id: "A0A2Y9DEZ0-AFDB-v6",
+    memberId: "A0A2Y9DEZ0_TRIMA-27-137:member",
+    label: "A0A2Y9DEZ0 AlphaFold DB v6",
+    provenanceLabel: "AlphaFold DB v6 predicted model — theoretical; not experimental",
+    url: "/input/AF-A0A2Y9DEZ0-F1-model_v6.cif",
+    color: "#A855F7",
+    predicted: true,
+    mappingTsv: a0a2y9dez0Mapping,
+    transform: matrix(a0a2y9dez0Transform),
+  },
+];
 const document = createAlignmentStructureSeqViewSpec(source);
 const columnRows = parseAlignmentStructureMappingTsv(alignmentMappingTsv);
 const structureRows = parseP69905StructureMappingTsv(structureMappingTsv);
@@ -49,6 +112,29 @@ const deferred = () => {
     resolve = done;
   });
   return { promise, resolve };
+};
+type MvsNode = {
+  readonly kind: string;
+  readonly params?: Readonly<Record<string, unknown>>;
+  readonly children?: readonly MvsNode[];
+};
+const mvsNodes = (value: unknown): readonly MvsNode[] => {
+  const root = (value as { readonly root: MvsNode }).root;
+  const visit = (node: MvsNode): readonly MvsNode[] => [
+    node,
+    ...(node.children ?? []).flatMap(visit),
+  ];
+  return visit(root);
+};
+const colorCounts = (value: unknown): Readonly<Record<string, number>> => {
+  const counts: Record<string, number> = {};
+  for (const node of mvsNodes(value).filter((item) => item.kind === "color")) {
+    const color = String(node.params?.color);
+    counts[color] = (counts[color] ?? 0) + 1;
+  }
+  return Object.fromEntries(
+    Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)),
+  );
 };
 
 describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
@@ -95,12 +181,30 @@ describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
     const annotations = new Map((document.annotations ?? []).map((item) => [item.id, item]));
     const consensusAnnotation = annotations.get("PF00042.29-consensus");
     const conservationAnnotation = annotations.get("PF00042.29-conservation");
+    const subgroupAnnotation = annotations.get("PF00042.29-subgroups");
     expect(consensusAnnotation?.kind === "values" && consensusAnnotation.values.data).toEqual(
       expectedConsensus,
     );
     expect(conservationAnnotation?.kind === "values" && conservationAnnotation.values.data).toEqual(
       expectedConservation,
     );
+    expect(subgroupAnnotation?.kind === "loci" && subgroupAnnotation.items).toEqual([
+      {
+        id: "query-helix-rich-core",
+        label: "Query globin core",
+        value: "query-subgroup",
+        loci: [{ kind: "interval", space: alignmentColumnSpace.id, start: 26, end: 91 }],
+      },
+      {
+        id: "insertion-edge-columns",
+        label: "Query insertion/deletion edges",
+        value: "gap-edge",
+        loci: [
+          { kind: "interval", space: alignmentColumnSpace.id, start: 21, end: 25 },
+          { kind: "interval", space: alignmentColumnSpace.id, start: 56, end: 59 },
+        ],
+      },
+    ]);
     expect(expectedConsensus).toHaveLength(118);
     expect(expectedConservation).toHaveLength(118);
     expect(
@@ -244,6 +348,315 @@ describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
     expect(JSON.stringify(mvs)).toContain("/fixtures/1A3N.cif");
   });
 
+  it("generates distinct validated profile and checked four-root ensemble MVS trees", () => {
+    const normalized = normalizeAlignment(
+      (() => {
+        const parsed = parseAlignedFasta(alignmentAfa);
+        if (!parsed.ok) throw new Error("alignment parse failed");
+        return parsed.value;
+      })(),
+      { alignmentId: "PF00042.29", coordinateSpace: alignmentColumnSpace.id, alphabet: "protein" },
+    );
+    if (!normalized.ok) throw new Error("alignment normalization failed");
+    const create = (profile?: "consensus" | "conservation" | "subgroup") =>
+      createAlignmentEnsembleMvs({
+        members: approvedEnsemble,
+        ...(profile === undefined ? {} : { profile }),
+        alignment: normalized.value.alignment,
+        title: `checked ${profile ?? "all"}`,
+        description: "checked test document",
+      });
+    const all = create();
+    const consensusMvs = create("consensus");
+    const conservationMvs = create("conservation");
+    const subgroupMvs = create("subgroup");
+    for (const mvs of [all, consensusMvs, conservationMvs, subgroupMvs])
+      expect(MVSData.validationIssues(mvs, { noExtra: true })).toBeUndefined();
+    const allNodes = mvsNodes(all);
+    expect(
+      allNodes.filter((node) => node.kind === "download").map((node) => node.params?.url),
+    ).toEqual(approvedEnsemble.map((member) => member.url));
+    expect(
+      allNodes.filter((node) => node.kind === "transform").map((node) => node.params?.matrix),
+    ).toEqual(approvedEnsemble.slice(1).map((member) => member.transform));
+    expect(allNodes.filter((node) => node.kind === "component")).toHaveLength(4);
+    expect(colorCounts(all)).toEqual({
+      "#10B981": 1,
+      "#2563EB": 1,
+      "#A855F7": 1,
+      "#F97316": 1,
+    });
+    for (const profile of [consensusMvs, conservationMvs, subgroupMvs]) {
+      const nodes = mvsNodes(profile);
+      expect(nodes.filter((node) => node.kind === "download")).toHaveLength(4);
+      expect(nodes.filter((node) => node.kind === "transform")).toHaveLength(3);
+      expect(nodes.filter((node) => node.kind === "component")).toHaveLength(448);
+      expect(nodes.filter((node) => node.kind === "representation")).toHaveLength(448);
+      expect(nodes.filter((node) => node.kind === "color")).toHaveLength(448);
+      expect(
+        nodes.filter(
+          (node) => node.kind === "component" && typeof node.params?.selector === "object",
+        ),
+      ).toHaveLength(448);
+      const roots = ((profile as unknown as { readonly root: MvsNode }).root.children ?? []).filter(
+        (node) => node.kind === "download",
+      );
+      expect(
+        roots.map((root) => mvsNodes({ root }).filter((node) => node.kind === "component").length),
+      ).toEqual([112, 113, 112, 111]);
+      expect(
+        nodes.filter((node) => {
+          if (node.kind !== "component" || typeof node.params?.selector !== "object") return false;
+          return "label_seq_id" in (node.params.selector as object);
+        }),
+      ).toHaveLength(444);
+    }
+    expect(colorCounts(consensusMvs)).toEqual({
+      "#2563EB": 216,
+      "#CBD5E1": 4,
+      "#DC2626": 228,
+    });
+    expect(colorCounts(conservationMvs)).toEqual({
+      "#0EA5E9": 95,
+      "#2563EB": 8,
+      "#312E81": 14,
+      "#94A3B8": 327,
+      "#CBD5E1": 4,
+    });
+    expect(colorCounts(subgroupMvs)).toEqual({
+      "#64748B": 192,
+      "#7C3AED": 248,
+      "#CBD5E1": 4,
+      "#D97706": 4,
+    });
+    const p02197Root = ((subgroupMvs as unknown as { readonly root: MvsNode }).root.children ?? [])
+      .filter((node) => node.kind === "download")
+      .find((node) => node.params?.url === "/input/AF-P02197-F1-model_v6.cif");
+    if (p02197Root === undefined) throw new Error("P02197 subgroup root missing");
+    const colorAtLabelSeqId = (labelSeqId: number): unknown => {
+      const component = mvsNodes({ root: p02197Root }).find(
+        (node) =>
+          node.kind === "component" &&
+          typeof node.params?.selector === "object" &&
+          node.params.selector !== null &&
+          "label_seq_id" in node.params.selector &&
+          node.params.selector.label_seq_id === labelSeqId,
+      );
+      return component === undefined
+        ? undefined
+        : mvsNodes({ root: component }).find((node) => node.kind === "color")?.params?.color;
+    };
+    // Exact fixture-backed boundary selectors: [21,25) is orange through
+    // column 24, while columns 25 and 91 are outside their half-open ranges.
+    // Column 59 is past the gap-edge end but remains in the broad core.
+    expect({
+      column24: colorAtLabelSeqId(53),
+      column25: colorAtLabelSeqId(54),
+      column59: colorAtLabelSeqId(85),
+      column90: colorAtLabelSeqId(116),
+      column91: colorAtLabelSeqId(117),
+    }).toEqual({
+      column24: "#D97706",
+      column25: "#64748B",
+      column59: "#7C3AED",
+      column90: "#7C3AED",
+      column91: "#64748B",
+    });
+    expect(JSON.stringify(consensusMvs)).not.toEqual(JSON.stringify(conservationMvs));
+    expect(JSON.stringify(conservationMvs)).not.toEqual(JSON.stringify(subgroupMvs));
+    expect(JSON.stringify(consensusMvs)).toContain("#DC2626");
+    expect(JSON.stringify(conservationMvs)).toContain("#312E81");
+    expect(JSON.stringify(subgroupMvs)).toContain("#7C3AED");
+  });
+
+  it("fails predicted interaction closed until the exact member structure is active", async () => {
+    const predictedSpace: CoordinateSpace = {
+      id: "structure-p02197-active",
+      kind: "structure-residue",
+      authority: "molstar",
+      context: {
+        entry: "AF-P02197-F1-model_v6",
+        structure: "p02197-state",
+        model: "model-0",
+        "model-index": "0",
+        "model-number": "1",
+        entity: "1",
+        "label-asym": "A",
+        "auth-asym": "A",
+        unit: "1",
+        operator: "1_555",
+        instance: "1_555",
+        numbering: "label-and-auth",
+      },
+    };
+    let reportStructureSpaces: ComponentContext["reportCoordinateSpaces"] = () => undefined;
+    const passive = (
+      type: string,
+      capabilities: readonly string[],
+      start: (context: ComponentContext) => void,
+    ): ComponentFactory => ({
+      type,
+      create({ id }) {
+        return {
+          id,
+          capabilities,
+          async start(context) {
+            start(context);
+          },
+          dispose() {},
+        };
+      },
+    });
+    const harness = createApplicationHarness(
+      {
+        id: "m50-predicted-lifecycle",
+        components: [
+          { id: "alignment", type: "test.alignment" },
+          { id: "structure", type: "test.structure" },
+        ],
+        plugins: [{ id: "alignment-structure", plugin: "test.alignment-structure" }],
+      },
+      {
+        componentFactories: [
+          passive("test.alignment", ["seqstar:format/seqviewspec"], (context) =>
+            context.reportCoordinateSpaces([alignmentColumnSpace]),
+          ),
+          passive("test.structure", ["seqstar:format/mvs"], (context) => {
+            reportStructureSpaces = context.reportCoordinateSpaces;
+            reportStructureSpaces([]);
+          }),
+        ],
+        pluginFactories: [
+          {
+            plugin: "test.alignment-structure",
+            create: () =>
+              createAlignmentStructurePlugin({
+                alignmentComponent: "alignment",
+                structureComponent: "structure",
+                ...source,
+                structureUrl: "/input/1A3N.cif",
+                ensemble: approvedEnsemble,
+                ensembleId: "PF00042.29-P69905-1A3N-plus-AFDB-v6-3",
+              }),
+          },
+        ],
+      },
+    );
+    const observed: HarnessMessage[] = [];
+    harness.fabric.observe().subscribe((message) => observed.push(message));
+    await harness.start();
+    const publishNative = (
+      interaction: "hover" | "select",
+      phase: "set" | "clear",
+      column: number,
+    ) => {
+      const id = crypto.randomUUID();
+      harness.fabric.publish({
+        id,
+        type: "interaction.native",
+        version: "0.1.0",
+        source: { component: "alignment" },
+        correlationId: id,
+        timestamp: new Date().toISOString(),
+        payload: {
+          interactionId: id,
+          interaction,
+          phase,
+          origin: {
+            componentId: "alignment",
+            documentId: document.id,
+            viewId: "PF00042.29-main",
+            alignmentId: "PF00042.29",
+            alignmentMemberId: "MYG_CHICK-27-143:member",
+          },
+          loci: phase === "clear" ? [] : [point(alignmentColumnSpace, column)],
+        } as never,
+      });
+      return id;
+    };
+    const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
+    const before = publishNative("hover", "set", 1);
+    await settle();
+    expect(
+      observed.filter(
+        (message) =>
+          message.correlationId === before &&
+          message.type === "interaction.highlight.apply" &&
+          message.target !== undefined &&
+          "component" in message.target &&
+          message.target.component === "structure",
+      ),
+    ).toHaveLength(0);
+    expect(
+      observed.find(
+        (message) =>
+          message.correlationId === before && message.type === "alignment-structure.mapping",
+      )?.payload,
+    ).toMatchObject({ status: "unmapped", targetCount: 0 });
+
+    const actionId = crypto.randomUUID();
+    harness.fabric.publish({
+      id: actionId,
+      type: "alignment.structure.show-member",
+      version: "0.1.0",
+      source: { component: "alignment" },
+      correlationId: actionId,
+      timestamp: new Date().toISOString(),
+      payload: { memberId: "MYG_CHICK-27-143:member" } as never,
+    });
+    await settle();
+    const request = observed.find(
+      (message) =>
+        message.correlationId === actionId && message.type === "visualization.mvs.request",
+    );
+    expect(JSON.stringify(request?.payload)).toContain("/input/AF-P02197-F1-model_v6.cif");
+    reportStructureSpaces([predictedSpace]);
+
+    const hover = publishNative("hover", "set", 1);
+    const select = publishNative("select", "set", 1);
+    await settle();
+    for (const [correlationId, type] of [
+      [hover, "interaction.highlight.apply"],
+      [select, "interaction.selection.apply"],
+    ] as const) {
+      const apply = observed.find(
+        (message) =>
+          message.correlationId === correlationId &&
+          message.type === type &&
+          message.target !== undefined &&
+          "component" in message.target &&
+          message.target.component === "structure",
+      );
+      expect(apply).toBeDefined();
+      if (apply === undefined) throw new Error("predicted structure application missing");
+      expect((apply.payload as { loci?: readonly CoordinateLocus[] }).loci?.[0]?.space).toEqual(
+        predictedSpace,
+      );
+    }
+    const clear = publishNative("select", "clear", 1);
+    const gap = publishNative("hover", "set", 0);
+    await settle();
+    expect(
+      observed.find(
+        (message) =>
+          message.correlationId === clear && message.type === "interaction.selection.clear",
+      ),
+    ).toBeDefined();
+    expect(
+      observed.find(
+        (message) =>
+          message.correlationId === gap && message.type === "alignment-structure.mapping",
+      )?.payload,
+    ).toMatchObject({ status: "unmapped", targetCount: 0 });
+    expect(
+      observed.filter(
+        (message) =>
+          message.correlationId === gap && message.type === "interaction.highlight.apply",
+      ),
+    ).toHaveLength(0);
+    await harness.disposeAsync();
+  });
+
   it("routes real harness native events through the gated two-step seam without echo", async () => {
     const actualMolstarSpace: CoordinateSpace = {
       ...p69905StructureSpace,
@@ -308,6 +721,8 @@ describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
                 structureComponent: "structure",
                 ...source,
                 structureUrl: "/fixtures/1A3N.cif",
+                ensemble: approvedEnsemble,
+                ensembleId: "test-ensemble",
               }),
           },
         ],

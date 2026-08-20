@@ -31,6 +31,20 @@ import type { MVSData as MvsDocument } from "molstar/lib/extensions/mvs/mvs-data
 const alignmentColumnLength = 118;
 const p69905SequenceLength = 142;
 
+/** Frozen SeqViewSpec interval coordinates; every interval is half-open [start, end). */
+const subgroupAnnotationRanges = {
+  core: [[26, 91]],
+  gapEdge: [
+    [21, 25],
+    [56, 59],
+  ],
+} as const;
+
+const inHalfOpenRanges = (
+  column: number,
+  ranges: readonly (readonly [start: number, end: number])[],
+): boolean => ranges.some(([start, end]) => column >= start && column < end);
+
 export const alignmentColumnSpace: CoordinateSpace = Object.freeze({
   id: "PF00042.29:alignment-columns",
   kind: "alignment",
@@ -370,16 +384,23 @@ const parseData = (options: {
             id: "query-helix-rich-core",
             label: "Query globin core",
             value: "query-subgroup",
-            loci: [{ kind: "interval", space: alignmentColumnSpace.id, start: 26, end: 91 }],
+            loci: subgroupAnnotationRanges.core.map(([start, end]) => ({
+              kind: "interval" as const,
+              space: alignmentColumnSpace.id,
+              start,
+              end,
+            })),
           },
           {
             id: "insertion-edge-columns",
             label: "Query insertion/deletion edges",
             value: "gap-edge",
-            loci: [
-              { kind: "interval", space: alignmentColumnSpace.id, start: 21, end: 25 },
-              { kind: "interval", space: alignmentColumnSpace.id, start: 56, end: 59 },
-            ],
+            loci: subgroupAnnotationRanges.gapEdge.map(([start, end]) => ({
+              kind: "interval" as const,
+              space: alignmentColumnSpace.id,
+              start,
+              end,
+            })),
           },
         ],
         provenance: { label: "P60 visual subgroup annotations", generatedBy: "P60" },
@@ -677,6 +698,167 @@ export const createNeutral1A3nMvs = (structureUrl: string): MvsDocument => {
   return document;
 };
 
+export type AlignmentProfile = "consensus" | "conservation" | "subgroup";
+
+/** A checked local structure available to the alignment presentation. */
+export interface AlignmentEnsembleMember {
+  readonly id: string;
+  readonly memberId: string;
+  readonly label: string;
+  readonly provenanceLabel: string;
+  readonly url: string;
+  readonly color: string;
+  readonly predicted: boolean;
+  /** The approved derived column-to-model table, or the P69905 table for 1A3N. */
+  readonly mappingTsv: string;
+  /** A checked column-major mobile-to-1A3N transform. Omit only for the reference model. */
+  readonly transform?: readonly number[];
+}
+
+type EnsembleResidue = {
+  readonly column: number;
+  readonly labelSeqId: number;
+  readonly authSeqId: number;
+};
+
+const exactMvs = (document: MvsDocument, label: string): MvsDocument => {
+  const issues = MVSData.validationIssues(document, { noExtra: true }) ?? [];
+  if (issues.length) throw new Error(`${label} MVS is invalid: ${issues.join("; ")}`);
+  return document;
+};
+
+const profileColor = (
+  profile: AlignmentProfile,
+  column: number,
+  memberResidue: string,
+  consensusValues: readonly unknown[],
+  conservationValues: readonly unknown[],
+): string | undefined => {
+  if (memberResidue === "-") return undefined;
+  if (profile === "consensus")
+    return memberResidue === consensusValues[column] ? "#2563EB" : "#DC2626";
+  if (profile === "conservation") {
+    const value = conservationValues[column];
+    if (typeof value !== "number") return undefined;
+    if (value >= 0.9) return "#312E81";
+    if (value >= 0.75) return "#2563EB";
+    if (value >= 0.5) return "#0EA5E9";
+    return "#94A3B8";
+  }
+  // The narrower gap-edge annotation has intentional precedence where its
+  // [56, 59) interval overlaps the broad [26, 91) core annotation.
+  if (inHalfOpenRanges(column, subgroupAnnotationRanges.gapEdge)) return "#D97706";
+  if (inHalfOpenRanges(column, subgroupAnnotationRanges.core)) return "#7C3AED";
+  return "#64748B";
+};
+
+const parseEnsembleResidues = (member: AlignmentEnsembleMember): readonly EnsembleResidue[] => {
+  const table = textRows(member.mappingTsv);
+  const headings = table.headings;
+  const columnIndex = headings.indexOf("alignment_index_0based");
+  const labelIndex = headings.indexOf("label_seq_id");
+  const authIndex = headings.indexOf("auth_seq_id");
+  const statusIndex = headings.indexOf("status");
+  if (columnIndex < 0 || labelIndex < 0 || authIndex < 0 || statusIndex < 0)
+    throw new Error(`Checked mapping for '${member.id}' lacks alignment/model columns.`);
+  const values = table.rows.flatMap((fields) => {
+    const status = fields[statusIndex];
+    const column = Number(fields[columnIndex]);
+    const labelSeqId = optionalNumber(fields[labelIndex]);
+    const authSeqId = optionalNumber(fields[authIndex]);
+    if (!Number.isInteger(column) || column < 0 || column >= alignmentColumnLength) return [];
+    // P69905 uses 'exact'; the predicted mappings use 'exact_observed'.
+    if (
+      (status !== "exact" && status !== "exact_observed") ||
+      labelSeqId === undefined ||
+      authSeqId === undefined
+    )
+      return [];
+    return [{ column, labelSeqId, authSeqId } satisfies EnsembleResidue];
+  });
+  if (values.length === 0)
+    throw new Error(`Checked mapping for '${member.id}' has no observed residues.`);
+  return Object.freeze(values);
+};
+
+const chainSelector = {
+  label_entity_id: "1",
+  label_asym_id: "A",
+  auth_asym_id: "A",
+};
+
+/**
+ * Build all alignment presentations through the pinned Mol* MVS builder.  We
+ * deliberately use checked mapping rows only; no CIF parsing or inferred
+ * sequence alignment occurs in the browser route.
+ */
+export const createAlignmentEnsembleMvs = (options: {
+  readonly members: readonly AlignmentEnsembleMember[];
+  readonly title: string;
+  readonly description: string;
+  readonly profile?: AlignmentProfile;
+  readonly alignment: AlignmentModel;
+}): MvsDocument => {
+  if (options.members.length !== 4)
+    throw new Error("The approved PF00042.29 display contains exactly four checked structures.");
+  const consensusAnnotation = consensus(options.alignment).values;
+  const conservationAnnotation = conservation(options.alignment).values;
+  const memberById = new Map(options.alignment.members.map((member) => [member.id, member]));
+  const builder = MVSData.createBuilder();
+  builder.canvas({ background_color: "white" });
+  for (const entry of options.members) {
+    const aligned = memberById.get(entry.memberId);
+    if (aligned === undefined) throw new Error(`Ensemble member '${entry.memberId}' is absent.`);
+    const structure = builder
+      .download({ url: entry.url })
+      .parse({ format: "mmcif" })
+      .modelStructure();
+    const transformed =
+      entry.transform === undefined
+        ? structure
+        : structure.transform({ matrix: [...entry.transform] });
+    const full = transformed.component({ selector: chainSelector });
+    if (!entry.predicted) full.focus();
+    full
+      .representation({ type: "cartoon" })
+      .color({ color: (options.profile === undefined ? entry.color : "#CBD5E1") as never });
+    if (options.profile === undefined) continue;
+    const groups = new Map<string, EnsembleResidue[]>();
+    for (const residue of parseEnsembleResidues(entry)) {
+      const memberPosition = aligned.positions[residue.column];
+      const color = profileColor(
+        options.profile,
+        residue.column,
+        memberPosition === null || memberPosition === undefined
+          ? "-"
+          : (aligned.residues[memberPosition] ?? "-"),
+        consensusAnnotation,
+        conservationAnnotation,
+      );
+      if (color !== undefined) groups.set(color, [...(groups.get(color) ?? []), residue]);
+    }
+    for (const [color, residues] of groups) {
+      // One selector per frozen category/bin/member is deterministic and keeps
+      // every mapped structure represented without a custom color theme.
+      for (const residue of residues)
+        transformed
+          .component({ selector: { ...chainSelector, label_seq_id: residue.labelSeqId } })
+          .representation({ type: "cartoon" })
+          .color({ color: color as never });
+    }
+  }
+  return exactMvs(
+    fixedTimestamp(
+      builder.getState({
+        title: options.title,
+        description: options.description,
+        description_format: "plaintext",
+      }),
+    ),
+    "Alignment ensemble",
+  );
+};
+
 const customSchema = <T>(check: (value: unknown) => value is T) => ({
   schema: VisualizationRequestSchema,
   check,
@@ -701,6 +883,13 @@ type MappingPayload = {
   readonly sourceMemberId?: string;
   readonly alignmentId: string;
 };
+type ProfileIntentPayload = { readonly profile: AlignmentProfile };
+type MemberIntentPayload = { readonly memberId: string };
+type ShowAllIntentPayload = { readonly ensembleId: string };
+type AlignmentActionPayload =
+  | { readonly kind: "profile"; readonly profile: AlignmentProfile; readonly requestId: string }
+  | { readonly kind: "member"; readonly memberId: string; readonly requestId: string }
+  | { readonly kind: "show-all"; readonly ensembleId: string; readonly requestId: string };
 const readySchema = customSchema<ReadyPayload>(
   (value): value is ReadyPayload =>
     isObject(value) &&
@@ -726,6 +915,31 @@ const mappingSchema = customSchema<MappingPayload>(
     Array.isArray(value.translatorIds) &&
     typeof value.targetCount === "number" &&
     typeof value.alignmentId === "string",
+);
+const profileIntentSchema = customSchema<ProfileIntentPayload>(
+  (value): value is ProfileIntentPayload =>
+    isObject(value) &&
+    (value.profile === "consensus" ||
+      value.profile === "conservation" ||
+      value.profile === "subgroup"),
+);
+const memberIntentSchema = customSchema<MemberIntentPayload>(
+  (value): value is MemberIntentPayload => isObject(value) && typeof value.memberId === "string",
+);
+const showAllIntentSchema = customSchema<ShowAllIntentPayload>(
+  (value): value is ShowAllIntentPayload => isObject(value) && typeof value.ensembleId === "string",
+);
+const actionSchema = customSchema<AlignmentActionPayload>(
+  (value): value is AlignmentActionPayload =>
+    isObject(value) &&
+    typeof value.kind === "string" &&
+    typeof value.requestId === "string" &&
+    ((value.kind === "profile" &&
+      (value.profile === "consensus" ||
+        value.profile === "conservation" ||
+        value.profile === "subgroup")) ||
+      (value.kind === "member" && typeof value.memberId === "string") ||
+      (value.kind === "show-all" && typeof value.ensembleId === "string")),
 );
 const message = <T>(
   type: string,
@@ -754,6 +968,8 @@ export interface AlignmentStructurePluginOptions {
   readonly alignmentMappingTsv: string;
   readonly structureMappingTsv: string;
   readonly structureUrl: string;
+  readonly ensemble: readonly AlignmentEnsembleMember[];
+  readonly ensembleId: string;
 }
 
 /**
@@ -781,6 +997,10 @@ export const createAlignmentStructurePlugin = (
     });
     context.messageSchemas.register("alignment-structure.ready", "0.1.0", readySchema);
     context.messageSchemas.register("alignment-structure.mapping", "0.1.0", mappingSchema);
+    context.messageSchemas.register("alignment.profile.activate", "0.1.0", profileIntentSchema);
+    context.messageSchemas.register("alignment.structure.show-member", "0.1.0", memberIntentSchema);
+    context.messageSchemas.register("alignment.structure.show-all", "0.1.0", showAllIntentSchema);
+    context.messageSchemas.register("alignment-structure.action", "0.1.0", actionSchema);
     const correlationId = crypto.randomUUID();
     const ready: ReadyPayload = {
       documentId: data.document.id,
@@ -828,6 +1048,144 @@ export const createAlignmentStructurePlugin = (
     const queryMember = alignment?.members.find((member) => member.sequence === "P69905");
     if (alignment === undefined || queryMember === undefined)
       throw new Error("P60 document has no structure-linked alignment member.");
+    const ensembleByMember = new Map(options.ensemble.map((member) => [member.memberId, member]));
+    const ensembleResiduesByMember = new Map(
+      options.ensemble.map((member) => [
+        member.memberId,
+        new Map(parseEnsembleResidues(member).map((residue) => [residue.column, residue])),
+      ]),
+    );
+    if (ensembleByMember.size !== 4 || !ensembleByMember.has(queryMember.id))
+      throw new Error("The alignment ensemble must expose the exact four approved members.");
+    let actionGeneration = 0;
+    const actionRequest = (
+      incoming: HarnessMessage,
+      action:
+        | { readonly kind: "profile"; readonly profile: AlignmentProfile }
+        | { readonly kind: "member"; readonly memberId: string }
+        | { readonly kind: "show-all"; readonly ensembleId: string },
+    ): void => {
+      const requestId = `M50-${action.kind}-${++actionGeneration}`;
+      let document: MvsDocument;
+      let detail: AlignmentActionPayload;
+      if (action.kind === "profile") {
+        document = createAlignmentEnsembleMvs({
+          members: options.ensemble,
+          profile: action.profile,
+          alignment: data.normalized.alignment,
+          title: `PF00042.29 ${action.profile} profile across checked structures`,
+          description:
+            "Checked local experimental 1A3N and AlphaFold DB v6 predicted models; colors are derived only from frozen PF00042.29 alignment columns.",
+        });
+        detail = { kind: "profile", profile: action.profile, requestId };
+      } else if (action.kind === "member") {
+        const member = ensembleByMember.get(action.memberId);
+        if (member === undefined) return;
+        // A member action must load its exact structure, not a similarly named row.
+        const builder = MVSData.createBuilder();
+        builder.canvas({ background_color: "white" });
+        const structure = builder
+          .download({ url: member.url })
+          .parse({ format: "mmcif" })
+          .modelStructure();
+        const transformed =
+          member.transform === undefined
+            ? structure
+            : structure.transform({ matrix: [...member.transform] });
+        const component = transformed.component({ selector: chainSelector });
+        component.focus();
+        component.representation({ type: "cartoon" }).color({ color: member.color as never });
+        document = exactMvs(
+          fixedTimestamp(
+            builder.getState({
+              title: `${member.label} — checked local structure`,
+              description: `${member.provenanceLabel}. Displayed in the frozen P69905/1A3N frame.`,
+              description_format: "plaintext",
+            }),
+          ),
+          "Alignment member",
+        );
+        detail = { kind: "member", memberId: member.memberId, requestId };
+      } else {
+        if (action.ensembleId !== options.ensembleId) return;
+        document = createAlignmentEnsembleMvs({
+          members: options.ensemble,
+          alignment: data.normalized.alignment,
+          title: "PF00042.29 experimental 1A3N plus three AlphaFold DB v6 predictions",
+          description:
+            "Comparative experimental-plus-predicted display; this is not a biological ensemble. Every model uses a frozen local transform into the P69905/1A3N frame.",
+        });
+        detail = { kind: "show-all", ensembleId: action.ensembleId, requestId };
+      }
+      context.fabric.publish(
+        message(
+          "visualization.mvs.request",
+          { format: "mvs", requestId, mode: "replace", document },
+          "seqstar.alignment-structure",
+          incoming.correlationId,
+          incoming.id,
+          { component: options.structureComponent },
+        ),
+      );
+      context.fabric.publish(
+        message(
+          "alignment-structure.action",
+          detail,
+          "seqstar.alignment-structure",
+          incoming.correlationId,
+          incoming.id,
+        ),
+      );
+    };
+    context.addProcessor({
+      id: "m50.alignment-structure-actions",
+      types: [
+        "alignment.profile.activate",
+        "alignment.structure.show-member",
+        "alignment.structure.show-all",
+        "interaction.native",
+      ],
+      process(incoming) {
+        if (incoming.type === "alignment.profile.activate") {
+          actionRequest(incoming, {
+            kind: "profile",
+            profile: (incoming.payload as unknown as ProfileIntentPayload).profile,
+          });
+          return;
+        }
+        if (incoming.type === "alignment.structure.show-member") {
+          actionRequest(incoming, {
+            kind: "member",
+            memberId: (incoming.payload as unknown as MemberIntentPayload).memberId,
+          });
+          return;
+        }
+        if (incoming.type === "alignment.structure.show-all") {
+          actionRequest(incoming, {
+            kind: "show-all",
+            ensembleId: (incoming.payload as unknown as ShowAllIntentPayload).ensembleId,
+          });
+          return;
+        }
+        const event = incoming.payload as unknown as InteractionEvent;
+        if (
+          event.interaction !== "track-activate" ||
+          event.phase !== "set" ||
+          event.origin.componentId !== options.alignmentComponent
+        )
+          return;
+        const profileByTrack: Record<string, AlignmentProfile> = {
+          consensus: "consensus",
+          conservation: "conservation",
+          subgroups: "subgroup",
+        };
+        const profile =
+          event.origin.trackId === undefined ? undefined : profileByTrack[event.origin.trackId];
+        if (profile !== undefined) actionRequest(incoming, { kind: "profile", profile });
+        else if (event.origin.alignmentMemberId !== undefined)
+          actionRequest(incoming, { kind: "member", memberId: event.origin.alignmentMemberId });
+      },
+    });
     type RoutedInteraction = "hover" | "select";
     type ActiveLease = {
       readonly interactionId: string;
@@ -918,6 +1276,27 @@ export const createAlignmentStructurePlugin = (
         [];
       return candidates.length === 1 ? candidates[0] : undefined;
     };
+    const currentStructureSpaceForMember = (memberId: string): CoordinateSpace | undefined => {
+      const member = ensembleByMember.get(memberId);
+      if (member === undefined) return undefined;
+      if (memberId === queryMember.id) return currentStructureSpace();
+      const accession = member.id.split("-")[0]?.toUpperCase();
+      const allCandidates =
+        context.components
+          .get(options.structureComponent)
+          ?.coordinateSpaces.filter(
+            (space) => space.kind === "structure-residue" && space.authority === "molstar",
+          ) ?? [];
+      const candidates = allCandidates.filter((space) => {
+        if (space.kind !== "structure-residue" || space.authority !== "molstar") return false;
+        const entry = String(space.context?.entry ?? "").toUpperCase();
+        return accession !== undefined && entry.includes(accession);
+      });
+      // A member action intentionally loads a single local model. Mol*'s
+      // model-entry identifier varies by mmCIF producer, so use that exact
+      // active singleton rather than guessing an identifier from a URL.
+      return candidates.length === 1 ? candidates[0] : undefined;
+    };
     const controllerFor = (
       direction: "forward" | "reverse",
       interaction: "hover" | "select",
@@ -963,8 +1342,20 @@ export const createAlignmentStructurePlugin = (
           if (event.origin.componentId === options.alignmentComponent) {
             if (event.interaction === "select")
               publishClear(incoming, event, options.alignmentComponent);
-            if (event.origin.alignmentMemberId === queryMember.id)
+            if (
+              event.origin.alignmentMemberId !== undefined &&
+              ensembleByMember.has(event.origin.alignmentMemberId)
+            ) {
+              const hadLease = forwardLeases.has(event.interaction);
               clearDirection("forward", incoming, event, options.structureComponent);
+              publishMapping(incoming, event, {
+                direction: "alignment-to-structure",
+                status: hadLease ? "exact" : "unmapped",
+                translatorIds: [],
+                targetCount: 0,
+                sourceMemberId: event.origin.alignmentMemberId,
+              });
+            }
           } else clearDirection("reverse", incoming, event, options.alignmentComponent);
           return;
         }
@@ -974,7 +1365,9 @@ export const createAlignmentStructurePlugin = (
               locus.kind === "point" && coordinateSpaceEquals(locus.space, alignmentColumnSpace),
           );
           if (columns.length === 0) return;
-          const structureLinkedOrigin = event.origin.alignmentMemberId === queryMember.id;
+          const sourceMemberId = event.origin.alignmentMemberId;
+          const structureLinkedOrigin =
+            sourceMemberId !== undefined && ensembleByMember.has(sourceMemberId);
           // Entering any other row replaces the active structure mark even
           // though the reference viewer does not emit a separate native clear.
           if (!structureLinkedOrigin)
@@ -1035,7 +1428,10 @@ export const createAlignmentStructurePlugin = (
             });
             return;
           }
-          const target = currentStructureSpace();
+          const target =
+            sourceMemberId === undefined
+              ? undefined
+              : currentStructureSpaceForMember(sourceMemberId);
           if (target === undefined) {
             clearDirection("forward", incoming, event, options.structureComponent);
             publishMapping(incoming, event, {
@@ -1043,7 +1439,48 @@ export const createAlignmentStructurePlugin = (
               status: "unmapped",
               translatorIds: [],
               targetCount: 0,
-              sourceMemberId: queryMember.id,
+              sourceMemberId: sourceMemberId ?? queryMember.id,
+            });
+            return;
+          }
+          // P69905 retains its audited registry path. The three predicted
+          // members use their own frozen alignment-column -> member sequence
+          // -> model table; they are never routed through P69905/1A3N.
+          if (sourceMemberId !== queryMember.id && sourceMemberId !== undefined) {
+            const rows = ensembleResiduesByMember.get(sourceMemberId);
+            const loci = columns.flatMap((column) => {
+              if (column.kind !== "point" || column.position.kind !== "index") return [];
+              const residue = rows?.get(column.position.value);
+              if (residue === undefined) return [];
+              return [
+                {
+                  kind: "point" as const,
+                  space: target,
+                  position: {
+                    kind: "label" as const,
+                    value: `label:${residue.labelSeqId}|auth:${residue.authSeqId}`,
+                  },
+                },
+              ];
+            });
+            if (loci.length === 0)
+              clearDirection("forward", incoming, event, options.structureComponent);
+            else {
+              publishApply(incoming, event, options.structureComponent, loci);
+              forwardLeases.set(event.interaction, {
+                interactionId: event.interactionId,
+                owner: owner(incoming, event),
+              });
+            }
+            publishMapping(incoming, event, {
+              direction: "alignment-to-structure",
+              status: loci.length === 0 ? "unmapped" : "exact",
+              translatorIds: [
+                `p60.PF00042.29.column-to-${sourceMemberId}`,
+                `m50.${sourceMemberId}.sequence-to-checked-structure`,
+              ],
+              targetCount: loci.length,
+              sourceMemberId,
             });
             return;
           }
