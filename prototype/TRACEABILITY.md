@@ -3,7 +3,8 @@
 Status values are evidence-based through the reviewed P80 clean-worktree gate.
 P80 was independently reviewed after reconciliation, then verified from an
 exact detached checkout using the pinned offline toolchain and full browser
-matrix.
+matrix. The C00–C50 Complex-interaction evidence below is implemented and
+awaiting its separate final independent review.
 “Future” means intentionally outside the prototype rather than silently
 unimplemented.
 
@@ -62,6 +63,14 @@ unimplemented.
 | P80-01 | dependency, license, vendor, fixture, boundary and schema hardening audit | `scripts/audit-p80-hardening.mjs`; `THIRD_PARTY_LICENSES.md` | `check:p80` | signed off |
 | P80-02 | offline repeated-navigation/rapid-interaction hardening coverage | `tests/e2e/hardening.spec.ts` | `test:e2e:hardening` | signed off |
 | P80-03 | clean offline checkout recipe and final traceability | this file; `README.md` | orchestrator clean-worktree gate | signed off |
+| C00 | reviewed Complex/reference interaction plan, P01 ancestry, fixture and dependency prerequisite | `spec/complex-interaction-improvement-plan.md`; commits `f51b4a7`, `0102cc4` | `git merge-base --is-ancestor 0102cc4 HEAD`, `check:fixtures`, `check:dependencies` | reviewed checkpoint |
+| C10 | reference viewer native hover/selection replaces stale local state, preserves external owners, and exposes all relationship endpoints | `packages/seq-viewer/src/index.ts`; `tests/p20-seq-viewer`; `tests/e2e/reference-viewer.spec.ts` | focused Vitest/Playwright, `test` | reviewed checkpoint `5f302d3` |
+| C11 | navigation chrome exposes bounded pan/zoom, gaps, keyboard controls and a JSON-safe viewport descriptor | `packages/seq-viewer`; `packages/wrapper-seq-viewer`; `tests/p20-seq-viewer`; reference wrapper contracts | focused Vitest/Playwright, `test` | reviewed checkpoint `026fc05` |
+| C20 | harness maps one native interaction across exact destination spaces, unions successes, diagnoses partial/ambiguous loci and cancels stale hover leases | `packages/harness-core/src/runtime.test.ts` | `mise run test` | reviewed checkpoint `8736430` |
+| C30 | 1BRS startup and six validated deterministic MVS profiles preserve exact chain translators, atomic-detail counts, selector colors and contact focus | `packages/integration-plugins/src/complex.ts`; `complex.test.ts`; `molviewspec-hardening.test.ts` | focused Vitest, `test` | reviewed checkpoint `48a192a` |
+| C40 | generic inspector binds rendered SeqViewSpec/MVS lifecycle identity, generated summaries and bounded redacted messages without a dataset catalog | `apps/web/src/inspect-panel*`; `inspect-panel-state.test.ts` | `mise run test`, app e2e | reviewed checkpoint `aadb8ca` |
+| C41 | Complex and reference pages prove offline startup, native sequence relationship events, exact MVS summaries, bounded navigation, remount disposal and P01 evidence overflow | `tests/e2e/{complex,reference-viewer,p01-feasibility}.spec.ts`; `tests/e2e/molviewspec-improvements.spec.ts` | focused Playwright, `test:e2e` | reviewed checkpoint `ded26bd` |
+| C50 | integrated audit covers startup/document identity, six MVS profiles, local/applied owner isolation, bidirectional mapping/clear, relationship endpoints, cancellation/no echo, navigation/remount, P01 narrow/wide overflow, and offline/dependency/fixture/license checks; narrow P01 host shrink fix is the authorized production reconciliation | cumulative C00–C41 tests; `tests/e2e/p01-feasibility.spec.ts`; `scripts/audit-p80-hardening.mjs` | final C50 command matrix in `spec/complex-interaction-improvement-plan.md` | implemented, pending independent review |
 | FUTURE-01 | EMDB/tomogram third-visualizer validation | `spec/case-studies.md` | none | future, not prototype scope |
 
 The original P80 clean worktree passed `mise install --locked`,

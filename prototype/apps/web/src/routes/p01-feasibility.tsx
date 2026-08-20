@@ -181,12 +181,15 @@ function P01FeasibilityPage() {
     setSession((value) => value + 1);
   };
   return (
-    <main className="mx-auto grid max-w-6xl gap-8 px-6 py-10" data-testid="p01-feasibility-page">
+    <main
+      className="mx-auto grid min-w-0 max-w-6xl gap-8 px-6 py-10"
+      data-testid="p01-feasibility-page"
+    >
       <section>
         <p className="font-semibold text-sky-700 text-sm uppercase tracking-[0.16em]">P01 gate</p>
         <h1 className="mt-2 font-bold text-3xl text-slate-950">Offline renderer feasibility</h1>
       </section>
-      <section className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="min-w-0 rounded border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="font-semibold text-xl text-slate-900">
           Nightingale renderer-output feasibility
         </h2>
@@ -202,9 +205,9 @@ function P01FeasibilityPage() {
         <button onClick={proveNightingale} type="button">
           Prove Nightingale highlight
         </button>
-        <div className="mt-4 overflow-x-auto" ref={nightingaleTarget} />
+        <div className="mt-4 min-w-0 max-w-full overflow-x-auto" ref={nightingaleTarget} />
       </section>
-      <section className="rounded border border-slate-200 bg-white p-5 shadow-sm">
+      <section className="min-w-0 rounded border border-slate-200 bg-white p-5 shadow-sm">
         <h2 className="font-semibold text-xl text-slate-900">
           Mol* interaction-stream/locus normalization feasibility
         </h2>
@@ -221,7 +224,7 @@ function P01FeasibilityPage() {
           Prove external Mol* commands
         </button>
         <div
-          className="relative mt-4 h-[420px] overflow-hidden rounded border border-slate-200"
+          className="relative mt-4 h-[420px] min-w-0 max-w-full overflow-hidden rounded border border-slate-200"
           data-testid="p01b-canvas-host"
           ref={molstarTarget}
         />

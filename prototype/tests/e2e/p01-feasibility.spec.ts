@@ -70,3 +70,22 @@ test("proves offline Nightingale renderer output and Mol* MVS/locus feasibility"
   await expect(nightingale).toHaveAttribute("data-session", "2");
   await expect(nightingale).toHaveAttribute("data-status", "ready", { timeout: 30_000 });
 });
+
+test("keeps P01 interaction evidence bounded at narrow and wide layouts", async ({ page }) => {
+  for (const width of [480, 1600]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto("/#/p01-feasibility");
+    const nightingale = page.getByTestId("p01a-status");
+    const molstar = page.getByTestId("p01b-status");
+    await expect(nightingale).toHaveAttribute("data-status", "ready", { timeout: 30_000 });
+    await expect(molstar).toHaveAttribute("data-status", "ready", { timeout: 30_000 });
+    await expect(nightingale).toHaveCSS("max-height", "192px");
+    await expect(molstar).toHaveCSS("max-height", "192px");
+    await expect(nightingale).toHaveCSS("overflow-y", "auto");
+    await expect(molstar).toHaveCSS("overflow-y", "auto");
+    await expect(molstar).toHaveCSS("overflow-wrap", "break-word");
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+    ).toBe(true);
+  }
+});
