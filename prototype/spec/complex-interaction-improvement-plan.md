@@ -1,6 +1,6 @@
 # Complex Interaction Improvement Implementation Plan
 
-Status: implemented; C50 evidence complete, pending independent final review
+Status: implemented and independently reviewed through C50
 
 This plan improves the 1BRS barnase–barstar case study, the reusable Seq\*
 reference viewer, and the shared inspector. It uses the same reviewed packet
