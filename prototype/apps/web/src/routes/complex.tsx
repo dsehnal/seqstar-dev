@@ -89,25 +89,29 @@ function Panel({ id, title }: { readonly id: string; readonly title: string }) {
 function ComplexContent() {
   const { status } = useHarness();
   const [generated, setGenerated] = useState<ComplexMvsGeneration>();
-  const [lifecycle, setLifecycle] = useState("awaiting activation");
-  useHarnessMessages(
-    useCallback(
-      (event: HarnessMessage) => {
-        if (event.type === "document.generated.mvs")
-          setGenerated(event.payload as unknown as ComplexMvsGeneration);
-        if (event.type === "lifecycle.visualization") {
-          const value = event.payload as { requestId?: string; status?: string };
-          if (
-            value.requestId !== undefined &&
-            value.requestId === generated?.requestId &&
-            value.status !== undefined
-          )
-            setLifecycle(value.status);
-        }
-      },
-      [generated?.requestId],
-    ),
+  const [lifecycleByRequest, setLifecycleByRequest] = useState<Readonly<Record<string, string>>>(
+    {},
   );
+  useHarnessMessages(
+    useCallback((event: HarnessMessage) => {
+      if (event.type === "document.generated.mvs")
+        setGenerated(event.payload as unknown as ComplexMvsGeneration);
+      if (event.type === "lifecycle.visualization") {
+        const value = event.payload as { requestId?: string; status?: string };
+        const requestId = value.requestId;
+        const lifecycleStatus = value.status;
+        if (requestId !== undefined && lifecycleStatus !== undefined)
+          setLifecycleByRequest((current) => ({
+            ...current,
+            [requestId]: lifecycleStatus,
+          }));
+      }
+    }, []),
+  );
+  const lifecycle =
+    generated === undefined
+      ? "awaiting activation"
+      : (lifecycleByRequest[generated.requestId] ?? "awaiting render");
   const download = () => {
     if (generated === undefined) return;
     const href = URL.createObjectURL(
@@ -154,7 +158,11 @@ function ComplexContent() {
             <p className="text-slate-300 text-sm" data-testid="p50-request-id">
               {generated?.requestId ?? "Activate Interface residues or 43 frozen contacts."}
             </p>
-            <p className="text-slate-300 text-sm" data-testid="p50-lifecycle">
+            <p
+              className="text-slate-300 text-sm"
+              data-request-id={generated?.requestId}
+              data-testid="p50-lifecycle"
+            >
               {lifecycle}
             </p>
           </div>

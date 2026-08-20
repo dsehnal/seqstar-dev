@@ -24,23 +24,16 @@ import {
   parseComplexMappingTsv,
   parseSyntheticConfidenceTsv,
 } from "./complex.js";
+import {
+  countMvsRepresentationTypes,
+  countMvsTreeNodes,
+  queryMvsTree,
+} from "./mvs-presentation.js";
 
 const barnaseRows = parseComplexMappingTsv(barnaseText);
 const barstarRows = parseComplexMappingTsv(barstarText);
 const contacts = parseComplexContactsTsv(contactsText);
 const confidence = parseSyntheticConfidenceTsv(confidenceText);
-
-const components = (document: unknown): readonly Record<string, unknown>[] => {
-  const found: Record<string, unknown>[] = [];
-  const visit = (value: unknown): void => {
-    if (typeof value !== "object" || value === null) return;
-    const node = value as Record<string, unknown>;
-    if (node.kind === "component") found.push(node);
-    if (Array.isArray(node.children)) node.children.forEach(visit);
-  };
-  visit(document);
-  return found;
-};
 
 describe("P50 frozen 1BRS complex integration", () => {
   it("uses the approved transforms exactly, including missing coordinates and verified construct conflicts", () => {
@@ -215,7 +208,47 @@ describe("P50 frozen 1BRS complex integration", () => {
     ]);
   });
 
-  it("emits valid multi-chain MVS selectors with distinguishable endpoint colors for all contacts or one named relationship", () => {
+  it("fails closed for contradictory activation and relationship inputs", () => {
+    const common = {
+      contacts,
+      structureUrl: "/fixtures/1BRS.cif",
+      requestId: "invalid",
+    };
+    expect(() =>
+      generateComplexMvs({
+        ...common,
+        activation: "unknown",
+      } as unknown as Parameters<typeof generateComplexMvs>[0]),
+    ).toThrow("Unsupported complex MVS activation 'unknown'");
+    expect(() =>
+      generateComplexMvs({
+        ...common,
+        activation: null,
+      } as unknown as Parameters<typeof generateComplexMvs>[0]),
+    ).toThrow("Unsupported complex MVS activation 'null'");
+    expect(() =>
+      generateComplexMvs({
+        ...common,
+        activation: "interface",
+        relationshipId: "1brs-A-D-001",
+      } as unknown as Parameters<typeof generateComplexMvs>[0]),
+    ).toThrow("Interface activation must not include a relationship ID");
+    expect(() =>
+      generateComplexMvs({
+        ...common,
+        activation: "contact",
+      } as unknown as Parameters<typeof generateComplexMvs>[0]),
+    ).toThrow("Contact activation requires a nonempty relationship ID");
+    expect(() =>
+      generateComplexMvs({
+        ...common,
+        activation: "contact",
+        relationshipId: "   ",
+      }),
+    ).toThrow("Contact activation requires a nonempty relationship ID");
+  });
+
+  it("uses proportional, deterministic MVS profiles for every frozen interface endpoint or one contact", () => {
     const interfaceMvs = generateComplexMvs({
       contacts,
       structureUrl: "/fixtures/1BRS.cif",
@@ -223,12 +256,50 @@ describe("P50 frozen 1BRS complex integration", () => {
       activation: "interface",
     });
     expect(MVSData.validationIssues(interfaceMvs.document, { noExtra: true })).toBeUndefined();
+    expect(interfaceMvs.document.metadata.description).toBe(
+      "Two role-colored cartoons with all mapped interface endpoints recolored and no atomic-detail representation.",
+    );
     expect(interfaceMvs.mappedContactIds).toEqual(contacts.map((contact) => contact.id));
     expect(
       interfaceMvs.endpointRoles.map((endpoint) => [endpoint.role, endpoint.selectors.length]),
     ).toEqual([
       ["barnase", 19],
       ["barstar", 16],
+    ]);
+    expect(interfaceMvs.endpointRoles).toEqual([
+      {
+        role: "barnase",
+        selectors: expect.arrayContaining(
+          contacts.map((contact) => ({
+            label_entity_id: "1",
+            label_asym_id: "A",
+            auth_asym_id: "A",
+            label_seq_id: contact.barnaseLabelSeqId,
+            auth_seq_id: contact.barnaseAuthSeqId,
+          })),
+        ),
+      },
+      {
+        role: "barstar",
+        selectors: expect.arrayContaining(
+          contacts.map((contact) => ({
+            label_entity_id: "2",
+            label_asym_id: "D",
+            auth_asym_id: "D",
+            label_seq_id: contact.barstarLabelSeqId,
+            auth_seq_id: contact.barstarAuthSeqId,
+          })),
+        ),
+      },
+    ]);
+    expect(countMvsRepresentationTypes(interfaceMvs.document)).toEqual({ cartoon: 2 });
+    expect(countMvsTreeNodes(interfaceMvs.document)).toMatchObject({ component: 2 });
+    expect(countMvsTreeNodes(interfaceMvs.document).focus ?? 0).toBe(0);
+    expect(queryMvsTree(interfaceMvs.document, "color").map((node) => node.params)).toEqual([
+      { color: "#BFDBFE" },
+      { color: "#2563EB", selector: interfaceMvs.endpointRoles[0]?.selectors },
+      { color: "#FDE68A" },
+      { color: "#D97706", selector: interfaceMvs.endpointRoles[1]?.selectors },
     ]);
     const selected = generateComplexMvs({
       contacts,
@@ -238,6 +309,9 @@ describe("P50 frozen 1BRS complex integration", () => {
       relationshipId: "1brs-A-D-001",
     });
     expect(selected.relationshipId).toBe("1brs-A-D-001");
+    expect(selected.document.metadata.description).toBe(
+      "Two role-colored cartoons with bounded ball-and-stick atomic detail for both endpoints of contact 1brs-A-D-001 and a union focus.",
+    );
     expect(selected.endpointRoles.map((endpoint) => endpoint.selectors[0])).toEqual([
       {
         label_entity_id: "1",
@@ -254,13 +328,30 @@ describe("P50 frozen 1BRS complex integration", () => {
         auth_seq_id: 38,
       },
     ]);
-    const params = components("root" in selected.document ? selected.document.root : undefined).map(
-      (component) => component.params,
+    expect(MVSData.validationIssues(selected.document, { noExtra: true })).toBeUndefined();
+    expect(countMvsRepresentationTypes(selected.document)).toEqual({
+      ball_and_stick: 2,
+      cartoon: 2,
+    });
+    expect(countMvsTreeNodes(selected.document)).toMatchObject({ component: 5, focus: 1 });
+    const focus = queryMvsTree(selected.document, "focus")[0];
+    expect(focus).toBeDefined();
+    const focusParent = queryMvsTree(selected.document, "component").find((component) =>
+      component.children?.some((child) => child.kind === "focus"),
     );
-    expect(JSON.stringify(params)).toContain('"label_asym_id":"A"');
-    expect(JSON.stringify(params)).toContain('"label_asym_id":"D"');
-    expect(JSON.stringify(selected.document)).toContain("#2563EB");
-    expect(JSON.stringify(selected.document)).toContain("#D97706");
+    expect(focusParent?.params).toEqual({
+      selector: selected.endpointRoles.flatMap((endpoint) => endpoint.selectors),
+    });
+    const reordered = generateComplexMvs({
+      contacts: [...contacts].reverse(),
+      structureUrl: "/fixtures/1BRS.cif",
+      requestId: "contact-reordered",
+      activation: "contact",
+      relationshipId: "1brs-A-D-001",
+    });
+    expect(JSON.stringify(queryMvsTree(selected.document))).toBe(
+      JSON.stringify(queryMvsTree(reordered.document)),
+    );
   });
 
   it("publishes each inspectable complete document before its targeted MVS request in replacement order", async () => {
