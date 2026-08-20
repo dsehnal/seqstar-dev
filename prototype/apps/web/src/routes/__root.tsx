@@ -25,6 +25,9 @@ function RootLayout() {
             <Link activeProps={{ "aria-current": "page" }} to="/alignment-structure">
               Alignment + structure
             </Link>
+            <Link activeProps={{ "aria-current": "page" }} to="/cds-protein">
+              CDS + protein
+            </Link>
             <Link activeProps={{ "aria-current": "page" }} to="/p01-feasibility">
               P01 evidence
             </Link>

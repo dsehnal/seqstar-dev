@@ -240,6 +240,15 @@ export {
   parseP69905StructureMappingTsv,
 } from "./alignment-structure.js";
 export {
+  type CdsProteinPluginOptions,
+  cdsNucleotideDocument,
+  cdsNucleotideSpace,
+  cdsProteinConfig,
+  cdsProteinDocument,
+  cdsProteinSpace,
+  createCdsProteinPlugin,
+} from "./cds-protein.js";
+export {
   barnaseSequenceSpace,
   barnaseStructureSpace,
   barstarSequenceSpace,

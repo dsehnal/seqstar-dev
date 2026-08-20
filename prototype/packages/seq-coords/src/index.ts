@@ -20,6 +20,13 @@ export const CoordinateSpaceSchema = Type.Object(
   { additionalProperties: false },
 );
 export type CoordinateSpace = DeepReadonly<Static<typeof CoordinateSpaceSchema>>;
+export {
+  type CdsTranslatorConfig,
+  createCdsNucleotideToProteinTranslator,
+  createCdsProteinToNucleotideTranslator,
+  createCdsTranslators,
+  validateCdsTranslatorConfig,
+} from "./cds.js";
 export const CoordinatePositionSchema = Type.Union([
   Type.Object(
     { kind: Type.Literal("index"), value: Type.Integer({ minimum: 0 }) },
@@ -68,6 +75,7 @@ export interface LocusSet {
 }
 export const CoordinateSpacePatternSchema = Type.Object(
   {
+    id: Type.Optional(Type.String({ minLength: 1 })),
     kind: Type.String({ minLength: 1 }),
     authority: Type.Optional(Type.String({ minLength: 1 })),
     context: Type.Optional(Type.Record(Type.String(), Type.String())),
@@ -75,6 +83,7 @@ export const CoordinateSpacePatternSchema = Type.Object(
   { additionalProperties: false },
 );
 export interface CoordinateSpacePattern {
+  readonly id?: string;
   readonly kind: string;
   readonly authority?: string;
   readonly context?: Readonly<Record<string, string | "*">>;
@@ -242,6 +251,7 @@ export const coordinateSpaceMatches = (
   pattern: CoordinateSpacePattern,
   space: CoordinateSpace,
 ): boolean =>
+  (pattern.id === undefined || pattern.id === space.id) &&
   pattern.kind === space.kind &&
   (pattern.authority === undefined || pattern.authority === space.authority) &&
   Object.entries(pattern.context ?? {}).every(([key, expected]) => {

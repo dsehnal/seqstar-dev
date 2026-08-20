@@ -276,6 +276,7 @@ const patternsConnect = (
   output: CoordinateTranslator["target"],
   input: CoordinateTranslator["source"],
 ): boolean =>
+  (output.id === undefined || input.id === undefined || output.id === input.id) &&
   output.kind === input.kind &&
   (output.authority === undefined ||
     input.authority === undefined ||

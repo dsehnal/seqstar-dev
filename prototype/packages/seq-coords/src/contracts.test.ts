@@ -54,6 +54,16 @@ describe("coordinate contract golden examples", () => {
     ).toBe(false);
   });
 
+  it("supports an optional exact coordinate-space ID selector without changing equality", () => {
+    expect(coordinateSpaceMatches({ id: "P12345", kind: "sequence" }, sequenceSpace)).toBe(true);
+    expect(
+      coordinateSpaceMatches({ id: "different-sequence", kind: "sequence" }, sequenceSpace),
+    ).toBe(false);
+    expect(
+      coordinateSpaceEquals(sequenceSpace, { ...sequenceSpace, id: "different-sequence" }),
+    ).toBe(false);
+  });
+
   it("canonicalizes label-position fields independently of insertion order", () => {
     const label: CoordinateLocus = {
       kind: "point",

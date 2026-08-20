@@ -165,6 +165,106 @@ describe("harness runtime", () => {
     expect(mapped.associations[0]).toMatchObject({ source, status: "exact" });
   });
 
+  it("does not connect incompatible exact pattern IDs or choose their cheaper path", async () => {
+    const source: CoordinateSpace = {
+      id: "source",
+      kind: "sequence",
+      context: { step: "source" },
+    };
+    const middle: CoordinateSpace = {
+      id: "middle-a",
+      kind: "sequence",
+      context: { step: "middle" },
+    };
+    const target: CoordinateSpace = { id: "target", kind: "sequence" };
+    const translator = (
+      id: string,
+      input: CoordinateTranslator["source"],
+      output: CoordinateTranslator["target"],
+      outputSpace: CoordinateSpace,
+      cost: number,
+    ): CoordinateTranslator => ({
+      id,
+      source: input,
+      target: output,
+      cost,
+      async map(request) {
+        return {
+          translatorIds: [id],
+          diagnostics: [],
+          associations: request.loci.map((locus) => ({
+            source: locus,
+            targets: [{ ...locus, space: outputSpace }],
+            status: "exact" as const,
+          })),
+        };
+      },
+    });
+    const registry = createTranslatorRegistry();
+    registry.register(
+      translator(
+        "source-middle",
+        { id: "source", kind: "sequence", context: { step: "source" } },
+        { id: "middle-a", kind: "sequence", context: { step: "middle" } },
+        middle,
+        1,
+      ),
+    );
+    registry.register(
+      translator(
+        "wrong-cheap",
+        { id: "middle-b", kind: "sequence", context: { step: "middle" } },
+        { id: "target", kind: "sequence" },
+        target,
+        0,
+      ),
+    );
+    registry.register(
+      translator(
+        "right-expensive",
+        { id: "middle-a", kind: "sequence", context: { step: "middle" } },
+        { id: "target", kind: "sequence" },
+        target,
+        5,
+      ),
+    );
+    const paths = registry.findPaths(source, target);
+    expect(paths.map((path) => path.translatorIds)).toEqual([["source-middle", "right-expensive"]]);
+    const locus = {
+      kind: "point" as const,
+      space: source,
+      position: { kind: "index" as const, value: 0 },
+    };
+    expect((await registry.map({ loci: [locus], target })).paths[0]?.translatorIds).toEqual([
+      "source-middle",
+      "right-expensive",
+    ]);
+
+    const wildcard = createTranslatorRegistry();
+    wildcard.register(
+      translator(
+        "source-middle",
+        { id: "source", kind: "sequence", context: { step: "source" } },
+        { id: "middle-a", kind: "sequence", context: { step: "middle" } },
+        middle,
+        1,
+      ),
+    );
+    wildcard.register(
+      translator(
+        "unspecified-input",
+        { kind: "sequence", context: { step: "middle" } },
+        { id: "target", kind: "sequence" },
+        target,
+        1,
+      ),
+    );
+    expect(wildcard.findPaths(source, target)[0]?.translatorIds).toEqual([
+      "source-middle",
+      "unspecified-input",
+    ]);
+  });
+
   it("composes real table translators without imposing the final target on an intermediate hop", async () => {
     const a: CoordinateSpace = { id: "a", kind: "index", context: { name: "a" } };
     const b: CoordinateSpace = { id: "b", kind: "index", context: { name: "b" } };

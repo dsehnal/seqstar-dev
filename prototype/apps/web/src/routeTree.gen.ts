@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlignmentStructureRouteImport } from './routes/alignment-structure'
+import { Route as CdsProteinRouteImport } from './routes/cds-protein'
 import { Route as ComplexRouteImport } from './routes/complex'
 import { Route as HarnessDiagnosticsRouteImport } from './routes/harness-diagnostics'
 import { Route as P01FeasibilityRouteImport } from './routes/p01-feasibility'
@@ -26,6 +27,11 @@ const IndexRoute = IndexRouteImport.update({
 const AlignmentStructureRoute = AlignmentStructureRouteImport.update({
   id: '/alignment-structure',
   path: '/alignment-structure',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CdsProteinRoute = CdsProteinRouteImport.update({
+  id: '/cds-protein',
+  path: '/cds-protein',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ComplexRoute = ComplexRouteImport.update({
@@ -62,6 +68,7 @@ const UniprotStructureRoute = UniprotStructureRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/alignment-structure': typeof AlignmentStructureRoute
+  '/cds-protein': typeof CdsProteinRoute
   '/complex': typeof ComplexRoute
   '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
@@ -72,6 +79,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/alignment-structure': typeof AlignmentStructureRoute
+  '/cds-protein': typeof CdsProteinRoute
   '/complex': typeof ComplexRoute
   '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
@@ -83,6 +91,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/alignment-structure': typeof AlignmentStructureRoute
+  '/cds-protein': typeof CdsProteinRoute
   '/complex': typeof ComplexRoute
   '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
@@ -95,6 +104,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/alignment-structure'
+    | '/cds-protein'
     | '/complex'
     | '/harness-diagnostics'
     | '/p01-feasibility'
@@ -105,6 +115,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/alignment-structure'
+    | '/cds-protein'
     | '/complex'
     | '/harness-diagnostics'
     | '/p01-feasibility'
@@ -115,6 +126,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/alignment-structure'
+    | '/cds-protein'
     | '/complex'
     | '/harness-diagnostics'
     | '/p01-feasibility'
@@ -126,6 +138,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AlignmentStructureRoute: typeof AlignmentStructureRoute
+  CdsProteinRoute: typeof CdsProteinRoute
   ComplexRoute: typeof ComplexRoute
   HarnessDiagnosticsRoute: typeof HarnessDiagnosticsRoute
   P01FeasibilityRoute: typeof P01FeasibilityRoute
@@ -148,6 +161,13 @@ declare module '@tanstack/react-router' {
       path: '/alignment-structure'
       fullPath: '/alignment-structure'
       preLoaderRoute: typeof AlignmentStructureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cds-protein': {
+      id: '/cds-protein'
+      path: '/cds-protein'
+      fullPath: '/cds-protein'
+      preLoaderRoute: typeof CdsProteinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/complex': {
@@ -198,6 +218,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AlignmentStructureRoute: AlignmentStructureRoute,
+  CdsProteinRoute: CdsProteinRoute,
   ComplexRoute: ComplexRoute,
   HarnessDiagnosticsRoute: HarnessDiagnosticsRoute,
   P01FeasibilityRoute: P01FeasibilityRoute,
