@@ -83,15 +83,19 @@ type AppliedEntry = Pick<InteractionCommand, "interactionId" | "loci" | "semanti
 type Subscription = { unsubscribe(): void };
 type NativeFamily = "highlight" | "selection";
 type NativeInteraction = "hover" | "select";
+type NativeLease = { readonly interactionId: string; readonly correlationId: string };
+type NativeSelectionLease = NativeLease & {
+  readonly fingerprint: string;
+  readonly loci: readonly CoordinateLocus[];
+  readonly structureObjectId?: string;
+};
 
 interface PriorView {
   readonly requestId: string;
   readonly document: unknown;
   readonly nativeState: ReadonlyMap<NativeFamily, readonly CoordinateLocus[]>;
-  readonly nativeLeases: ReadonlyMap<
-    NativeInteraction,
-    { readonly interactionId: string; readonly correlationId: string }
-  >;
+  readonly nativeLeases: ReadonlyMap<NativeInteraction, NativeLease>;
+  readonly nativeSelectionLease?: NativeSelectionLease;
 }
 
 type WrapperDiagnostic = {
@@ -400,7 +404,10 @@ export class MolstarViewerDriver implements MolstarNativeDriver {
   apply(action: "highlight" | "select" | "focus", loci: readonly StructureElement.Loci[]): void {
     const { interactivity, camera } = this.viewer.plugin.managers;
     if (action === "highlight") {
-      const [first, ...rest] = loci;
+      // A semantic feature commonly resolves as several residue loci in one
+      // structure. Collapse those into one replacement locus before touching
+      // Mol* so pointer movement cannot build up highlight calls/residents.
+      const [first, ...rest] = this.unionByStructure(loci);
       if (first === undefined) interactivity.lociHighlights.clearHighlights();
       else {
         interactivity.lociHighlights.clearHighlights();
@@ -420,6 +427,23 @@ export class MolstarViewerDriver implements MolstarNativeDriver {
     }
     if (loci.length > 0) camera.focusLoci([...loci]);
     else this.viewer.plugin.canvas3d?.requestCameraReset();
+  }
+
+  private unionByStructure(
+    loci: readonly StructureElement.Loci[],
+  ): readonly StructureElement.Loci[] {
+    // Contract-driver doubles are intentionally not Mol* element loci.
+    if (!loci.every((locus) => locus.kind === "element-loci")) return loci;
+    const result: StructureElement.Loci[] = [];
+    for (const locus of loci) {
+      const index = result.findIndex((candidate) => candidate.structure === locus.structure);
+      if (index < 0) result.push(locus);
+      else {
+        const current = result[index];
+        if (current !== undefined) result[index] = StructureElement.Loci.union(current, locus);
+      }
+    }
+    return result;
   }
 
   clearView(): Promise<void> {
@@ -462,10 +486,8 @@ export class MolstarWrapper implements VisualizerWrapper {
   private applying = false;
   private readonly applied = new Map<AppliedFamily, Map<string, Map<string, AppliedEntry>>>();
   private readonly nativeState = new Map<NativeFamily, CoordinateLocus[]>();
-  private readonly nativeLeases = new Map<
-    NativeInteraction,
-    { readonly interactionId: string; readonly correlationId: string }
-  >();
+  private readonly nativeLeases = new Map<NativeInteraction, NativeLease>();
+  private nativeSelectionLease: NativeSelectionLease | undefined;
 
   constructor(options: MolstarWrapperOptions) {
     this.id = options.id;
@@ -588,12 +610,16 @@ export class MolstarWrapper implements VisualizerWrapper {
               [...this.nativeState].map(([family, loci]) => [family, [...loci]] as const),
             ),
             nativeLeases: new Map(this.nativeLeases),
+            ...(this.nativeSelectionLease === undefined
+              ? {}
+              : { nativeSelectionLease: this.nativeSelectionLease }),
           };
     this.nativeSubscription?.unsubscribe();
     this.nativeSubscription = undefined;
     this.nativeState.set("highlight", []);
     this.nativeState.set("selection", []);
     this.nativeLeases.clear();
+    this.nativeSelectionLease = undefined;
     this.activeSpaces = [];
     this.context?.reportCoordinateSpaces([]);
     this.requestAbort?.abort();
@@ -741,6 +767,7 @@ export class MolstarWrapper implements VisualizerWrapper {
     this.nativeLeases.clear();
     for (const [interaction, lease] of priorView.nativeLeases)
       this.nativeLeases.set(interaction, lease);
+    this.nativeSelectionLease = priorView.nativeSelectionLease;
     this.activeSpaces = uniqueSpaces(driver.knownResidues().map(residueSpace));
     this.context?.reportCoordinateSpaces(this.activeSpaces);
     this.installNativeSubscription(generation, priorView.requestId);
@@ -788,26 +815,23 @@ export class MolstarWrapper implements VisualizerWrapper {
       );
       return;
     }
-    const interaction = event.kind === "hover" ? "hover" : "select";
-    const phase = event.kind === "selection-clear" || event.residues.length === 0 ? "clear" : "set";
     const loci = normalizedNative(event);
-    this.updateNativeState(event, loci);
-    this.renderApplied(interaction === "hover" ? "highlight" : "selection");
-    const lease = this.nativeLeases.get(interaction) ?? {
+    if (event.kind !== "hover") {
+      this.publishNativeSelection(event, loci);
+      return;
+    }
+    this.nativeState.set("highlight", [...loci]);
+    this.renderApplied("highlight");
+    const lease = this.nativeLeases.get("hover") ?? {
       interactionId: uuid(),
       correlationId: uuid(),
     };
-    this.nativeLeases.set(interaction, lease);
+    this.nativeLeases.set("hover", lease);
     const structureObjectId = loci[0]?.space.context?.structure;
     const payload: InteractionEvent = {
       interactionId: lease.interactionId,
-      interaction,
-      phase,
-      ...(event.kind === "selection-add"
-        ? { mode: "add" as const }
-        : event.kind === "selection-remove"
-          ? { mode: "remove" as const }
-          : {}),
+      interaction: "hover",
+      phase: loci.length === 0 ? "clear" : "set",
       origin: {
         componentId: this.id,
         ...(this.visibleRequestId === undefined ? {} : { documentId: this.visibleRequestId }),
@@ -824,34 +848,80 @@ export class MolstarWrapper implements VisualizerWrapper {
       timestamp: now(),
       payload: payload as unknown as JsonObject,
     });
-    const nativeSelectionEmpty = (this.nativeState.get("selection")?.length ?? 0) === 0;
-    if (phase === "clear" || (event.kind === "selection-remove" && nativeSelectionEmpty))
-      this.nativeLeases.delete(interaction);
+    if (loci.length === 0) this.nativeLeases.delete("hover");
   }
 
-  private updateNativeState(event: NativeResidueEvent, loci: readonly CoordinateLocus[]): void {
-    if (event.kind === "hover") {
-      this.nativeState.set("highlight", [...loci]);
-      return;
-    }
-    const current = this.nativeState.get("selection") ?? [];
-    if (event.kind === "selection-clear") {
+  private publishNativeSelection(
+    event: Exclude<NativeResidueEvent, { readonly kind: "hover" }>,
+    loci: readonly CoordinateLocus[],
+  ): void {
+    const structureObjectId = loci[0]?.space.context?.structure;
+    const fingerprint = JSON.stringify({
+      documentId: this.visibleRequestId ?? "",
+      viewId: "",
+      origin: this.id,
+      ...(structureObjectId === undefined ? {} : { semanticTarget: { structureObjectId } }),
+      loci,
+    });
+    const clear = (lease: NativeSelectionLease): void => {
       this.nativeState.set("selection", []);
+      this.renderApplied("selection");
+      this.publishSelectionLease(lease, "clear");
+      this.nativeSelectionLease = undefined;
+      this.nativeLeases.delete("select");
+    };
+    if (event.kind === "selection-add" && loci.length > 0) {
+      const current = this.nativeSelectionLease;
+      if (current?.fingerprint === fingerprint) {
+        clear(current);
+        return;
+      }
+      if (current !== undefined) clear(current);
+      const lease: NativeSelectionLease = {
+        interactionId: uuid(),
+        correlationId: uuid(),
+        fingerprint,
+        loci: [...loci],
+        ...(structureObjectId === undefined ? {} : { structureObjectId }),
+      };
+      this.nativeSelectionLease = lease;
+      this.nativeLeases.set("select", lease);
+      this.nativeState.set("selection", [...loci]);
+      this.renderApplied("selection");
+      this.publishSelectionLease(lease, "set");
       return;
     }
-    if (event.kind === "selection-remove") {
-      this.nativeState.set(
-        "selection",
-        current.filter(
-          (candidate) => !loci.some((removed) => coordinateLocusEquals(candidate, removed)),
-        ),
-      );
-      return;
-    }
-    const next = [...current];
-    for (const locus of loci)
-      if (!next.some((candidate) => coordinateLocusEquals(candidate, locus))) next.push(locus);
-    this.nativeState.set("selection", next);
+    // Mol* may report a remove with no residue once its native selection is
+    // empty. Both remove and clear retire the current single-selection lease;
+    // neither is exposed as an additive/remove command to synchronized peers.
+    const current = this.nativeSelectionLease;
+    if (current !== undefined) clear(current);
+    // A remove can be followed by Mol*'s terminal selection-clear event. The
+    // remove already published the paired clear, so never mint an orphan lease.
+  }
+
+  private publishSelectionLease(lease: NativeSelectionLease, phase: "set" | "clear"): void {
+    this.context?.fabric.publish({
+      id: uuid(),
+      type: "interaction.native",
+      version: "0.1.0",
+      source: { component: this.id },
+      correlationId: lease.correlationId,
+      timestamp: now(),
+      payload: {
+        interactionId: lease.interactionId,
+        interaction: "select",
+        phase,
+        origin: {
+          componentId: this.id,
+          ...(this.visibleRequestId === undefined ? {} : { documentId: this.visibleRequestId }),
+        },
+        ...(lease.structureObjectId === undefined
+          ? {}
+          : { semanticTarget: { structureObjectId: lease.structureObjectId } }),
+        loci: phase === "clear" ? lease.loci : lease.loci,
+      } as unknown as JsonObject,
+    });
   }
 
   private apply(family: AppliedFamily, command: InteractionCommand, message: HarnessMessage): void {
@@ -979,6 +1049,7 @@ export class MolstarWrapper implements VisualizerWrapper {
     this.applied.clear();
     this.nativeState.clear();
     this.nativeLeases.clear();
+    this.nativeSelectionLease = undefined;
     this.activeSpaces = [];
     this.context?.reportCoordinateSpaces([]);
     this.context = undefined;

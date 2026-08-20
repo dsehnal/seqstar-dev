@@ -1019,14 +1019,16 @@ describe("harness runtime", () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect([...highlights.values()].map((state) => state.positions)).toEqual([[5], [2]]);
 
-    native("hover", "set", [1], {
+    const replacementHoverLease = {
       correlationId: crypto.randomUUID(),
       interactionId: crypto.randomUUID(),
-    });
-    native("hover", "set", [4], {
+    };
+    native("hover", "set", [1], replacementHoverLease);
+    const currentHoverLease = {
       correlationId: crypto.randomUUID(),
       interactionId: crypto.randomUUID(),
-    });
+    };
+    native("hover", "set", [4], currentHoverLease);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect([...highlights.values()].map((state) => state.positions)).toEqual([[5], [4]]);
@@ -1058,6 +1060,11 @@ describe("harness runtime", () => {
       interactionId: crypto.randomUUID(),
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
+    // An older source's clear is not allowed to erase the later resident hover.
+    expect([...highlights.values()].map((state) => state.positions)).toEqual([[5], [4]]);
+
+    native("hover", "clear", [], currentHoverLease);
+    await new Promise((resolve) => setTimeout(resolve, 0));
     expect([...highlights.values()].map((state) => state.positions)).toEqual([[5]]);
 
     const selectionLease = {
@@ -1078,6 +1085,69 @@ describe("harness runtime", () => {
     native("select", "clear", [], selectionLease);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(selections.size).toBe(0);
+    await harness.disposeAsync();
+  });
+
+  it("retires the resident hover when ownership transfers between renderers", async () => {
+    const space: CoordinateSpace = { id: "shared", kind: "index", length: 4 };
+    const marks = new Map<string, number>();
+    const commands: string[] = [];
+    const harness = createApplicationHarness(
+      {
+        id: "app",
+        components: [
+          { id: "molstar", type: "mock" },
+          { id: "sequence", type: "mock" },
+        ],
+        synchronization: [{ id: "hover", interaction: "hover", between: ["molstar", "sequence"] }],
+      },
+      {
+        componentFactories: [
+          {
+            type: "mock",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                context.reportCoordinateSpaces([space]);
+                context.fabric.observe({ targetComponent: id }).subscribe((entry) => {
+                  if (!entry.type.startsWith("interaction.highlight")) return;
+                  const payload = entry.payload as unknown as {
+                    readonly loci?: readonly { readonly position: { readonly value: number } }[];
+                  };
+                  commands.push(`${id}:${entry.type}`);
+                  if (entry.type.endsWith(".clear")) marks.delete(id);
+                  else if (payload.loci?.[0]) marks.set(id, payload.loci[0].position.value);
+                });
+              },
+              dispose() {},
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    const publish = (origin: "molstar" | "sequence", position: number, interactionId: string) =>
+      harness.fabric.publish(
+        message("interaction.native", {
+          interactionId,
+          interaction: "hover",
+          phase: "set",
+          origin: { componentId: origin },
+          loci: [{ kind: "point", space, position: { kind: "index", value: position } }],
+        }),
+      );
+    publish("molstar", 0, "molstar-a");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(marks).toEqual(new Map([["sequence", 0]]));
+    publish("sequence", 2, "sequence-b");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(marks).toEqual(new Map([["molstar", 2]]));
+    expect(commands).toEqual([
+      "sequence:interaction.highlight.apply",
+      "sequence:interaction.highlight.clear",
+      "molstar:interaction.highlight.apply",
+    ]);
     await harness.disposeAsync();
   });
 

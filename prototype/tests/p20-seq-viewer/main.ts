@@ -27,7 +27,13 @@ const fixtureDocument: SeqViewSpec = {
       kind: "loci",
       semanticType: "test:loci",
       items: [
-        { id: "block", loci: [{ kind: "interval", space: "sequence-space", start: 0, end: 2 }] },
+        {
+          id: "block",
+          loci: [
+            { kind: "interval", space: "sequence-space", start: 0, end: 2 },
+            { kind: "point", space: "sequence-space", position: 3 },
+          ],
+        },
         { id: "overlap", loci: [{ kind: "interval", space: "sequence-space", start: 1, end: 3 }] },
         { id: "point-overlap", loci: [{ kind: "point", space: "sequence-space", position: 1 }] },
       ],
@@ -211,7 +217,22 @@ let viewer: SeqViewer;
 const events: unknown[] = [];
 const mount = async (): Promise<void> => {
   viewer?.dispose();
-  viewer = createSeqViewer({ target });
+  viewer = createSeqViewer({
+    target,
+    presentation: {
+      tracks: [
+        {
+          trackId: "track",
+          action: {
+            kind: "structure-profile",
+            accessibleName: "Show Core track in 3D",
+            tooltip: "Show Core track in 3D",
+            icon: "box",
+          },
+        },
+      ],
+    },
+  });
   viewer.interactions.subscribe((event) => events.push({ ...event, nativeEvent: undefined }));
   const result = await viewer.load(fixtureDocument, "view");
   status.dataset.status = result.status;

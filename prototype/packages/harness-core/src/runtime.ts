@@ -573,13 +573,16 @@ export const createApplicationHarness = (
   const cleanups: Disposable[] = [];
   const processors = new Map<string, { processor: MessageProcessor; abort: AbortController }>();
   const synchronizationControllers = new Map<string, AbortController>();
-  const hoverSynchronizationLeases = new Map<
-    string,
-    {
-      readonly interactionId: string;
-      readonly owner: { readonly correlationId: string; readonly sourceComponent: string };
-    }
-  >();
+  type HoverSynchronizationLease = {
+    readonly interactionId: string;
+    readonly owner: { readonly correlationId: string; readonly sourceComponent: string };
+    sourceComponent: string;
+    /** The newest native message eligible to retire this global lease. */
+    nativeInteractionId: string;
+    readonly destinations: Set<string>;
+  };
+  const hoverSynchronizationLeases = new Map<string, HoverSynchronizationLease>();
+  const hoverSynchronizationControllers = new Map<string, Set<AbortController>>();
   const reflections = new Set<string>();
   const policies = {
     partialRendering: spec.policies?.partialRendering ?? "reject",
@@ -731,6 +734,27 @@ export const createApplicationHarness = (
       return registration;
     },
   });
+  const abortHoverSynchronization = (ruleId: string): void => {
+    const controllers = hoverSynchronizationControllers.get(ruleId);
+    for (const controller of controllers ?? []) controller.abort();
+    hoverSynchronizationControllers.delete(ruleId);
+  };
+  const retireHoverLease = (
+    ruleId: string,
+    lease: HoverSynchronizationLease,
+    message: HarnessMessage<string, InteractionEvent>,
+  ): void => {
+    for (const destination of lease.destinations)
+      fabric.publish({
+        ...message,
+        id: newId(),
+        causationId: message.id,
+        target: { component: destination },
+        type: "interaction.highlight.clear",
+        payload: { interactionId: lease.interactionId, owner: lease.owner },
+      });
+    hoverSynchronizationLeases.delete(ruleId);
+  };
   const setupSync = (rule: InteractionSyncRule): Disposable => {
     const subscription = fabric
       .messages("interaction.native", payloadSchema<InteractionEvent>(InteractionEventSchema))
@@ -747,6 +771,42 @@ export const createApplicationHarness = (
             rule.direction === "forward"
               ? rule.between.slice(1)
               : rule.between.filter((id) => id !== event.origin.componentId);
+          if (event.interaction === "hover") {
+            const prior = hoverSynchronizationLeases.get(rule.id);
+            if (event.phase === "clear") {
+              // A late clear from A must not retire B after the pointer crossed
+              // renderers.  The global lease records the currently active native
+              // interaction, rather than trusting directed-edge ownership.
+              if (
+                prior !== undefined &&
+                prior.sourceComponent === event.origin.componentId &&
+                prior.nativeInteractionId === event.interactionId
+              ) {
+                abortHoverSynchronization(rule.id);
+                retireHoverLease(rule.id, prior, message);
+              }
+              return;
+            }
+            abortHoverSynchronization(rule.id);
+            if (prior !== undefined && prior.sourceComponent !== event.origin.componentId)
+              retireHoverLease(rule.id, prior, message);
+            const retained = hoverSynchronizationLeases.get(rule.id);
+            const lease = retained ?? {
+              interactionId: event.interactionId,
+              owner: {
+                correlationId: message.correlationId,
+                sourceComponent: event.origin.componentId,
+              },
+              sourceComponent: event.origin.componentId,
+              nativeInteractionId: event.interactionId,
+              destinations: new Set<string>(),
+            };
+            // Moving over a second feature in the same source is still one
+            // source lease, but only the newest feature may clear it later.
+            lease.sourceComponent = event.origin.componentId;
+            lease.nativeInteractionId = event.interactionId;
+            hoverSynchronizationLeases.set(rule.id, lease);
+          }
           for (const destination of candidates) {
             // Correlation IDs intentionally remain stable for the lifetime of a native hover
             // lease. Individual moves still need to supersede one another, so reflection
@@ -764,30 +824,28 @@ export const createApplicationHarness = (
               sourceComponent: event.origin.componentId,
             };
             const key = `${rule.id}\u0000${event.origin.componentId}\u0000${destination}`;
-            const existingHoverLease = hoverSynchronizationLeases.get(key);
-            const hoverLease = existingHoverLease ?? {
-              interactionId: event.interactionId,
-              owner: incomingOwner,
-            };
-            const owner = event.interaction === "hover" ? hoverLease.owner : incomingOwner;
+            const hoverLease =
+              event.interaction === "hover" ? hoverSynchronizationLeases.get(rule.id) : undefined;
+            const owner =
+              event.interaction === "hover" ? (hoverLease?.owner ?? incomingOwner) : incomingOwner;
             const interactionId =
-              event.interaction === "hover" ? hoverLease.interactionId : event.interactionId;
+              event.interaction === "hover"
+                ? (hoverLease?.interactionId ?? event.interactionId)
+                : event.interactionId;
             // A hover's lease is one destination-wide union.  Its controller deliberately
             // covers every per-locus mapping group, so a replacement or clear cannot let a
             // slower group publish a stale fragment after a newer hover has been applied.
-            const controllerKey =
-              event.interaction === "hover" ? key : `${key}\u0000${++synchronizationGeneration}`;
+            const controllerKey = `${key}\u0000${++synchronizationGeneration}`;
             if (event.interaction === "hover") {
-              synchronizationControllers.get(controllerKey)?.abort();
-              if (event.phase === "set") {
-                synchronizationControllers.set(controllerKey, new AbortController());
-                hoverSynchronizationLeases.set(key, hoverLease);
-              } else synchronizationControllers.delete(controllerKey);
+              const controller = new AbortController();
+              const controllers = hoverSynchronizationControllers.get(rule.id) ?? new Set();
+              controllers.add(controller);
+              hoverSynchronizationControllers.set(rule.id, controllers);
+              synchronizationControllers.set(controllerKey, controller);
             } else if (event.phase === "set")
               synchronizationControllers.set(controllerKey, new AbortController());
             const signal = synchronizationControllers.get(controllerKey)?.signal;
             if (event.phase === "clear") {
-              if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
               fabric.publish({
                 ...message,
                 id: newId(),
@@ -846,7 +904,7 @@ export const createApplicationHarness = (
             // after a space-capability update is not mistaken for a feedback loop.
             if (groups.size === 0) {
               if (unmappedPolicy === "clear") {
-                if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
+                if (event.interaction === "hover") hoverLease?.destinations.delete(destination);
                 fabric.publish({
                   ...message,
                   id: newId(),
@@ -857,6 +915,12 @@ export const createApplicationHarness = (
                 });
               }
               synchronizationControllers.delete(controllerKey);
+              if (event.interaction === "hover") {
+                const controllers = hoverSynchronizationControllers.get(rule.id);
+                for (const controller of controllers ?? [])
+                  if (controller.signal === signal) controllers?.delete(controller);
+                if (controllers?.size === 0) hoverSynchronizationControllers.delete(rule.id);
+              }
               reflections.delete(reflection);
               continue;
             }
@@ -897,7 +961,7 @@ export const createApplicationHarness = (
                 }
                 const loci = mapped.flatMap((item) => item.targets);
                 if (loci.length === 0 && unmappedPolicy === "clear") {
-                  if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
+                  if (event.interaction === "hover") hoverLease?.destinations.delete(destination);
                   fabric.publish({
                     ...message,
                     id: newId(),
@@ -908,6 +972,8 @@ export const createApplicationHarness = (
                   });
                   return;
                 }
+                if (loci.length > 0)
+                  if (event.interaction === "hover") hoverLease?.destinations.add(destination);
                 if (loci.length > 0)
                   fabric.publish({
                     ...message,
@@ -930,7 +996,7 @@ export const createApplicationHarness = (
                 if (signal?.aborted || disposed) return;
                 diagnosis(`Synchronization '${rule.id}' failed.`, message);
                 if (event.interaction === "hover" && unmappedPolicy === "clear") {
-                  hoverSynchronizationLeases.delete(key);
+                  hoverLease?.destinations.delete(destination);
                   fabric.publish({
                     ...message,
                     id: newId(),
@@ -944,6 +1010,12 @@ export const createApplicationHarness = (
               .finally(() => {
                 if (synchronizationControllers.get(controllerKey)?.signal === signal)
                   synchronizationControllers.delete(controllerKey);
+                if (event.interaction === "hover") {
+                  const controllers = hoverSynchronizationControllers.get(rule.id);
+                  for (const controller of controllers ?? [])
+                    if (controller.signal === signal) controllers?.delete(controller);
+                  if (controllers?.size === 0) hoverSynchronizationControllers.delete(rule.id);
+                }
                 reflections.delete(reflection);
               });
           }
@@ -958,6 +1030,9 @@ export const createApplicationHarness = (
       const failures: unknown[] = [];
       for (const entry of processors.values()) entry.abort.abort();
       for (const controller of synchronizationControllers.values()) controller.abort();
+      for (const controllers of hoverSynchronizationControllers.values())
+        for (const controller of controllers) controller.abort();
+      hoverSynchronizationControllers.clear();
       hoverSynchronizationLeases.clear();
       for (const cleanup of cleanups.splice(0).reverse()) {
         try {

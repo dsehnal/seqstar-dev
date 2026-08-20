@@ -1,7 +1,11 @@
 import type { CoordinateLocus } from "@seq-star/seq-coords";
 import { describe, expect, it } from "vitest";
 import type { SeqViewer } from "../../packages/seq-viewer/src/index.js";
-import { ReferenceViewerWrapper } from "../../packages/wrapper-seq-viewer/src/index.js";
+import {
+  ReferencePresentationError,
+  ReferenceViewerWrapper,
+  snapshotReferenceViewerPresentation,
+} from "../../packages/wrapper-seq-viewer/src/index.js";
 import { createHarnessContext, message, runWrapperConformance, uuid } from "./contract-kit.js";
 
 const wrapperDocument = {
@@ -145,6 +149,82 @@ runWrapperConformance({
 });
 
 describe("reference viewer wrapper common contract", () => {
+  it("fails closed and detaches the JSON-safe reference presentation snapshot", () => {
+    const presentation = {
+      tracks: [
+        {
+          trackId: "track",
+          action: {
+            kind: "structure-profile",
+            accessibleName: "Show track in 3D",
+            tooltip: "Show track in 3D",
+            icon: "box",
+          },
+        },
+      ],
+    };
+    const snapshot = snapshotReferenceViewerPresentation(presentation);
+    presentation.tracks[0].action.tooltip = "mutated";
+    expect(snapshot).toEqual({
+      tracks: [
+        expect.objectContaining({
+          trackId: "track",
+          action: expect.objectContaining({ tooltip: "Show track in 3D" }),
+        }),
+      ],
+    });
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.tracks ?? [])).toBe(true);
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    const accessor = {} as { readonly tracks: unknown };
+    Object.defineProperty(accessor, "tracks", { enumerable: true, get: () => [] });
+    for (const invalid of [
+      cyclic,
+      new Date(),
+      accessor,
+      { tracks: [{ trackId: "track", action: () => undefined }] },
+      { tracks: [{ trackId: "track", action: { kind: "bad" } }] },
+      { tracks: [{ trackId: "track" }, { trackId: "track" }] },
+      { tracks: Infinity },
+    ])
+      expect(() => snapshotReferenceViewerPresentation(invalid)).toThrow(
+        ReferencePresentationError,
+      );
+  });
+
+  it("reports an absent configured track deterministically after loading", async () => {
+    const harness = createHarnessContext();
+    const viewer = new ControlledNativeMock();
+    const wrapper = new ReferenceViewerWrapper({
+      id: "reference",
+      target: {} as HTMLElement,
+      config: { presentation: { tracks: [{ trackId: "absent" }] } },
+      viewerFactory: () => viewer as unknown as SeqViewer,
+    });
+    await wrapper.start(harness.context);
+    harness.fabric.publish(
+      message("visualization.seqviewspec.request", request("configured-action"), {
+        component: "reference",
+      }),
+    );
+    viewer.loads[0]?.resolve(rendered(1));
+    await tick();
+    expect(harness.messages).toContainEqual(
+      expect.objectContaining({
+        type: "lifecycle.visualization",
+        payload: expect.objectContaining({
+          diagnostics: expect.arrayContaining([
+            expect.objectContaining({
+              code: "wrapper.seq-viewer.presentation.track-action.absent",
+            }),
+          ]),
+        }),
+      }),
+    );
+    await wrapper.dispose();
+  });
+
   it("does not let an invalid replacement supersede an accepted in-flight request", async () => {
     const harness = createHarnessContext();
     const viewer = new ControlledNativeMock();
@@ -387,7 +467,9 @@ describe("reference viewer wrapper common contract", () => {
       viewId: "main",
       trackId: "track",
       layerId: "letters",
-      loci: phase === "set" ? [locus] : [],
+      // Clear retains the semantic fingerprint of its set; only routing uses
+      // an empty application command after the wrapper boundary.
+      loci: [locus],
     });
     viewer.emit(native("set"));
     viewer.emit(native("clear"));

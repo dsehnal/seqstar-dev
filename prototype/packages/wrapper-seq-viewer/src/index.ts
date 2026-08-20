@@ -23,9 +23,16 @@ import { type SeqViewSpec, validateSeqViewSpec } from "@seq-star/seq-view-spec";
 import {
   type CreateSeqViewerOptions,
   createSeqViewer,
+  type SequenceWrapperPresentationConfig,
   type SeqViewer,
   type SeqViewerInteraction,
 } from "@seq-star/seq-viewer";
+import { snapshotReferenceViewerPresentation } from "./presentation.js";
+
+export {
+  ReferencePresentationError,
+  snapshotReferenceViewerPresentation,
+} from "./presentation.js";
 
 export const referenceViewerWrapperType = "seqstar.reference-viewer";
 
@@ -51,6 +58,8 @@ export interface VisualizerWrapperFactory<TConfig extends JsonObject = JsonObjec
 export type ReferenceViewerWrapperConfig = JsonObject & {
   /** Keep the last successful canvas when a replacement request fails. */
   readonly failureViewPolicy?: "retain" | "clear";
+  /** JSON-safe presentation-only header/action configuration. */
+  readonly presentation?: SequenceWrapperPresentationConfig;
 };
 
 export interface ReferenceViewerWrapperOptions {
@@ -137,6 +146,7 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
   readonly element: HTMLElement;
   private readonly viewerFactory: (options: CreateSeqViewerOptions) => SeqViewer;
   private readonly failureViewPolicy: "retain" | "clear";
+  private readonly presentation: SequenceWrapperPresentationConfig;
   private viewer: SeqViewer | undefined;
   private context: ComponentContext | undefined;
   private subscription: Subscription | undefined;
@@ -154,12 +164,15 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     string,
     { readonly correlationId: string; readonly interactionId: string }
   >();
+  /** Last native semantic fingerprint per interaction, used by clear-only drivers. */
+  private readonly activeNativeLeaseKeys = new Map<InteractionKind, string>();
 
   constructor(options: ReferenceViewerWrapperOptions) {
     this.id = options.id;
     this.element = options.target;
     this.viewerFactory = options.viewerFactory ?? createSeqViewer;
     this.failureViewPolicy = options.config?.failureViewPolicy ?? "retain";
+    this.presentation = snapshotReferenceViewerPresentation(options.config?.presentation);
     this.applied.set("highlight", new Map());
     this.applied.set("selection", new Map());
   }
@@ -174,7 +187,10 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     if (this.disposed) throw new Error(`Wrapper '${this.id}' has been disposed.`);
     if (this.context !== undefined) return;
     this.context = context;
-    this.viewer = this.viewerFactory({ target: this.element });
+    this.viewer = this.viewerFactory({
+      target: this.element,
+      ...(this.presentation === undefined ? {} : { presentation: this.presentation }),
+    });
     this.reportViewerCapabilities();
     this.nativeSubscription = this.viewer.interactions.subscribe((event) =>
       this.publishNative(event),
@@ -254,6 +270,7 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     }
     this.requestAbort?.abort();
     this.nativeLeases.clear();
+    this.activeNativeLeaseKeys.clear();
     const generation = ++this.nextGeneration;
     this.activeAcceptedGeneration = generation;
     const controller = new AbortController();
@@ -292,11 +309,12 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
         this.activeSpaces = documentSpaces(checked.value);
         this.context?.reportCoordinateSpaces(this.activeSpaces);
         const degraded = result.layers.some((layer) => layer.status === "degraded");
+        const presentationDiagnostics = this.presentationDiagnostics(checked.value);
         this.lifecycle(
           request.requestId,
           generation,
           degraded ? "degraded" : "rendered",
-          result.diagnostics,
+          [...result.diagnostics, ...presentationDiagnostics],
           message,
         );
       },
@@ -342,7 +360,10 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     this.nativeSubscription?.unsubscribe();
     this.nativeSubscription = undefined;
     this.viewer?.dispose();
-    this.viewer = this.viewerFactory({ target: this.element });
+    this.viewer = this.viewerFactory({
+      target: this.element,
+      ...(this.presentation === undefined ? {} : { presentation: this.presentation }),
+    });
     this.nativeSubscription = this.viewer.interactions.subscribe((event) =>
       this.publishNative(event),
     );
@@ -352,6 +373,24 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     this.context?.reportCoordinateSpaces([]);
     this.reportViewerCapabilities();
     return hadVisibleRequest ? "cleared" : undefined;
+  }
+
+  private presentationDiagnostics(document: SeqViewSpec): readonly Diagnostic[] {
+    const tracks = new Set(
+      document.views.flatMap((view) =>
+        view.sections.flatMap((section) => section.tracks.map((track) => track.id)),
+      ),
+    );
+    return Object.freeze(
+      (this.presentation.tracks ?? [])
+        .filter((item) => !tracks.has(item.trackId))
+        .map((item) => ({
+          code: "wrapper.seq-viewer.presentation.track-action.absent",
+          severity: "warning" as const,
+          message: `Configured reference track action '${item.trackId}' is absent from the loaded document.`,
+          path: "/views",
+        })),
+    );
   }
 
   private lifecycle(
@@ -389,27 +428,45 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     const context = this.context;
     if (context === undefined || this.disposed) return;
     const interaction: InteractionKind = event.kind === "viewport-change" ? "viewport" : event.kind;
-    const leaseKey = [
+    const nativeLeaseKey = [
       interaction,
       event.documentId,
       event.viewId,
       event.sectionId ?? "",
       event.trackId ?? "",
       event.layerId ?? "",
+      event.sequenceId ?? "",
+      event.alignmentId ?? "",
+      event.alignmentMemberId ?? "",
       event.annotationId ?? "",
       event.itemId ?? "",
       event.endpointRole ?? "",
       event.locusIndex ?? -1,
+      // Native selection identity is semantic, not just annotation identity.
+      // This keeps click A -> click B as clear(A)/set(B), while the identical
+      // fingerprint retains the lease required by the matching clear.
+      JSON.stringify(event.loci),
     ].join("\u0000");
+    const phase = event.phase ?? "set";
+    // Real Seq* clears retain their loci. Some native-compatible adapters
+    // deliberately send an empty clear payload, however; pair that clear with
+    // the current source lease instead of minting a second owner.
+    const leaseKey =
+      phase === "clear"
+        ? (this.activeNativeLeaseKeys.get(interaction) ?? nativeLeaseKey)
+        : nativeLeaseKey;
     const lease = this.nativeLeases.get(leaseKey) ?? {
       correlationId: id(),
       interactionId: id(),
     };
-    if ((event.phase ?? "set") === "set") this.nativeLeases.set(leaseKey, lease);
+    if (phase === "set") {
+      this.nativeLeases.set(leaseKey, lease);
+      this.activeNativeLeaseKeys.set(interaction, leaseKey);
+    }
     const payload: InteractionEvent = {
       interactionId: lease.interactionId,
       interaction,
-      phase: event.phase ?? "set",
+      phase,
       origin: {
         componentId: this.id,
         documentId: event.documentId,
@@ -454,7 +511,11 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
       timestamp: timestamp(),
       payload: serializedPayload,
     });
-    if (event.phase === "clear") this.nativeLeases.delete(leaseKey);
+    if (phase === "clear") {
+      this.nativeLeases.delete(leaseKey);
+      if (this.activeNativeLeaseKeys.get(interaction) === leaseKey)
+        this.activeNativeLeaseKeys.delete(interaction);
+    }
   }
 
   private apply(family: AppliedFamily, command: InteractionCommand, message: HarnessMessage): void {
@@ -568,6 +629,7 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     this.nativeSubscription = undefined;
     this.applied.clear();
     this.nativeLeases.clear();
+    this.activeNativeLeaseKeys.clear();
     this.activeSpaces = [];
     const dataset = (this.element as { readonly dataset?: DOMStringMap }).dataset;
     if (dataset !== undefined) {

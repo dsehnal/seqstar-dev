@@ -1090,24 +1090,49 @@ describe("Mol* wrapper production boundary", () => {
     driver.emit({ kind: "selection-add", residues: [residue] });
     driver.emit({ kind: "selection-add", residues: [sameLabelsOtherModel] });
     driver.emit({ kind: "selection-remove", residues: [residue] });
-    expect(driver.calls.at(-1)).toMatchObject({
-      action: "select",
-      schemas: 1,
-      targets: ["structure-b"],
-    });
+    expect(driver.calls.at(-1)).toMatchObject({ action: "select", schemas: 0, targets: [] });
+    // Mol* follows a final remove with one or more empty clears; the paired
+    // remove clear is terminal and neither trailing clear can mint a lease.
+    driver.emit({ kind: "selection-clear", residues: [] });
     driver.emit({ kind: "selection-clear", residues: [] });
     const selectionEvents = harness.messages
       .filter((event) => event.type === "interaction.native")
       .slice(beforeSelection);
     expect(selectionEvents).toHaveLength(4);
-    expect(new Set(selectionEvents.map((event) => event.payload.interactionId)).size).toBe(1);
-    expect(new Set(selectionEvents.map((event) => event.correlationId)).size).toBe(1);
-    const releasedId = selectionEvents[0]?.payload.interactionId;
+    expect(selectionEvents.map((event) => event.payload.phase)).toEqual([
+      "set",
+      "clear",
+      "set",
+      "clear",
+    ]);
+    expect(selectionEvents.every((event) => event.payload.mode === undefined)).toBe(true);
+    expect(selectionEvents[1]?.payload.interactionId).toBe(
+      selectionEvents[0]?.payload.interactionId,
+    );
+    expect(selectionEvents[1]?.correlationId).toBe(selectionEvents[0]?.correlationId);
+    expect(selectionEvents[3]?.payload.interactionId).toBe(
+      selectionEvents[2]?.payload.interactionId,
+    );
+    expect(selectionEvents[3]?.correlationId).toBe(selectionEvents[2]?.correlationId);
+    const releasedId = selectionEvents[2]?.payload.interactionId;
     driver.emit({ kind: "selection-add", residues: [residue] });
     expect(
       harness.messages.filter((event) => event.type === "interaction.native").at(-1)?.payload
         .interactionId,
     ).not.toBe(releasedId);
+    const beforeRepeat = harness.messages.filter(
+      (event) => event.type === "interaction.native",
+    ).length;
+    driver.emit({ kind: "selection-add", residues: [residue] });
+    const repeated = harness.messages
+      .filter((event) => event.type === "interaction.native")
+      .slice(beforeRepeat);
+    expect(repeated).toHaveLength(1);
+    expect(repeated[0]?.payload).toMatchObject({ phase: "clear" });
+    expect(repeated[0]?.payload.interactionId).toBe(
+      harness.messages.filter((event) => event.type === "interaction.native")[beforeRepeat - 1]
+        ?.payload.interactionId,
+    );
     await wrapper.dispose();
   });
 

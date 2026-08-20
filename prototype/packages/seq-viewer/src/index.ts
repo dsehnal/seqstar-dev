@@ -6,6 +6,7 @@ import {
   type SeqViewSpec,
   validateSeqViewSpec,
 } from "@seq-star/seq-view-spec";
+import { Box, createElement as createLucideElement, Layers } from "lucide";
 import { type Observable, Subject } from "rxjs";
 
 export interface InteractionOwner {
@@ -67,6 +68,19 @@ export interface SeqViewerInteraction {
   readonly loci: readonly CoordinateLocus[];
   readonly nativeEvent?: Event;
 }
+export type TrackPresentationAction = Readonly<{
+  readonly kind: "structure-profile" | "layer-inspection";
+  readonly accessibleName: string;
+  readonly tooltip: string;
+  readonly icon: "box" | "layers";
+}>;
+export type TrackPresentation = Readonly<{
+  readonly trackId: string;
+  readonly action?: TrackPresentationAction;
+}>;
+export type SequenceWrapperPresentationConfig = Readonly<{
+  readonly tracks?: readonly TrackPresentation[];
+}>;
 type View = SeqViewSpec["views"][number];
 type Track = View["sections"][number]["tracks"][number];
 type Layer = Track["layers"][number];
@@ -128,6 +142,8 @@ export interface SeqViewer {
 export interface CreateSeqViewerOptions {
   readonly target: HTMLElement;
   readonly spec?: SeqViewerPluginSpec;
+  /** Presentation-only wrapper configuration; it never changes SeqViewSpec semantics. */
+  readonly presentation?: SequenceWrapperPresentationConfig;
 }
 
 interface ResolvedLayer {
@@ -378,6 +394,11 @@ class CanvasSeqViewer implements SeqViewer {
       bottom: "4px",
       height: "30px",
       display: "none",
+      gridTemplateColumns: "minmax(0, 1fr) auto",
+      alignItems: "center",
+      columnGap: "4px",
+      padding: "3px 4px",
+      boxSizing: "border-box",
       zIndex: "2",
       pointerEvents: "auto",
       background: "rgb(255 255 255 / 94%)",
@@ -389,10 +410,8 @@ class CanvasSeqViewer implements SeqViewer {
     this.navigationAxis.title =
       "Drag the window to pan. Drag handles to zoom. Shift-wheel pans; Ctrl-wheel zooms.";
     Object.assign(this.navigationAxis.style, {
-      position: "absolute",
-      left: "4px",
-      right: "130px",
-      top: "5px",
+      position: "relative",
+      minWidth: "0",
       height: "18px",
       overflow: "hidden",
       cursor: "grab",
@@ -437,12 +456,12 @@ class CanvasSeqViewer implements SeqViewer {
     }
     this.navigationWindow.append(this.navigationLeftHandle, this.navigationRightHandle);
     const controls = document.createElement("div");
+    controls.dataset.seqViewerNavigation = "controls";
     Object.assign(controls.style, {
-      position: "absolute",
-      right: "4px",
-      top: "3px",
       display: "flex",
       gap: "2px",
+      alignItems: "center",
+      flex: "0 0 auto",
     });
     for (const [control, text, label] of [
       ["pan-left", "◀", "Pan left"],
@@ -946,6 +965,10 @@ class CanvasSeqViewer implements SeqViewer {
               annotation.kind === "relationships"
                 ? annotation.items.find((relationship) => relationship.id === item.id)
                 : undefined;
+            const lociItem =
+              annotation.kind === "loci"
+                ? annotation.items.find((candidate) => candidate.id === item.id)
+                : undefined;
             return {
               layer: resolved,
               annotation,
@@ -956,7 +979,9 @@ class CanvasSeqViewer implements SeqViewer {
               locusIndex: item.locusIndex,
               loci: relationship
                 ? this.relationshipLoci(active, relationship)
-                : [boundary(space, item.locus.position)],
+                : lociItem
+                  ? this.lociItemLoci(active, lociItem)
+                  : [boundary(space, item.locus.position)],
             };
           }
         }
@@ -998,7 +1023,9 @@ class CanvasSeqViewer implements SeqViewer {
             layer: resolved,
             annotation,
             itemId: item.id,
-            loci: [this.convertLocus(space, locus)],
+            // A pointer finds the item, not a single constituent locus.  Keep
+            // the declared order so discontinuous annotations remain semantic.
+            loci: this.lociItemLoci(active, item),
           };
       }
     if (annotation.kind === "relationships")
@@ -1028,6 +1055,18 @@ class CanvasSeqViewer implements SeqViewer {
           return space ? [this.convertLocus(space, locus)] : [];
         }),
       ),
+    );
+  }
+
+  private lociItemLoci(
+    active: Active,
+    item: Extract<Annotation, { kind: "loci" }>["items"][number],
+  ): readonly CoordinateLocus[] {
+    return Object.freeze(
+      item.loci.flatMap((locus) => {
+        const space = active.spaces.get(locus.space);
+        return space ? [this.convertLocus(space, locus)] : [];
+      }),
     );
   }
 
@@ -1160,7 +1199,9 @@ class CanvasSeqViewer implements SeqViewer {
     });
   }
   private navigationAxisWidth(): number {
-    return Math.max(1, this.navigationAxis.clientWidth || this.width - HEADER - 138);
+    // CSS grid owns the controls reserve.  Never derive this from a second
+    // absolute-width formula: it is wrong as soon as controls are measured.
+    return Math.max(1, this.navigationAxis.clientWidth);
   }
   private navigationCell(active: Active, width = this.navigationAxisWidth()): number {
     const gaps = Math.max(0, active.view.axis.segments.length - 1) * NAVIGATION_GAP;
@@ -1188,7 +1229,7 @@ class CanvasSeqViewer implements SeqViewer {
       this.navigation.style.display = "none";
       return;
     }
-    this.navigation.style.display = "block";
+    this.navigation.style.display = "grid";
     const viewport = this.viewportDescriptor();
     if (!viewport) return;
     const width = this.navigationAxisWidth();
@@ -1694,19 +1735,35 @@ class CanvasSeqViewer implements SeqViewer {
     const active = this.active;
     if (!active) return;
     for (const row of active.rows) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.textContent = row.label;
-      button.dataset.seqViewerTrack = row.track.id;
-      button.setAttribute("aria-label", `Activate track ${row.label}`);
-      Object.assign(button.style, {
+      const presentation = this.options.presentation?.tracks?.find(
+        (item) => item.trackId === row.track.id,
+      );
+      const header = document.createElement("div");
+      Object.assign(header.style, {
         position: "absolute",
         top: `${row.top}px`,
         left: "0",
         width: "100%",
         height: `${row.height - 1}px`,
-        border: "0",
+        display: "grid",
+        gridTemplateColumns: presentation?.action ? "minmax(0, 1fr) 20px" : "minmax(0, 1fr)",
+        gap: presentation?.action ? "2px" : "0",
+        boxSizing: "border-box",
         borderBottom: "1px solid #dbeafe",
+        background: "#f8fafc",
+        pointerEvents: "auto",
+      });
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = row.label;
+      button.dataset.seqViewerTrack = row.track.id;
+      button.dataset.seqstarTrackActivate = row.track.id;
+      button.setAttribute("aria-label", `Activate track ${row.label}`);
+      Object.assign(button.style, {
+        width: "100%",
+        height: `${row.height - 1}px`,
+        border: "0",
+        minWidth: "0",
         background: "#f8fafc",
         color: "#102a43",
         overflow: "hidden",
@@ -1729,7 +1786,53 @@ class CanvasSeqViewer implements SeqViewer {
           }),
         { signal: this.abort.signal },
       );
-      this.headers.append(button);
+      header.append(button);
+      if (presentation?.action) {
+        const action = document.createElement("button");
+        action.type = "button";
+        action.dataset.seqViewerTrackAction = row.track.id;
+        action.dataset.seqViewerTrackActionKind = presentation.action.kind;
+        action.append(
+          createLucideElement(presentation.action.icon === "box" ? Box : Layers, {
+            width: 13,
+            height: 13,
+            "aria-hidden": "true",
+            focusable: "false",
+          }),
+        );
+        action.setAttribute("aria-label", presentation.action.accessibleName);
+        action.title = presentation.action.tooltip;
+        Object.assign(action.style, {
+          width: "20px",
+          height: "20px",
+          padding: "0",
+          alignSelf: "center",
+          border: "1px solid #94a3b8",
+          borderRadius: "0",
+          background: "#fff",
+          color: "#102a43",
+          display: "grid",
+          placeItems: "center",
+        });
+        action.addEventListener(
+          "click",
+          (event) => {
+            event.stopPropagation();
+            this.subject.next({
+              kind: "track-activate",
+              documentId: active.document.id,
+              viewId: active.view.id,
+              sectionId: row.sectionId,
+              trackId: row.track.id,
+              loci: NONE,
+              nativeEvent: event,
+            });
+          },
+          { signal: this.abort.signal },
+        );
+        header.append(action);
+      }
+      this.headers.append(header);
     }
   }
   private readonly hover = (event: PointerEvent): void => {

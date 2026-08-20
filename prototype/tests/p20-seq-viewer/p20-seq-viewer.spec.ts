@@ -88,6 +88,28 @@ test("publishes a real pointer event for a non-first track", async ({ page }) =>
     .toMatchObject({ layerId: "boundary-layer", itemId: "boundary-zero" });
 });
 
+test("keeps a truncated label separate from its square presentation action", async ({ page }) => {
+  await page.goto("/");
+  const action = page.getByRole("button", { name: "Show Core track in 3D" });
+  await expect(action).toBeVisible();
+  await expect(action).toHaveCSS("border-radius", "0px");
+  const box = await action.boundingBox();
+  if (!box) throw new Error("Missing configured track action.");
+  expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
+  await action.click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (
+          window as typeof window & {
+            __p20: { events: readonly { readonly kind: string; readonly trackId?: string }[] };
+          }
+        ).__p20.events.at(-1),
+      ),
+    )
+    .toMatchObject({ kind: "track-activate", trackId: "track" });
+});
+
 test("preserves relationship endpoint and locus identity for boundary links", async ({ page }) => {
   await page.goto("/");
   const hits = await page.evaluate(() => {
@@ -130,6 +152,24 @@ test("preserves relationship endpoint and locus identity for boundary links", as
       expect.arrayContaining(allEndpointLoci),
     );
   }
+});
+
+test("resolves a feature hit to every declared discontinuous item locus", async ({ page }) => {
+  await page.goto("/");
+  const hit = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: { viewer: () => { hitTest(x: number, y: number): unknown } };
+      }
+    ).__p20
+      .viewer()
+      .hitTest(184, 85),
+  );
+  expect(hit).toMatchObject({ layerId: "lane-layer", itemId: "block" });
+  expect((hit as { loci: unknown[] }).loci).toEqual([
+    expect.objectContaining({ kind: "interval", start: 0, end: 2 }),
+    expect.objectContaining({ kind: "point", position: expect.objectContaining({ value: 3 }) }),
+  ]);
 });
 
 test("keeps stacked block lanes stable over whole intervals", async ({ page }) => {
@@ -346,6 +386,41 @@ test("navigates with bounded viewport descriptors and keeps gap hits empty", asy
   expect(afterWheel.viewport).toMatchObject({ offsetStart: 2, offsetEnd: 8 });
 });
 
+test("keeps the measured navigation overview before controls from 390px through 1600px", async ({
+  page,
+}) => {
+  for (const width of [390, 480, 768, 1280, 1600]) {
+    await page.setViewportSize({ width, height: 420 });
+    await page.goto("/");
+    await page.locator("#viewer").evaluate((element, nextWidth) => {
+      (element as HTMLElement).style.width = `${nextWidth}px`;
+    }, width);
+    await expect(page.locator("[data-seq-viewer-navigation=root]")).toBeVisible();
+    // The canvas and navigation update from the host ResizeObserver.
+    await page.waitForTimeout(50);
+    const boxes = await page.evaluate(() => {
+      const box = (selector: string) => {
+        const element = document.querySelector(selector);
+        if (!(element instanceof HTMLElement)) throw new Error(`Missing ${selector}`);
+        const rect = element.getBoundingClientRect();
+        return { left: rect.left, right: rect.right, width: rect.width };
+      };
+      return {
+        root: box("[data-seq-viewer-navigation=root]"),
+        axis: box("[data-seq-viewer-navigation=axis]"),
+        controls: box("[data-seq-viewer-navigation=controls]"),
+        window: box("[data-seq-viewer-navigation=window]"),
+      };
+    });
+    expect(boxes.axis.width).toBeGreaterThan(0);
+    expect(boxes.axis.right).toBeLessThanOrEqual(boxes.controls.left);
+    expect(boxes.window.left).toBeGreaterThanOrEqual(boxes.axis.left);
+    // Sub-pixel grid rounding may differ by a fraction of a CSS pixel.
+    expect(boxes.window.right).toBeLessThanOrEqual(boxes.axis.right + 1);
+    expect(boxes.root.right).toBeLessThanOrEqual(width);
+  }
+});
+
 test("cancels an old navigation drag before replacement installs its viewport", async ({
   page,
 }) => {
@@ -462,6 +537,33 @@ test("renders and leases complete relationship state locally with replace semant
   expect(selection.map((event) => event.endpointRole)).toEqual(["from", "from", "to", "to"]);
   expect([...hover, ...selection].every((event) => event.loci.length === 6)).toBe(true);
   expect(hoverPixels.every((pixel) => pixel[0] > pixel[2])).toBe(true);
+});
+
+test("toggles an identical native semantic selection off with its matching clear", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.mouse.click(184, 35);
+  await page.mouse.click(184, 35);
+  const selection = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: {
+          events: readonly {
+            readonly kind: string;
+            readonly phase?: string;
+            readonly itemId?: string;
+            readonly loci: unknown[];
+          }[];
+        };
+      }
+    ).__p20.events.filter((event) => event.kind === "select"),
+  );
+  expect(selection.map((event) => event.phase)).toEqual(["set", "clear"]);
+  expect(selection).toEqual(
+    expect.arrayContaining([expect.objectContaining({ itemId: "edge", loci: expect.any(Array) })]),
+  );
+  expect(selection[0]?.loci).toEqual(selection[1]?.loci);
 });
 
 test("clears native hover and selection during replacement and disposal", async ({ page }) => {
