@@ -7,6 +7,7 @@ type Probe = {
   clearFailure(): Promise<unknown>;
   declaredFallback(): Promise<unknown>;
   clickLinegraph(): Promise<unknown>;
+  alignmentAdapter(): Promise<unknown>;
 };
 const run = <T>(page: import("@playwright/test").Page, key: keyof Probe): Promise<T> =>
   page.evaluate(async (name) => (window as unknown as { p30Probe: Probe }).p30Probe[name](), key);
@@ -198,4 +199,53 @@ test("resolves complete semantic loci and toggle leases from native Nightingale 
     ],
   });
   expect(selection[1]?.interactionId).toBe(selection[0]?.interactionId);
+});
+
+test("renders the 32×118 alignment as exact member rows with mapped non-gap loci", async ({
+  page,
+}) => {
+  const result = await run<{
+    rowCount: number;
+    sequenceRows: number;
+    structureActionCount: number;
+    annotationTracks: number;
+    viewport: { length: number } | undefined;
+    rowsScrollTop: number;
+    actionEvents: Array<{ origin: { alignmentId?: string; alignmentMemberId?: string } }>;
+    loci: Array<{ origin: { alignmentMemberId?: string }; loci: unknown[] }>;
+    replacementRows: number;
+  }>(page, "alignmentAdapter");
+  expect(result.rowCount).toBe(32);
+  expect(result.sequenceRows).toBe(32);
+  expect(result.structureActionCount).toBe(1);
+  expect(result.annotationTracks).toBe(3);
+  expect(result.viewport).toMatchObject({ length: 118 });
+  expect(result.rowsScrollTop).toBeGreaterThanOrEqual(0);
+  expect(result.actionEvents).toEqual([
+    expect.objectContaining({
+      origin: expect.objectContaining({
+        alignmentId: "alignment-32",
+        alignmentMemberId: "member-0",
+      }),
+    }),
+  ]);
+  // Query non-gap column 2 maps to its member sequence. The following gap at
+  // column 3 retains only the alignment column. Member-1's explicit column-6
+  // gap also remains unmapped despite being a non-query row.
+  expect(result.loci[0]).toMatchObject({
+    origin: { alignmentMemberId: "member-0" },
+    loci: [
+      { kind: "point", space: { id: "alignment-columns", kind: "alignment", length: 118 } },
+      { kind: "point", space: { id: "member-space-0", kind: "sequence", length: 117 } },
+    ],
+  });
+  expect(result.loci[1]).toMatchObject({
+    origin: { alignmentMemberId: "member-1" },
+    loci: [{ kind: "point", space: { id: "alignment-columns", kind: "alignment", length: 118 } }],
+  });
+  expect(result.loci[2]).toMatchObject({
+    origin: { alignmentMemberId: "member-1" },
+    loci: [{ kind: "point", space: { id: "alignment-columns", kind: "alignment", length: 118 } }],
+  });
+  expect(result.replacementRows).toBe(32);
 });

@@ -6,6 +6,7 @@ import {
   installCoreMessageSchemas,
 } from "@seq-star/harness-core";
 import type { SeqViewSpec } from "@seq-star/seq-view-spec";
+import type { NightingalePresentation } from "@seq-star/wrapper-nightingale";
 import { NightingaleWrapper } from "@seq-star/wrapper-nightingale";
 
 const base = {
@@ -258,18 +259,155 @@ const viewportDocument: SeqViewSpec = {
   ],
 };
 
+const alignmentColumns = 118;
+const alignmentMembers = Array.from({ length: 32 }, (_, memberIndex) => {
+  let position = 0;
+  const positions = Array.from({ length: alignmentColumns }, (_, column) => {
+    // Every row has a stable explicit gap at column 2. Member 1 adds a
+    // member-specific gap at column 5 to prove rows are not inferred from the
+    // query sequence.
+    if (column === 2 || (memberIndex === 1 && column === 5)) return null;
+    return position++;
+  });
+  return {
+    id: `member-${memberIndex}`,
+    sequence: `sequence-${memberIndex}`,
+    positions,
+    metadata: { label: memberIndex === 0 ? "query" : `member ${memberIndex}` },
+  };
+});
+const alignmentDocument: SeqViewSpec = {
+  kind: "seq-view-spec",
+  version: "0.1.0",
+  id: "alignment-32x118",
+  sequences: alignmentMembers.map((member, memberIndex) => ({
+    id: member.sequence,
+    coordinateSpace: `member-space-${memberIndex}`,
+    alphabet: "protein" as const,
+    residues: Array.from(
+      { length: member.positions.filter((position) => position !== null).length },
+      (_, position) => "ACDEFGHIKLMNPQRSTVWY"[(position + memberIndex) % 20],
+    ).join(""),
+  })),
+  alignments: [
+    {
+      id: "alignment-32",
+      coordinateSpace: "alignment-columns",
+      length: alignmentColumns,
+      members: alignmentMembers,
+    },
+  ],
+  annotations: [
+    {
+      id: "annotation-consensus",
+      kind: "values",
+      semanticType: "test.consensus",
+      space: "alignment-columns",
+      valueType: "category",
+      values: { encoding: "dense", data: Array.from({ length: alignmentColumns }, () => "A") },
+    },
+    {
+      id: "annotation-conservation",
+      kind: "values",
+      semanticType: "test.conservation",
+      space: "alignment-columns",
+      valueType: "number",
+      values: {
+        encoding: "dense",
+        data: Array.from({ length: alignmentColumns }, (_, column) => column / alignmentColumns),
+      },
+    },
+    {
+      id: "annotation-subgroups",
+      kind: "loci",
+      semanticType: "test.subgroups",
+      items: [
+        {
+          id: "subgroup",
+          value: "group-a",
+          loci: [{ kind: "interval", space: "alignment-columns", start: 20, end: 60 }],
+        },
+      ],
+    },
+  ],
+  views: [
+    {
+      id: "main",
+      context: { alignment: "alignment-32" },
+      axis: { segments: [{ id: "columns", space: "alignment-columns", start: 0, end: 118 }] },
+      sections: [
+        {
+          id: "rows",
+          tracks: [
+            {
+              id: "alignment",
+              label: "Alignment",
+              layers: [
+                {
+                  id: "aligned-residues",
+                  representation: "alignment",
+                  alignment: "alignment-32",
+                  showLetters: true,
+                },
+              ],
+            },
+          ],
+        },
+        {
+          id: "annotations",
+          tracks: [
+            {
+              id: "track-consensus",
+              layers: [
+                {
+                  id: "consensus-swatch",
+                  representation: "swatch",
+                  annotation: "annotation-consensus",
+                  color: { kind: "fixed", color: "#2563eb" },
+                },
+              ],
+            },
+            {
+              id: "track-conservation",
+              layers: [
+                {
+                  id: "conservation-heatmap",
+                  representation: "heatmap",
+                  annotation: "annotation-conservation",
+                  color: {
+                    kind: "continuous",
+                    field: "value",
+                    domain: [0, 1],
+                    range: ["#dbeafe", "#1d4ed8"],
+                    missing: "#cbd5e1",
+                  },
+                },
+              ],
+            },
+            {
+              id: "track-subgroups",
+              layers: [
+                {
+                  id: "subgroup-blocks",
+                  representation: "blocks",
+                  annotation: "annotation-subgroups",
+                  color: { kind: "fixed", color: "#7c3aed" },
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+
 const uuid = (): string => crypto.randomUUID();
 const setup = async (
   id: string,
   target: HTMLElement,
   failureViewPolicy: "retain" | "clear",
-  presentation?: {
-    readonly trackActions?: readonly {
-      readonly trackId: string;
-      readonly label: string;
-      readonly kind?: "structure" | "layers";
-    }[];
-  },
+  presentation?: NightingalePresentation,
 ) => {
   const schemas = createMessageSchemaRegistry();
   installCoreMessageSchemas(schemas);
@@ -320,8 +458,15 @@ const setup = async (
 const retainTarget = document.querySelector<HTMLElement>("#retain");
 const clearTarget = document.querySelector<HTMLElement>("#clear");
 const viewportTarget = document.querySelector<HTMLElement>("#viewport");
+const alignmentTarget = document.querySelector<HTMLElement>("#alignment");
 const status = document.querySelector<HTMLElement>("#status");
-if (retainTarget === null || clearTarget === null || viewportTarget === null || status === null)
+if (
+  retainTarget === null ||
+  clearTarget === null ||
+  viewportTarget === null ||
+  alignmentTarget === null ||
+  status === null
+)
   throw new Error("Missing P30 fixture host.");
 const retain = await setup("retain", retainTarget, "retain");
 const clear = await setup("clear", clearTarget, "clear");
@@ -332,9 +477,16 @@ const viewport = await setup("viewport", viewportTarget, "retain", {
     { trackId: "absent-track", label: "Unavailable action", kind: "layers" },
   ],
 });
+const alignment = await setup("alignment", alignmentTarget, "retain", {
+  initialViewport: { start: 1, end: 10 },
+  alignmentMemberActions: [
+    { alignmentId: "alignment-32", memberId: "member-0", label: "Show query structure" },
+  ],
+});
 await retain.load(documentA, "retain-a");
 await clear.load(documentA, "clear-a");
 await viewport.load(viewportDocument, "viewport-a");
+await alignment.load(alignmentDocument, "alignment-a");
 
 const nativeMessages = (probe: typeof retain) =>
   probe.messages.filter((message) => message.type === "interaction.native");
@@ -535,6 +687,89 @@ Object.assign(window, {
       return nativeMessages(retain)
         .slice(before)
         .map((message) => message.payload);
+    },
+    async alignmentAdapter() {
+      const root = alignmentTarget.querySelector<HTMLElement>('[data-seqstar-nightingale="root"]');
+      const rows = root?.querySelector<HTMLElement>('[data-seqstar-alignment-rows="alignment-32"]');
+      const query = root?.querySelector<HTMLElement>('[data-seqstar-alignment-member="member-0"]');
+      const nonQuery = root?.querySelector<HTMLElement>(
+        '[data-seqstar-alignment-member="member-1"]',
+      );
+      const queryAction = query?.querySelector<HTMLButtonElement>(
+        '[aria-label="Show query structure"]',
+      );
+      if (
+        root === null ||
+        rows === null ||
+        query === null ||
+        nonQuery === null ||
+        queryAction === null
+      )
+        throw new Error(
+          `Missing rendered alignment rows or configured query action: ${JSON.stringify(
+            alignment.messages
+              .filter((message) => message.type === "lifecycle.visualization")
+              .map((message) => message.payload),
+          )}`,
+        );
+      const actionBefore = nativeMessages(alignment).length;
+      queryAction.click();
+      for (let index = 0; index < 100; index += 1) {
+        root.dispatchEvent(
+          new WheelEvent("wheel", {
+            bubbles: true,
+            cancelable: true,
+            clientX: root.getBoundingClientRect().left + root.getBoundingClientRect().width / 2,
+            deltaX: index % 2 === 0 ? 24 : 0,
+            deltaY: index % 2 === 0 ? 0 : index % 4 === 1 ? -120 : 120,
+          }),
+        );
+      }
+      rows.scrollTop = rows.scrollHeight;
+      const emit = (row: HTMLElement, column: number) => {
+        const native = row.querySelector<HTMLElement>("nightingale-sequence") as HTMLElement & {
+          emitSeqstarInteraction(value: {
+            kind: "select";
+            phase: "set";
+            regions: readonly { start: number; end: number }[];
+          }): void;
+        };
+        if (native === null) throw new Error("Missing native alignment sequence row.");
+        native.emitSeqstarInteraction({
+          kind: "select",
+          phase: "set",
+          regions: [{ start: column, end: column }],
+        });
+      };
+      const before = nativeMessages(alignment).length;
+      emit(query, 2);
+      emit(nonQuery, 3);
+      emit(nonQuery, 6);
+      await alignment.load(alignmentDocument, "alignment-b");
+      return {
+        rowCount: root.querySelectorAll("section[data-seqstar-alignment-member]").length,
+        sequenceRows: root.querySelectorAll("nightingale-sequence[data-seqstar-alignment]").length,
+        structureActionCount: root.querySelectorAll('[aria-label="Show query structure"]').length,
+        annotationTracks: root.querySelectorAll("nightingale-track").length,
+        viewport: alignment.wrapper.getViewport(),
+        rowsScrollTop: rows.scrollTop,
+        actionEvents: nativeMessages(alignment)
+          .slice(actionBefore)
+          .filter(
+            (message) =>
+              (message.payload as { interaction?: string }).interaction === "track-activate",
+          )
+          .map((message) => message.payload),
+        loci: nativeMessages(alignment)
+          .slice(before)
+          .filter((message) => {
+            const payload = message.payload as { interaction?: string; phase?: string };
+            return payload.interaction === "select" && payload.phase === "set";
+          })
+          .map((message) => message.payload),
+        replacementRows: alignmentTarget.querySelectorAll("section[data-seqstar-alignment-member]")
+          .length,
+      };
     },
   },
 });

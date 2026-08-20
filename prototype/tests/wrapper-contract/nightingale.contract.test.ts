@@ -484,16 +484,24 @@ describe("Nightingale wrapper boundaries", () => {
     const presentation = {
       initialViewport: { start: 2, end: 4 },
       trackActions: [{ trackId: "track", label: "Show track in 3D", kind: "structure" }],
+      alignmentMemberActions: [
+        { alignmentId: "alignment", memberId: "member", label: "Show member structure" },
+      ],
     };
     const snapshot = snapshotNightingalePresentation(presentation);
     presentation.trackActions[0].label = "mutated";
     expect(snapshot).toEqual({
       initialViewport: { start: 2, end: 4 },
       trackActions: [{ trackId: "track", label: "Show track in 3D", kind: "structure" }],
+      alignmentMemberActions: [
+        { alignmentId: "alignment", memberId: "member", label: "Show member structure" },
+      ],
     });
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.trackActions)).toBe(true);
     expect(Object.isFrozen(snapshot.trackActions?.[0])).toBe(true);
+    expect(Object.isFrozen(snapshot.alignmentMemberActions)).toBe(true);
+    expect(Object.isFrozen(snapshot.alignmentMemberActions?.[0])).toBe(true);
     expect(() =>
       snapshotNightingalePresentation({
         trackActions: [
@@ -519,6 +527,14 @@ describe("Nightingale wrapper boundaries", () => {
         trackActions: [{ trackId: "a", label: "A", kind: "dynamic" }],
       }),
     ).toThrow("must be structure or layers");
+    expect(() =>
+      snapshotNightingalePresentation({
+        alignmentMemberActions: [
+          { alignmentId: "alignment", memberId: "member", label: "A" },
+          { alignmentId: "alignment", memberId: "member", label: "B" },
+        ],
+      }),
+    ).toThrow("duplicate member");
     expect(() => snapshotNightingalePresentation({ initialViewport: { start: Infinity } })).toThrow(
       "JSON-safe",
     );

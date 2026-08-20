@@ -19,6 +19,18 @@ export interface NightingaleTrackAction extends JsonObject {
   readonly kind?: "structure" | "layers";
 }
 
+/**
+ * A member action is deliberately presentation-only.  It identifies a frozen
+ * alignment member, but contains neither a structure identifier nor a mapping
+ * instruction: the harness/plugin remains responsible for any structure work.
+ */
+export interface NightingaleAlignmentMemberAction extends JsonObject {
+  readonly alignmentId: string;
+  readonly memberId: string;
+  readonly label: string;
+  readonly kind?: "structure" | "layers";
+}
+
 export interface NightingaleInitialViewport extends JsonObject {
   readonly start?: number;
   readonly end?: number;
@@ -27,6 +39,7 @@ export interface NightingaleInitialViewport extends JsonObject {
 export interface NightingalePresentation extends JsonObject {
   readonly initialViewport?: NightingaleInitialViewport;
   readonly trackActions?: readonly NightingaleTrackAction[];
+  readonly alignmentMemberActions?: readonly NightingaleAlignmentMemberAction[];
 }
 
 export class NightingalePresentationError extends Error {
@@ -152,7 +165,11 @@ export const snapshotNightingalePresentation = (value: unknown): NightingalePres
       "Nightingale presentation must be a plain object.",
     );
   const presentation = value as Record<string, unknown>;
-  allowedKeys(presentation, ["initialViewport", "trackActions"], "presentation");
+  allowedKeys(
+    presentation,
+    ["initialViewport", "trackActions", "alignmentMemberActions"],
+    "presentation",
+  );
   let initialViewport: NightingaleInitialViewport | undefined;
   if (presentation.initialViewport !== undefined) {
     if (
@@ -229,9 +246,57 @@ export const snapshotNightingalePresentation = (value: unknown): NightingalePres
       }),
     );
   }
+  let alignmentMemberActions: readonly NightingaleAlignmentMemberAction[] | undefined;
+  const configuredMemberActions = presentation.alignmentMemberActions;
+  if (configuredMemberActions !== undefined) {
+    if (!Array.isArray(configuredMemberActions))
+      presentationError(
+        "wrapper.nightingale.presentation.shape",
+        "presentation.alignmentMemberActions must be an array.",
+      );
+    const keys = new Set<string>();
+    alignmentMemberActions = Object.freeze(
+      (configuredMemberActions as unknown[]).map((candidate, index) => {
+        if (candidate === null || typeof candidate !== "object" || Array.isArray(candidate))
+          presentationError(
+            "wrapper.nightingale.presentation.shape",
+            `presentation.alignmentMemberActions[${index}] must be a plain object.`,
+          );
+        const action = candidate as Record<string, unknown>;
+        const path = `presentation.alignmentMemberActions[${index}]`;
+        allowedKeys(action, ["alignmentId", "memberId", "label", "kind"], path);
+        const alignmentId = stringValue(action.alignmentId, `${path}.alignmentId`);
+        const memberId = stringValue(action.memberId, `${path}.memberId`);
+        const label = stringValue(action.label, `${path}.label`);
+        const kind =
+          action.kind === undefined
+            ? undefined
+            : action.kind === "structure" || action.kind === "layers"
+              ? action.kind
+              : presentationError(
+                  "wrapper.nightingale.presentation.shape",
+                  `${path}.kind must be structure or layers.`,
+                );
+        const key = `${alignmentId}\u0000${memberId}`;
+        if (keys.has(key))
+          presentationError(
+            "wrapper.nightingale.presentation.duplicate-member",
+            `presentation.alignmentMemberActions contains duplicate member '${alignmentId}/${memberId}'.`,
+          );
+        keys.add(key);
+        return Object.freeze({
+          alignmentId,
+          memberId,
+          label,
+          ...(kind === undefined ? {} : { kind }),
+        });
+      }),
+    );
+  }
   return Object.freeze({
     ...(initialViewport === undefined ? {} : { initialViewport }),
     ...(trackActions === undefined ? {} : { trackActions }),
+    ...(alignmentMemberActions === undefined ? {} : { alignmentMemberActions }),
   });
 };
 

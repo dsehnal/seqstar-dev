@@ -34,6 +34,7 @@ import {
 } from "./viewport.js";
 
 export type {
+  NightingaleAlignmentMemberAction,
   NightingalePresentation,
   NightingaleTrackAction,
   NightingaleViewportDescriptor,
@@ -54,6 +55,8 @@ type NativeElement = NightingaleViewportElement & {
   seqstarTrackId: string;
   seqstarLayerId: string;
   seqstarGeneration: number;
+  seqstarAlignmentMemberPositions?: readonly (number | null)[];
+  seqstarAlignmentMemberSequenceSpace?: string;
   waitForSeqstarFirstRender(generation: number, signal?: AbortSignal): Promise<void>;
   setSeqstarInteraction(
     family: AppliedFamily,
@@ -68,12 +71,14 @@ type NativeElement = NightingaleViewportElement & {
 const capabilities = Object.freeze([
   "seqstar:format/seqviewspec",
   "seqstar:coordinates/sequence",
+  "seqstar:coordinates/alignment",
   "seqstar:interaction/native-hover",
   "seqstar:interaction/native-selection",
   "seqstar:interaction/native-track-activate",
   "seqstar:interaction/external-highlight",
   "seqstar:interaction/external-selection",
   "seqviewspec:representation/sequence",
+  "seqviewspec:representation/alignment",
   "seqviewspec:representation/blocks",
   "seqviewspec:representation/markers",
   "seqstar:nightingale/fallback-bars-heatmap",
@@ -118,6 +123,10 @@ export interface NightingaleIdentity {
   readonly trackId: string;
   readonly layerId: string;
   readonly annotationId?: string;
+  /** Present only for a rendered alignment member row. */
+  readonly alignmentId?: string;
+  readonly alignmentMemberId?: string;
+  readonly sequenceId?: string;
   readonly generation: number;
   readonly itemId?: string;
   readonly endpointRole?: string;
@@ -139,6 +148,9 @@ export class NightingaleIdentityTable {
       identity.trackId,
       identity.layerId,
       identity.annotationId ?? "",
+      identity.alignmentId ?? "",
+      identity.alignmentMemberId ?? "",
+      identity.sequenceId ?? "",
       identity.itemId ?? "",
       identity.endpointRole ?? "",
       identity.endpointIndex ?? -1,
@@ -193,15 +205,22 @@ export interface NightingaleNativeDriver {
 }
 
 const coordinateSpaces = (document: SeqViewSpec): readonly CoordinateSpace[] =>
-  Object.freeze(
-    document.sequences.map((sequence) =>
+  Object.freeze([
+    ...document.sequences.map((sequence) =>
       Object.freeze({
         id: sequence.coordinateSpace,
         kind: "sequence",
         length: [...sequence.residues].length,
       } satisfies CoordinateSpace),
     ),
-  );
+    ...(document.alignments ?? []).map((alignment) =>
+      Object.freeze({
+        id: alignment.coordinateSpace,
+        kind: "alignment",
+        length: alignment.length,
+      } satisfies CoordinateSpace),
+    ),
+  ]);
 
 const sequenceSpace = (document: SeqViewSpec, id: string): CoordinateSpace | undefined => {
   const sequence = document.sequences.find((value) => value.coordinateSpace === id);
@@ -209,6 +228,23 @@ const sequenceSpace = (document: SeqViewSpec, id: string): CoordinateSpace | und
     ? undefined
     : { id, kind: "sequence", length: [...sequence.residues].length };
 };
+
+const documentSpace = (document: SeqViewSpec, id: string): CoordinateSpace | undefined =>
+  sequenceSpace(document, id) ??
+  (() => {
+    const alignment = document.alignments?.find((value) => value.coordinateSpace === id);
+    return alignment === undefined
+      ? undefined
+      : ({ id, kind: "alignment", length: alignment.length } satisfies CoordinateSpace);
+  })();
+
+const alignmentForLayer = (document: SeqViewSpec, layer: Layer) =>
+  layer.representation === "alignment"
+    ? document.alignments?.find((alignment) => alignment.id === layer.alignment)
+    : undefined;
+
+const lengthForSpace = (document: SeqViewSpec, id: string): number | undefined =>
+  documentSpace(document, id)?.length;
 
 const annotation = (document: SeqViewSpec, id: string): Annotation | undefined =>
   document.annotations?.find((entry) => entry.id === id);
@@ -349,8 +385,15 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     if (options.signal.aborted) throw new DOMException("superseded", "AbortError");
     await registerNightingaleElements();
     this.disposeTree(this.stagingTree);
+    const view = options.document.views.find((entry) => entry.id === options.viewId);
+    const axisSpace = view?.axis.segments[0]?.space;
+    const viewportLength =
+      axisSpace === undefined ? undefined : lengthForSpace(options.document, axisSpace);
     const sequenceLength = [...(options.document.sequences[0]?.residues ?? "")].length;
-    const staging = this.createTree(options.generation, Math.max(1, sequenceLength));
+    const staging = this.createTree(
+      options.generation,
+      Math.max(1, viewportLength ?? sequenceLength),
+    );
     this.stagingTree = staging;
     this.target.append(staging.root);
     try {
@@ -409,6 +452,14 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         align-items: center;
         column-gap: 0.5rem;
         min-width: 0;
+      }
+      .seqstar-nightingale-alignment-rows {
+        display: grid;
+        gap: 0.25rem;
+        min-width: 0;
+        max-block-size: min(44rem, 70vh);
+        overflow: auto;
+        overscroll-behavior: contain;
       }
       .seqstar-nightingale-track-header {
         position: sticky;
@@ -540,8 +591,13 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
           }
         }
       }
+      const native =
+        event.target instanceof HTMLElement ? (event.target as NativeElement) : undefined;
       const identity =
         (detail.featureId === undefined ? undefined : identities.getNative(detail.featureId)) ??
+        (native?.dataset.seqstarNativeId === undefined
+          ? undefined
+          : identities.getNative(native.dataset.seqstarNativeId)) ??
         identities
           .entries()
           .find(
@@ -551,16 +607,11 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
               entry.itemId === undefined,
           );
       if (identity === undefined) return;
-      const space = this.spaceForIdentity(options.document, identity) ?? firstSpace;
       const loci =
         detail.phase === "clear"
           ? []
           : identity.itemId === undefined
-            ? detail.regions.map<CoordinateLocus>((region) =>
-                region.start === region.end
-                  ? pointAt(space, region.start - 1)
-                  : { kind: "interval", space, start: region.start - 1, end: region.end },
-              )
+            ? this.lociForRegions(options.document, identity, detail.regions, firstSpace)
             : this.lociForIdentity(options.document, identity);
       this.emit({
         interaction:
@@ -574,131 +625,214 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         identity,
       });
     };
-    this.root.addEventListener("nightingale-interaction", normalized);
-    this.cleanups.push(() => this.root.removeEventListener("nightingale-interaction", normalized));
-    for (const section of view.sections) {
-      for (const track of section.tracks) {
-        const row = document.createElement("section");
-        row.dataset.seqstarTrack = track.id;
-        row.className = "seqstar-nightingale-row";
-        const header = document.createElement("div");
-        header.className = "seqstar-nightingale-track-header";
-        const configuredAction = this.presentation.trackActions?.find(
-          (action) => action.trackId === track.id,
+    const interactionRoot = this.root;
+    interactionRoot.addEventListener("nightingale-interaction", normalized);
+    this.cleanups.push(() =>
+      interactionRoot.removeEventListener("nightingale-interaction", normalized),
+    );
+    const appendTrackRow = (
+      section: (typeof view.sections)[number],
+      track: (typeof section.tracks)[number],
+      member?: NonNullable<SeqViewSpec["alignments"]>[number]["members"][number],
+      alignmentId?: string,
+      parent: HTMLElement = this.root,
+    ): void => {
+      const row = document.createElement("section");
+      row.dataset.seqstarTrack = track.id;
+      if (alignmentId !== undefined) row.dataset.seqstarAlignment = alignmentId;
+      if (member !== undefined) row.dataset.seqstarAlignmentMember = member.id;
+      row.className = "seqstar-nightingale-row";
+      const header = document.createElement("div");
+      header.className = "seqstar-nightingale-track-header";
+      const configuredAction =
+        member === undefined
+          ? this.presentation.trackActions?.find((action) => action.trackId === track.id)
+          : this.presentation.alignmentMemberActions?.find(
+              (action) => action.alignmentId === alignmentId && action.memberId === member.id,
+            );
+      const label = document.createElement("button");
+      label.type = "button";
+      const trackLabel = `${track.label ?? track.id}${member ? ` · ${member.metadata?.label ?? member.id}` : ""}`;
+      label.textContent = trackLabel;
+      label.title = trackLabel;
+      label.className = "seqstar-nightingale-track-label";
+      label.setAttribute("aria-label", `Activate ${trackLabel}`);
+      label.dataset.seqstarTrackActivate = track.id;
+      header.append(label);
+      const stack = document.createElement("div");
+      stack.className = "seqstar-nightingale-plot";
+      stack.style.display = "grid";
+      stack.style.gap = "0.2rem";
+      row.append(header, stack);
+      const activate = (): void =>
+        stack.querySelector<NativeElement>("[data-seqstar-native-id]")?.activateSeqstarTrack();
+      label.addEventListener("click", activate);
+      this.cleanups.push(() => label.removeEventListener("click", activate));
+      let memberIdentity: NightingaleIdentity | undefined;
+      for (const layer of track.layers) {
+        const nativeId = composeNightingaleNativeId(
+          ["document", options.document.id],
+          ["view", view.id],
+          ["section", section.id],
+          ["track", track.id],
+          ["layer", layer.id],
+          "annotation" in layer
+            ? ["annotation", layer.annotation]
+            : "sequence" in layer
+              ? ["sequence", layer.sequence]
+              : ["alignment", layer.alignment],
+          ...(member === undefined ? [] : ([["member", member.id]] as const)),
         );
-        const label = document.createElement("button");
-        label.type = "button";
-        const trackLabel = track.label ?? track.id;
-        label.textContent = trackLabel;
-        label.title = trackLabel;
-        label.className = "seqstar-nightingale-track-label";
-        label.setAttribute("aria-label", `Activate ${trackLabel}`);
-        label.dataset.seqstarTrackActivate = track.id;
-        header.append(label);
-        const stack = document.createElement("div");
-        stack.className = "seqstar-nightingale-plot";
-        stack.style.display = "grid";
-        stack.style.gap = "0.2rem";
-        row.append(header, stack);
-        this.root.append(row);
-        const activate = (): void =>
-          stack.querySelector<NativeElement>("[data-seqstar-native-id]")?.activateSeqstarTrack();
-        label.addEventListener("click", activate);
-        this.cleanups.push(() => label.removeEventListener("click", activate));
-        if (configuredAction !== undefined) {
-          const action = document.createElement("button");
-          action.type = "button";
-          action.className = "seqstar-nightingale-track-action";
-          action.dataset.seqstarTrackActivate = track.id;
-          action.setAttribute("aria-label", configuredAction.label);
-          action.title = configuredAction.label;
-          action.append(createNightingaleTrackActionIcon(configuredAction.kind));
-          action.addEventListener("click", activate);
-          this.cleanups.push(() => action.removeEventListener("click", activate));
-          header.append(action);
-        }
-        for (const layer of track.layers) {
-          const nativeId = composeNightingaleNativeId(
-            ["document", options.document.id],
-            ["view", view.id],
-            ["section", section.id],
-            ["track", track.id],
-            ["layer", layer.id],
-            "annotation" in layer
-              ? ["annotation", layer.annotation]
-              : "sequence" in layer
-                ? ["sequence", layer.sequence]
-                : ["alignment", layer.alignment],
-          );
-          const identity: NightingaleIdentity = {
-            documentId: options.document.id,
-            viewId: view.id,
-            sectionId: section.id,
-            trackId: track.id,
-            layerId: layer.id,
-            generation: options.generation,
-            nativeId,
-            ...("annotation" in layer ? { annotationId: layer.annotation } : {}),
-          };
-          identities.add(identity);
-          if ("annotation" in layer) {
-            const itemAnnotation = annotation(options.document, layer.annotation);
-            if (itemAnnotation?.kind === "loci")
-              for (const item of itemAnnotation.items)
-                identities.add({
-                  ...identity,
-                  itemId: item.id,
-                  nativeId: nativeItemId(nativeId, item.id),
-                });
-            else if (itemAnnotation?.kind === "relationships")
-              for (const item of itemAnnotation.items)
-                item.endpoints.forEach((endpoint, endpointIndex) => {
-                  endpoint.loci.forEach((_locus, locusIndex) => {
-                    identities.add({
-                      ...identity,
-                      itemId: item.id,
-                      endpointRole: endpoint.role,
-                      endpointIndex,
-                      locusIndex,
-                      nativeId: nativeChildId(
+        const identity: NightingaleIdentity = {
+          documentId: options.document.id,
+          viewId: view.id,
+          sectionId: section.id,
+          trackId: track.id,
+          layerId: layer.id,
+          generation: options.generation,
+          nativeId,
+          ...("annotation" in layer ? { annotationId: layer.annotation } : {}),
+          ...(member === undefined || alignmentId === undefined
+            ? {}
+            : {
+                alignmentId,
+                alignmentMemberId: member.id,
+                sequenceId: member.sequence,
+              }),
+        };
+        if (member !== undefined && layer.representation === "alignment") memberIdentity = identity;
+        identities.add(identity);
+        if ("annotation" in layer) {
+          const itemAnnotation = annotation(options.document, layer.annotation);
+          if (itemAnnotation?.kind === "loci")
+            for (const item of itemAnnotation.items)
+              identities.add({
+                ...identity,
+                itemId: item.id,
+                nativeId: nativeItemId(nativeId, item.id),
+              });
+          else if (itemAnnotation?.kind === "relationships")
+            for (const item of itemAnnotation.items)
+              item.endpoints.forEach((endpoint, endpointIndex) => {
+                endpoint.loci.forEach((_locus, locusIndex) => {
+                  identities.add({
+                    ...identity,
+                    itemId: item.id,
+                    endpointRole: endpoint.role,
+                    endpointIndex,
+                    locusIndex,
+                    nativeId: nativeChildId(
+                      nativeChildId(
                         nativeChildId(
-                          nativeChildId(
-                            nativeItemId(nativeId, item.id),
-                            "endpoint-role",
-                            endpoint.role,
-                          ),
-                          "endpoint-index",
-                          String(endpointIndex),
+                          nativeItemId(nativeId, item.id),
+                          "endpoint-role",
+                          endpoint.role,
                         ),
-                        "locus-index",
-                        String(locusIndex),
+                        "endpoint-index",
+                        String(endpointIndex),
                       ),
-                    });
+                      "locus-index",
+                      String(locusIndex),
+                    ),
                   });
                 });
-          }
-          const rendered = this.layerElement(
-            options.document,
-            layer,
-            nativeId,
-            track.id,
-            options.generation,
-            diagnostics,
-          );
-          rendered.dataset.seqstarNativeId = nativeId;
-          rendered.dataset.seqstarLayer = layer.id;
-          rendered.dataset.seqstarTrack = track.id;
-          const renderedSpace = this.spaceForIdentity(options.document, identity);
-          if (renderedSpace !== undefined) rendered.dataset.seqstarSpace = renderedSpace.id;
-          this.viewport.register(rendered, stack);
-          const ready = rendered.waitForSeqstarFirstRender(options.generation, options.signal);
-          // A later layer can reject the staged view before Promise.all is
-          // reached; attach rejection handling immediately so staging abort is
-          // never reported as an unhandled browser promise.
-          void ready.catch(() => undefined);
-          readiness.push(ready);
-          stack.append(rendered);
+              });
         }
+        const rendered = this.layerElement(
+          options.document,
+          layer,
+          nativeId,
+          track.id,
+          options.generation,
+          diagnostics,
+          member,
+        );
+        rendered.dataset.seqstarNativeId = nativeId;
+        rendered.dataset.seqstarLayer = layer.id;
+        rendered.dataset.seqstarTrack = track.id;
+        if (identity.alignmentId !== undefined)
+          rendered.dataset.seqstarAlignment = identity.alignmentId;
+        if (identity.alignmentMemberId !== undefined)
+          rendered.dataset.seqstarAlignmentMember = identity.alignmentMemberId;
+        if (layer.representation === "alignment" && member !== undefined) {
+          rendered.seqstarAlignmentMemberPositions = member.positions;
+          const memberSpace = options.document.sequences.find(
+            (value) => value.id === member.sequence,
+          )?.coordinateSpace;
+          if (memberSpace !== undefined) rendered.seqstarAlignmentMemberSequenceSpace = memberSpace;
+        }
+        const renderedSpace = this.spaceForIdentity(options.document, identity);
+        if (renderedSpace !== undefined) rendered.dataset.seqstarSpace = renderedSpace.id;
+        this.viewport.register(rendered, stack);
+        const ready = rendered.waitForSeqstarFirstRender(options.generation, options.signal);
+        // A later layer can reject the staged view before Promise.all is
+        // reached; attach rejection handling immediately so staging abort is
+        // never reported as an unhandled browser promise.
+        void ready.catch(() => undefined);
+        readiness.push(ready);
+        stack.append(rendered);
+      }
+      if (configuredAction !== undefined) {
+        const action = document.createElement("button");
+        action.type = "button";
+        action.className = "seqstar-nightingale-track-action";
+        action.dataset.seqstarTrackActivate = track.id;
+        action.setAttribute("aria-label", configuredAction.label);
+        action.title = configuredAction.label;
+        action.append(createNightingaleTrackActionIcon(configuredAction.kind));
+        const activateConfigured = (): void => {
+          if (memberIdentity !== undefined)
+            this.emit({
+              interaction: "track-activate",
+              phase: "set",
+              loci: [],
+              identity: memberIdentity,
+            });
+          else activate();
+        };
+        action.addEventListener("click", activateConfigured);
+        this.cleanups.push(() => action.removeEventListener("click", activateConfigured));
+        header.append(action);
+      }
+      parent.append(row);
+    };
+    for (const section of view.sections) {
+      for (const track of section.tracks) {
+        const alignmentLayers = track.layers.filter(
+          (layer) => layer.representation === "alignment",
+        );
+        const firstAlignmentLayer = alignmentLayers[0];
+        if (firstAlignmentLayer === undefined) {
+          appendTrackRow(section, track);
+          continue;
+        }
+        const alignment = alignmentForLayer(options.document, firstAlignmentLayer);
+        if (alignment === undefined)
+          return rejectLayer(firstAlignmentLayer, "references an absent alignment.");
+        if (
+          alignmentLayers.some(
+            (layer) => layer.representation === "alignment" && layer.alignment !== alignment.id,
+          )
+        )
+          return rejectLayer(
+            firstAlignmentLayer,
+            `combines alignment '${alignment.id}' with another alignment in one track.`,
+          );
+        const selected = alignment.members.filter((candidate) =>
+          alignmentLayers.some(
+            (layer) =>
+              layer.representation === "alignment" &&
+              (layer.members === undefined || layer.members.includes(candidate.id)),
+          ),
+        );
+        const rows = document.createElement("div");
+        rows.className = "seqstar-nightingale-alignment-rows";
+        rows.dataset.seqstarAlignmentRows = alignment.id;
+        this.root.append(rows);
+        // Keep every member in a bounded, vertically scrollable region.  The
+        // rows themselves are never re-keyed, so member identity survives pan,
+        // zoom, and staged renderer replacement.
+        for (const member of selected) appendTrackRow(section, track, member, alignment.id, rows);
       }
     }
     for (const action of this.presentation.trackActions ?? [])
@@ -713,6 +847,18 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
             `Configured Nightingale track action '${action.trackId}' is absent from view '${view.id}'.`,
           ),
         );
+    for (const action of this.presentation.alignmentMemberActions ?? []) {
+      const alignment = options.document.alignments?.find(
+        (value) => value.id === action.alignmentId,
+      );
+      if (alignment?.members.some((member) => member.id === action.memberId)) continue;
+      diagnostics.push(
+        warning(
+          "wrapper.nightingale.presentation.member-action.absent",
+          `Configured Nightingale alignment member action '${action.alignmentId}/${action.memberId}' is absent from view '${view.id}'.`,
+        ),
+      );
+    }
     await Promise.all(readiness);
     if (options.signal.aborted) throw new DOMException("superseded", "AbortError");
     this.root.append(this.viewport.navigation);
@@ -727,10 +873,27 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     trackId: string,
     generation: number,
     diagnostics: Diagnostic[],
+    member?: NonNullable<SeqViewSpec["alignments"]>[number]["members"][number],
   ): NativeElement {
     const firstSequence = documentValue.sequences[0];
     if (firstSequence === undefined) throw new Error("A SeqViewSpec needs a sequence.");
-    const length = [...firstSequence.residues].length;
+    const lengthForLayer = (): number => {
+      if (layer.representation === "sequence")
+        return [
+          ...(documentValue.sequences.find((entry) => entry.id === layer.sequence)?.residues ?? ""),
+        ].length;
+      if (layer.representation === "alignment")
+        return alignmentForLayer(documentValue, layer)?.length ?? 0;
+      const source = annotation(documentValue, layer.annotation);
+      const spaceId =
+        source?.kind === "values"
+          ? source.space
+          : source?.kind === "loci"
+            ? source.items[0]?.loci[0]?.space
+            : source?.items[0]?.endpoints[0]?.loci[0]?.space;
+      return spaceId === undefined ? 0 : (lengthForSpace(documentValue, spaceId) ?? 0);
+    };
+    const length = Math.max(1, lengthForLayer());
     const basic = (tag: string, height: number): NativeElement => {
       const element = document.createElement(tag) as NativeElement;
       element.length = length;
@@ -753,10 +916,39 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       return element;
     }
     if (layer.representation === "alignment") {
-      return rejectLayer(
-        layer,
-        "requests alignment, which has no schema-declarable Nightingale fallback.",
+      const alignment = alignmentForLayer(documentValue, layer);
+      if (alignment === undefined) return rejectLayer(layer, "references an absent alignment.");
+      if (member === undefined)
+        return rejectLayer(layer, "must be expanded to an explicit alignment member row.");
+      if (!alignment.members.some((candidate) => candidate.id === member.id))
+        return rejectLayer(
+          layer,
+          `references member '${member.id}' outside alignment '${alignment.id}'.`,
+        );
+      const sequence = documentValue.sequences.find(
+        (candidate) => candidate.id === member.sequence,
       );
+      if (sequence === undefined)
+        return rejectLayer(layer, `member '${member.id}' references an absent sequence.`);
+      const residues = [...sequence.residues];
+      if (member.positions.length !== alignment.length)
+        return rejectLayer(
+          layer,
+          `member '${member.id}' has a non-column-aligned positions table.`,
+        );
+      const explicitColumns = member.positions.map((position) =>
+        position === null ? "-" : (residues[position] ?? "?"),
+      );
+      if (explicitColumns.includes("?"))
+        return rejectLayer(layer, `member '${member.id}' has a position outside its sequence.`);
+      const element = basic(
+        "nightingale-sequence",
+        Math.max(20, layer.showLetters === false ? 20 : 34),
+      );
+      // Nightingale sees alignment columns as its sequence positions.  Gaps are
+      // literal columns, not removed or inferred from neighboring residues.
+      element.data = explicitColumns.join("");
+      return element;
     }
     const source = annotation(documentValue, layer.annotation);
     if (source === undefined) return rejectLayer(layer, "references an absent annotation.");
@@ -940,7 +1132,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       return (
         selected?.endpoints.flatMap((endpoint) =>
           endpoint.loci.flatMap<CoordinateLocus>((locus) => {
-            const space = sequenceSpace(documentValue, locus.space);
+            const space = documentSpace(documentValue, locus.space);
             if (space === undefined) return [];
             if (locus.kind === "point")
               return [{ kind: "point", space, position: { kind: "index", value: locus.position } }];
@@ -956,7 +1148,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     return selected === undefined
       ? []
       : selected.loci.flatMap<CoordinateLocus>((locus) => {
-          const space = sequenceSpace(documentValue, locus.space);
+          const space = documentSpace(documentValue, locus.space);
           if (space === undefined) return [];
           if (locus.kind === "point")
             return [{ kind: "point", space, position: { kind: "index", value: locus.position } }];
@@ -964,6 +1156,49 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
             return [{ kind: "interval", space, start: locus.start, end: locus.end }];
           return [{ kind: "boundary", space, position: locus.position }];
         });
+  }
+
+  /**
+   * A native alignment row is addressed in alignment-column coordinates.  A
+   * hit always publishes that column and, only for a non-gap column, the exact
+   * sequence locus of the rendered member.  This is display mapping only; no
+   * structure coordinate or translator is consulted here.
+   */
+  private lociForRegions(
+    documentValue: SeqViewSpec,
+    identity: NightingaleIdentity,
+    regions: readonly { readonly start: number; readonly end: number }[],
+    fallback: CoordinateSpace,
+  ): readonly CoordinateLocus[] {
+    const space = this.spaceForIdentity(documentValue, identity) ?? fallback;
+    if (identity.alignmentId === undefined || identity.alignmentMemberId === undefined)
+      return regions.map<CoordinateLocus>((region) =>
+        region.start === region.end
+          ? pointAt(space, region.start - 1)
+          : { kind: "interval", space, start: region.start - 1, end: region.end },
+      );
+    const alignment = documentValue.alignments?.find((value) => value.id === identity.alignmentId);
+    const member = alignment?.members.find((value) => value.id === identity.alignmentMemberId);
+    const sequence = documentValue.sequences.find((value) => value.id === member?.sequence);
+    if (alignment === undefined || member === undefined || sequence === undefined) return [];
+    const alignmentSpace = documentSpace(documentValue, alignment.coordinateSpace);
+    const memberSpace = sequenceSpace(documentValue, sequence.coordinateSpace);
+    if (alignmentSpace === undefined || memberSpace === undefined) return [];
+    return regions.flatMap<CoordinateLocus>((region) => {
+      const start = Math.max(0, region.start - 1);
+      const end = Math.min(alignment.length, region.end);
+      const columns = Array.from(
+        { length: Math.max(0, end - start) },
+        (_, offset) => start + offset,
+      );
+      return columns.flatMap<CoordinateLocus>((column) => {
+        const mapped = member.positions[column];
+        return [
+          pointAt(alignmentSpace, column),
+          ...(mapped === null || mapped === undefined ? [] : [pointAt(memberSpace, mapped)]),
+        ];
+      });
+    });
   }
 
   private spaceForIdentity(
@@ -982,7 +1217,12 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         ? undefined
         : sequenceSpace(documentValue, sequence.coordinateSpace);
     }
-    if (layer.representation === "alignment") return undefined;
+    if (layer.representation === "alignment") {
+      const alignment = alignmentForLayer(documentValue, layer);
+      return alignment === undefined
+        ? undefined
+        : documentSpace(documentValue, alignment.coordinateSpace);
+    }
     const source = annotation(documentValue, layer.annotation);
     const spaceId =
       source?.kind === "values"
@@ -990,7 +1230,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         : source?.kind === "loci"
           ? source.items[0]?.loci[0]?.space
           : source?.items[0]?.endpoints[0]?.loci[0]?.space;
-    return spaceId === undefined ? undefined : sequenceSpace(documentValue, spaceId);
+    return spaceId === undefined ? undefined : documentSpace(documentValue, spaceId);
   }
 
   private emit(event: NightingaleNativeInteraction): void {
@@ -1004,17 +1244,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     for (const tree of [this.activeTree, this.stagingTree])
       if (tree !== undefined)
         for (const element of this.nativeElements(tree.root))
-          element.setSeqstarInteraction(
-            family,
-            owner,
-            this.regions(
-              loci.filter(
-                (locus) =>
-                  element.dataset.seqstarSpace === undefined ||
-                  locus.space.id === element.dataset.seqstarSpace,
-              ),
-            ),
-          );
+          element.setSeqstarInteraction(family, owner, this.regionsForElement(element, loci));
     this.updateAppliedCounts();
   }
 
@@ -1037,17 +1267,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     for (const element of this.nativeElements())
       for (const family of ["highlight", "selection"] as const)
         for (const [owner, loci] of this.applied.get(family) ?? [])
-          element.setSeqstarInteraction(
-            family,
-            owner,
-            this.regions(
-              loci.filter(
-                (locus) =>
-                  element.dataset.seqstarSpace === undefined ||
-                  locus.space.id === element.dataset.seqstarSpace,
-              ),
-            ),
-          );
+          element.setSeqstarInteraction(family, owner, this.regionsForElement(element, loci));
     this.updateAppliedCounts();
   }
 
@@ -1062,6 +1282,47 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         ? [{ start: locus.position.value + 1, end: locus.position.value + 1 }]
         : [];
     });
+  }
+
+  private regionsForElement(
+    element: NativeElement,
+    loci: readonly CoordinateLocus[],
+  ): readonly { start: number; end: number }[] {
+    const alignmentId = element.dataset.seqstarAlignment;
+    const memberId = element.dataset.seqstarAlignmentMember;
+    if (alignmentId === undefined || memberId === undefined)
+      return this.regions(
+        loci.filter(
+          (locus) =>
+            element.dataset.seqstarSpace === undefined ||
+            locus.space.id === element.dataset.seqstarSpace,
+        ),
+      );
+    const positions = element.seqstarAlignmentMemberPositions;
+    const memberSpace = element.seqstarAlignmentMemberSequenceSpace;
+    const aligned = loci.flatMap<CoordinateLocus>((locus) => {
+      if (locus.space.id === element.dataset.seqstarSpace) return [locus];
+      if (memberSpace === undefined || locus.space.id !== memberSpace || positions === undefined)
+        return [];
+      return this.regions([locus]).flatMap((region) =>
+        positions.flatMap<CoordinateLocus>((position, column) =>
+          position !== null && position >= region.start - 1 && position <= region.end - 1
+            ? [
+                {
+                  kind: "point",
+                  space: {
+                    id: element.dataset.seqstarSpace ?? alignmentId,
+                    kind: "alignment",
+                    length: positions.length,
+                  },
+                  position: { kind: "index", value: column },
+                },
+              ]
+            : [],
+        ),
+      );
+    });
+    return this.regions(aligned);
   }
 
   private nativeElements(root = this.root): readonly NativeElement[] {
@@ -1433,6 +1694,9 @@ export class NightingaleWrapper implements HarnessComponent {
               sectionId: identity.sectionId,
               trackId: identity.trackId,
               layerId: identity.layerId,
+              alignmentId: identity.alignmentId,
+              alignmentMemberId: identity.alignmentMemberId,
+              sequenceId: identity.sequenceId,
             },
       semanticTarget:
         identity?.itemId === undefined
@@ -1476,6 +1740,11 @@ export class NightingaleWrapper implements HarnessComponent {
               sectionId: identity.sectionId,
               trackId: identity.trackId,
               layerId: identity.layerId,
+              ...(identity.sequenceId === undefined ? {} : { sequenceId: identity.sequenceId }),
+              ...(identity.alignmentId === undefined ? {} : { alignmentId: identity.alignmentId }),
+              ...(identity.alignmentMemberId === undefined
+                ? {}
+                : { alignmentMemberId: identity.alignmentMemberId }),
             }),
       },
       ...(identity?.itemId === undefined

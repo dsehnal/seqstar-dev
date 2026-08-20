@@ -28,7 +28,26 @@ const structureComponent = "p69905-structure";
 const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
 const rendererComponents = {
   reference: [{ id: alignmentComponent, type: "seqstar.reference-viewer" }],
-  nightingale: [{ id: alignmentComponent, type: "seqstar.nightingale" }],
+  nightingale: [
+    {
+      id: alignmentComponent,
+      type: "seqstar.nightingale",
+      // This is a frozen presentation affordance only.  The wrapper publishes
+      // member identity; it neither contains nor derives a structure mapping.
+      config: {
+        presentation: {
+          alignmentMemberActions: [
+            {
+              alignmentId: "PF00042.29",
+              memberId: "HBA_HUMAN-27-137:member",
+              label: "Show query structure",
+              kind: "structure",
+            },
+          ],
+        },
+      },
+    },
+  ],
 } as const;
 const createPageHarness = (
   hosts: { readonly require: (id: string) => HTMLElement },

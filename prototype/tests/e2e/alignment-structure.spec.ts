@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Locator, test } from "@playwright/test";
 
 test("loads the offline PF00042.29 alignment / 1A3N structure case", async ({ page }) => {
   const external: string[] = [];
@@ -97,5 +97,86 @@ test("keeps the query member identity stable while its row scrolls out and back 
       hasText: /PF00042\.29 · HBA_HUMAN-27-137:member .* hover · exact/u,
     }),
   ).toHaveCount(2);
+  expect(external).toEqual([]);
+});
+
+test("renders the checked 32×118 fixture faithfully in Nightingale mode", async ({ page }) => {
+  const external: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.protocol !== "data:" && !["127.0.0.1", "localhost"].includes(url.hostname))
+      external.push(request.url());
+  });
+  await page.goto("/#/alignment-structure?renderer=nightingale");
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText(
+    "nightingale renderer ready",
+  );
+  await expect(page.getByTestId("p60-harness-status")).toContainText("ready");
+
+  const host = page.getByTestId("pf00042-alignment-host");
+  const root = host.locator('[data-seqstar-nightingale="root"]');
+  await expect(root).toBeVisible();
+  const queryId = "HBA_HUMAN-27-137:member";
+  const nonQueryId = "A0A010R001_9PEZI-27-134:member";
+  const query = root.locator(`section[data-seqstar-alignment-member="${queryId}"]`);
+  const nonQuery = root.locator(`section[data-seqstar-alignment-member="${nonQueryId}"]`);
+  await expect(root.locator("section[data-seqstar-alignment-member]")).toHaveCount(32);
+  await expect(query).toHaveCount(1);
+  await expect(nonQuery).toHaveCount(1);
+  await expect(query.getByRole("button", { name: "Show query structure" })).toHaveCount(1);
+  await expect(nonQuery.getByRole("button", { name: "Show query structure" })).toHaveCount(0);
+  await expect(root.getByRole("button", { name: "Show query structure" })).toHaveCount(1);
+
+  const rows = await root
+    .locator("nightingale-sequence[data-seqstar-alignment]")
+    .evaluateAll((elements) =>
+      elements.map((element) => ({
+        member: (element as HTMLElement).dataset.seqstarAlignmentMember,
+        alignment: (element as HTMLElement).dataset.seqstarAlignment,
+        sequence: (element as HTMLElement & { sequence?: string }).sequence,
+      })),
+    );
+  expect(rows).toHaveLength(32);
+  expect(rows.every((row) => row.alignment === "PF00042.29" && row.sequence?.length === 118)).toBe(
+    true,
+  );
+  expect(rows.find((row) => row.member === queryId)?.sequence).toBe(
+    "AEALERMFLSFPTTKTYFPHF----DLSHGSAQVKGHGKKVADALTNAVAHVDDMP---NALSALSDLHAHKLRVDPVNFKLLSHCLLVTLAAHLPAEFTPAVHASLDKFLASVSTVL",
+  );
+  expect(rows.find((row) => row.member === nonQueryId)?.sequence).toBe(
+    "--FYANMLRAHPELHDHFNK-----VNQANGRQPRALTGVILSF----AANLNHISELIPKLERMCNKHC-SLGILPEHYDIVGKYLIQAFGQVLGPAMTPEIREAWTKAYWILAK--",
+  );
+
+  const emit = async (row: Locator, column: number) =>
+    row.locator("nightingale-sequence").evaluate(
+      (element, start) =>
+        (
+          element as HTMLElement & {
+            emitSeqstarInteraction(value: {
+              kind: "hover";
+              phase: "set";
+              regions: readonly { start: number; end: number }[];
+            }): void;
+          }
+        ).emitSeqstarInteraction({
+          kind: "hover",
+          phase: "set",
+          regions: [{ start, end: start }],
+        }),
+      column,
+    );
+  const paths = page.getByTestId("p60-composed-paths");
+  await emit(query, 1);
+  await expect(paths).toContainText(
+    "HBA_HUMAN-27-137:member · alignment-to-structure · hover · exact",
+  );
+  await emit(query, 22); // Checked query gap column: it has no member or structure locus.
+  await expect(paths).toContainText(
+    "HBA_HUMAN-27-137:member · alignment-to-structure · hover · unmapped · 0 targets",
+  );
+  await emit(nonQuery, 1);
+  await expect(paths).toContainText(
+    "A0A010R001_9PEZI-27-134:member · alignment-to-structure · hover · unmapped · 0 targets",
+  );
   expect(external).toEqual([]);
 });
