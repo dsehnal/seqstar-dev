@@ -1,4 +1,50 @@
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+
+const inspectedMvsProfile = async (page: Page) =>
+  page.getByTestId("p41-mvs-json").evaluate((element) => {
+    const document = JSON.parse(element.textContent ?? "null") as {
+      root?: unknown;
+      snapshots?: Array<{ root?: unknown }>;
+    };
+    const counts: Record<string, number> = {};
+    const representations: Record<string, number> = {};
+    const colors: Array<{ color?: unknown; selector?: unknown }> = [];
+    const visit = (value: unknown): void => {
+      if (typeof value !== "object" || value === null) return;
+      const node = value as {
+        kind?: unknown;
+        params?: { type?: unknown; color?: unknown; selector?: unknown };
+        children?: unknown[];
+      };
+      if (typeof node.kind === "string") counts[node.kind] = (counts[node.kind] ?? 0) + 1;
+      if (node.kind === "representation" && typeof node.params?.type === "string")
+        representations[node.params.type] = (representations[node.params.type] ?? 0) + 1;
+      if (node.kind === "color") colors.push(node.params ?? {});
+      node.children?.forEach(visit);
+    };
+    if (document.root !== undefined) visit(document.root);
+    document.snapshots?.forEach((snapshot) => {
+      visit(snapshot.root);
+    });
+    return {
+      counts,
+      representations,
+      colors,
+      selectorEntityIds: colors.flatMap((color) =>
+        Array.isArray(color.selector)
+          ? color.selector.map((selector) =>
+              typeof selector === "object" && selector !== null
+                ? (selector as { label_entity_id?: unknown }).label_entity_id
+                : undefined,
+            )
+          : [],
+      ),
+      selectorCount: colors.reduce(
+        (total, color) => total + (Array.isArray(color.selector) ? color.selector.length : 0),
+        0,
+      ),
+    };
+  });
 
 test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({ page }) => {
   const external: string[] = [];
@@ -85,6 +131,26 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   await expect(page.getByTestId("structure-view-host")).toHaveCSS("height", "384px");
   await page
     .getByTestId("uniprot-tracks-host")
+    .locator('[data-seqstar-track-activate="missense-score"]')
+    .click();
+  await expect(page.getByTestId("p41-request-id")).toContainText("P41-missense-score-");
+  await expect(page.getByTestId("p41-generated-lifecycle")).toHaveText(/rendered|degraded/u, {
+    timeout: 20_000,
+  });
+  const scoreProfile = await inspectedMvsProfile(page);
+  expect(scoreProfile.counts).toMatchObject({
+    download: 1,
+    parse: 1,
+    structure: 1,
+    component: 1,
+    representation: 1,
+  });
+  expect(scoreProfile.representations).toEqual({ cartoon: 1 });
+  expect(scoreProfile.selectorCount).toBe(196);
+  expect(new Set(scoreProfile.selectorEntityIds)).toEqual(new Set(["3"]));
+  expect(scoreProfile.colors[0]).toEqual({ color: "#CBD5E1" });
+  await page
+    .getByTestId("uniprot-tracks-host")
     .locator('[data-seqstar-track-activate="regions"]')
     .click();
   await expect(page.getByTestId("p41-request-id")).toContainText("P41-regions-");
@@ -97,6 +163,16 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   await expect(page.getByTestId("p41-generated-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
+  const regionProfile = await inspectedMvsProfile(page);
+  // Replacement is a complete MVS document, not a residue-detail append onto the score view.
+  expect(regionProfile.counts).toMatchObject({ component: 1, representation: 1 });
+  expect(regionProfile.representations).toEqual({ cartoon: 1 });
+  expect(regionProfile.selectorCount).toBe(196);
+  expect(new Set(regionProfile.selectorEntityIds)).toEqual(new Set(["3"]));
+  expect(regionProfile.colors).toEqual([
+    { color: "#CBD5E1" },
+    expect.objectContaining({ color: "#2563EB" }),
+  ]);
   const molstarCanvas = page.getByTestId("structure-view-host").locator("canvas").first();
   await expect(molstarCanvas).toBeVisible();
   expect((await molstarCanvas.boundingBox())?.height).toBeGreaterThan(0);

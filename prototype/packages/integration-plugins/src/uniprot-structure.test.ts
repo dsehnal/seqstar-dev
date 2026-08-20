@@ -7,6 +7,11 @@ import { MVSData } from "molstar/lib/extensions/mvs/index.js";
 import { describe, expect, it } from "vitest";
 import mappingText from "../../../fixtures/uniprot-structure/mappings/P04637-1TUP-chain-A.tsv?raw";
 import {
+  countMvsRepresentationTypes,
+  countMvsTreeNodes,
+  queryMvsTree,
+} from "./mvs-presentation.js";
+import {
   createP04637MappingTranslators,
   createUniProtStructurePlugin,
   createUniProtStructureSeqViewSpec,
@@ -33,34 +38,71 @@ const actualMolstarSpace = {
   },
 } as const;
 
-const selectors = (value: unknown): readonly Record<string, unknown>[] => {
-  const result: Record<string, unknown>[] = [];
-  const visit = (item: unknown): void => {
-    if (typeof item !== "object" || item === null) return;
-    const record = item as Record<string, unknown>;
-    if (record.kind === "component") {
-      const selector = (record.params as { selector?: unknown } | undefined)?.selector;
-      if (Array.isArray(selector)) result.push(...(selector as readonly Record<string, unknown>[]));
-    }
-    if (Array.isArray(record.children)) record.children.forEach(visit);
-  };
-  visit(value);
-  return result;
+const colorNodes = (document: Parameters<typeof queryMvsTree>[0]) =>
+  queryMvsTree(document, "color").map((node) => node.params as Record<string, unknown>);
+
+const selectorColors = (document: Parameters<typeof queryMvsTree>[0]) =>
+  colorNodes(document).flatMap((params) =>
+    Array.isArray(params.selector) ? (params.selector as readonly Record<string, unknown>[]) : [],
+  );
+
+const sortedSelectors = (values: readonly Record<string, unknown>[]) =>
+  [...values].sort(
+    (left, right) =>
+      Number(left.label_seq_id ?? -1) - Number(right.label_seq_id ?? -1) ||
+      Number(left.auth_seq_id ?? -1) - Number(right.auth_seq_id ?? -1),
+  );
+
+const selectorIdentity = (selector: Record<string, unknown>): string =>
+  [
+    selector.label_entity_id,
+    selector.label_asym_id,
+    selector.auth_asym_id,
+    selector.label_seq_id,
+    selector.auth_seq_id,
+    selector.pdbx_PDB_ins_code ?? "",
+  ].join("|");
+
+const colorsBySelector = (document: Parameters<typeof queryMvsTree>[0]) =>
+  Object.fromEntries(
+    colorNodes(document)
+      .flatMap(({ color, selector }) =>
+        typeof color !== "string" || !Array.isArray(selector)
+          ? []
+          : selector.map(
+              (item) => [selectorIdentity(item as Record<string, unknown>), color] as const,
+            ),
+      )
+      .sort(([left], [right]) => left.localeCompare(right)),
+  );
+
+const assertOneCartoonProfile = (document: Parameters<typeof queryMvsTree>[0]) => {
+  expect(MVSData.validationIssues(document, { noExtra: true })).toBeUndefined();
+  expect(countMvsTreeNodes(document)).toMatchObject({
+    download: 1,
+    parse: 1,
+    structure: 1,
+    component: 1,
+    representation: 1,
+  });
+  expect(countMvsRepresentationTypes(document)).toEqual({ cartoon: 1 });
+  expect(queryMvsTree(document, "primitive")).toHaveLength(0);
 };
 
-const colors = (value: unknown): readonly string[] => {
-  const result: string[] = [];
-  const visit = (item: unknown): void => {
-    if (typeof item !== "object" || item === null) return;
-    const record = item as Record<string, unknown>;
-    if (record.kind === "color") {
-      const color = (record.params as { color?: unknown } | undefined)?.color;
-      if (typeof color === "string") result.push(color);
-    }
-    if (Array.isArray(record.children)) record.children.forEach(visit);
-  };
-  visit(value);
-  return result;
+const generateTrack = async (trackId: string, layerId: string) => {
+  const [forward] = createP04637MappingTranslators(rows);
+  const controller = new AbortController();
+  return generateUniProtAnnotationMvs({
+    document: createUniProtStructureSeqViewSpec(rows),
+    viewId: "P04637-structure-main",
+    trackId,
+    layerId,
+    structureUrl: "/fixtures/1TUP.cif",
+    signal: controller.signal,
+    requestId: `${trackId}-test`,
+    translate: async (loci, signal) =>
+      (await forward.map({ loci, target: p53StructureSpace }, signal)).associations,
+  });
 };
 
 describe("P41 P04637 / 1TUP integration", () => {
@@ -169,7 +211,7 @@ describe("P41 P04637 / 1TUP integration", () => {
     });
   });
 
-  it("builds valid MVS selectors and exact track colors directly from approved mappings", async () => {
+  it("uses one cartoon-only profile for variants while retaining exact mapped selectors", async () => {
     const [forward] = createP04637MappingTranslators(rows);
     const controller = new AbortController();
     const generation = await generateUniProtAnnotationMvs({
@@ -183,7 +225,7 @@ describe("P41 P04637 / 1TUP integration", () => {
       translate: async (loci, signal) =>
         (await forward.map({ loci, target: p53StructureSpace }, signal)).associations,
     });
-    expect(MVSData.validationIssues(generation.document, { noExtra: true })).toBeUndefined();
+    assertOneCartoonProfile(generation.document);
     expect(
       generation.mapping.map(({ itemId, status, color }) => ({ itemId, status, color })),
     ).toEqual([
@@ -194,6 +236,7 @@ describe("P41 P04637 / 1TUP integration", () => {
     const expected = [174, 281].map((index) => {
       const row = rows[index];
       return {
+        label_entity_id: "3",
         label_asym_id: "C",
         auth_asym_id: "A",
         label_seq_id: row?.labelSeqId,
@@ -201,12 +244,9 @@ describe("P41 P04637 / 1TUP integration", () => {
       };
     });
     expect(generation.mapping.flatMap((item) => item.selectors)).toEqual(expected);
-    expect(selectors("root" in generation.document ? generation.document.root : undefined)).toEqual(
-      expected,
-    );
-    expect(colors("root" in generation.document ? generation.document.root : undefined)).toEqual([
+    expect(sortedSelectors(selectorColors(generation.document))).toEqual(expected);
+    expect(colorNodes(generation.document).map((node) => node.color)).toEqual([
       "#CBD5E1",
-      "#E11D48",
       "#E11D48",
     ]);
     expect(generation.mapping[2]?.originalLoci).toEqual([
@@ -214,7 +254,7 @@ describe("P41 P04637 / 1TUP integration", () => {
     ]);
   });
 
-  it("matches region and site selectors, colors, partial counts, and unmapped omissions", async () => {
+  it("uses one cartoon-only profile for regions and sites while retaining their mappings", async () => {
     const [forward] = createP04637MappingTranslators(rows);
     const build = (trackId: string, layerId: string) => {
       const controller = new AbortController();
@@ -247,18 +287,15 @@ describe("P41 P04637 / 1TUP integration", () => {
       .slice(93, 293)
       .filter((row) => row.status === "exact")
       .map((row) => ({
+        label_entity_id: "3",
         label_asym_id: "C",
         auth_asym_id: "A",
         label_seq_id: row.labelSeqId,
         auth_seq_id: row.authSeqId,
       }));
-    expect(selectors("root" in regions.document ? regions.document.root : undefined)).toEqual(
-      expectedRegion,
-    );
-    expect(colors("root" in regions.document ? regions.document.root : undefined)).toEqual([
-      "#CBD5E1",
-      "#2563EB",
-    ]);
+    assertOneCartoonProfile(regions.document);
+    expect(sortedSelectors(selectorColors(regions.document))).toEqual(expectedRegion);
+    expect(colorNodes(regions.document).map((node) => node.color)).toEqual(["#CBD5E1", "#2563EB"]);
 
     const sites = await build("sites", "site-markers");
     expect(sites.mapping.map(({ itemId, status, color }) => ({ itemId, status, color }))).toEqual([
@@ -267,19 +304,66 @@ describe("P41 P04637 / 1TUP integration", () => {
       { itemId: "functional-R248", status: "mapped", color: "#7C3AED" },
     ]);
     const expectedSites = [119, 247].map((index) => ({
+      label_entity_id: "3",
       label_asym_id: "C",
       auth_asym_id: "A",
       label_seq_id: rows[index]?.labelSeqId,
       auth_seq_id: rows[index]?.authSeqId,
     }));
-    expect(selectors("root" in sites.document ? sites.document.root : undefined)).toEqual(
-      expectedSites,
-    );
-    expect(colors("root" in sites.document ? sites.document.root : undefined)).toEqual([
+    assertOneCartoonProfile(sites.document);
+    expect(sortedSelectors(selectorColors(sites.document))).toEqual(expectedSites);
+    expect(colorNodes(sites.document).map((node) => node.color)).toEqual([
       "#CBD5E1",
-      "#D97706",
       "#7C3AED",
+      "#D97706",
     ]);
+  });
+
+  it("colors the exact AlphaMissense-like score on one cartoon without atomic geometry", async () => {
+    const score = await generateTrack("missense-score", "score-heatmap");
+    assertOneCartoonProfile(score.document);
+    expect(score.counts).toEqual({ mapped: 196, partial: 0, ambiguous: 0, unmapped: 197 });
+    const mapped = score.mapping.filter((item) => item.status === "mapped");
+    expect(mapped).toHaveLength(196);
+    const checkedTsvSelectors = rows
+      .filter(
+        (row): row is (typeof rows)[number] & { labelSeqId: number; authSeqId: number } =>
+          row.status === "exact" && row.labelSeqId !== undefined && row.authSeqId !== undefined,
+      )
+      .map((row) => ({
+        label_entity_id: "3",
+        label_asym_id: "C",
+        auth_asym_id: "A",
+        label_seq_id: row.labelSeqId,
+        auth_seq_id: row.authSeqId,
+        ...(row.insertionCode === undefined ? {} : { pdbx_PDB_ins_code: row.insertionCode }),
+      }));
+    expect(sortedSelectors(selectorColors(score.document))).toEqual(
+      sortedSelectors(checkedTsvSelectors),
+    );
+    const evaluatedColors = new Set(mapped.map((item) => item.color));
+    const scoreColors = colorNodes(score.document);
+    expect(scoreColors[0]).toEqual({ color: "#CBD5E1" });
+    expect(scoreColors.slice(1)).toHaveLength(evaluatedColors.size);
+    expect(scoreColors.slice(1).every((node) => typeof node.selector !== "undefined")).toBe(true);
+    expect(colorsBySelector(score.document)).toEqual(
+      Object.fromEntries(
+        mapped
+          .flatMap((item) =>
+            item.selectors.map((selector) => [selectorIdentity(selector), item.color] as const),
+          )
+          .sort(([left], [right]) => left.localeCompare(right)),
+      ),
+    );
+  });
+
+  it("keeps missing and unmapped coverage neutral on the one P04637 cartoon", async () => {
+    const coverage = await generateTrack("structure-coverage", "coverage-swatch");
+    assertOneCartoonProfile(coverage.document);
+    expect(coverage.counts).toEqual({ mapped: 196, partial: 0, ambiguous: 0, unmapped: 197 });
+    expect(colorNodes(coverage.document).map((node) => node.color)).toEqual(["#CBD5E1", "#059669"]);
+    expect(selectorColors(coverage.document)).toHaveLength(196);
+    expect(coverage.mapping.filter((item) => item.status === "unmapped")).toHaveLength(197);
   });
 
   it("publishes the inspectable generated document first and retains only rapid latest activation", async () => {

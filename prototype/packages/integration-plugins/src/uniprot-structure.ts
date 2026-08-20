@@ -19,6 +19,11 @@ import {
 } from "@seq-star/seq-view-spec";
 import { MVSData } from "molstar/lib/extensions/mvs/index.js";
 import type { MVSData as MvsDocument } from "molstar/lib/extensions/mvs/mvs-data.js";
+import {
+  appendMvsCartoonPresentation,
+  type MvsResidueColorGroup,
+  type MvsResidueSelector,
+} from "./mvs-presentation.js";
 
 export const uniprotSequenceSpace: CoordinateSpace = Object.freeze({
   id: "uniprot-P04637-sequence",
@@ -476,12 +481,8 @@ type ItemResult = {
   readonly color: string;
   readonly status: "mapped" | "partial" | "ambiguous" | "unmapped";
   readonly originalLoci: readonly CoordinateLocus[];
-  readonly selectors: readonly {
-    readonly label_asym_id: string;
-    readonly auth_asym_id: string;
-    readonly label_seq_id: number;
-    readonly auth_seq_id: number;
-  }[];
+  /** Exact structural identity returned by the checked coordinate translator. */
+  readonly selectors: readonly MvsResidueSelector[];
 };
 export interface UniProtMvsGeneration {
   readonly documentId: string;
@@ -523,6 +524,33 @@ const paletteColor = (id: string): string => {
   let hash = 2166136261;
   for (const character of id) hash = Math.imul(hash ^ (character.codePointAt(0) ?? 0), 16777619);
   return palette[(hash >>> 0) % palette.length] ?? "#2563EB";
+};
+
+const p53ChainSelector: MvsResidueSelector = Object.freeze({
+  label_entity_id: "3",
+  label_asym_id: "C",
+  auth_asym_id: "A",
+});
+
+/**
+ * Stable semantic precedence follows the authored SeqViewSpec order. The active
+ * request normally has one annotation layer, but retaining all three positions
+ * keeps the rule explicit if a track later acquires multiple layers.
+ */
+const semanticPrecedence = (
+  view: SeqViewSpec["views"][number],
+  trackId: string,
+  layerId: string,
+  itemIndex: number,
+): number => {
+  const tracks = view.sections.flatMap((section) => section.tracks);
+  const trackIndex = tracks.findIndex((track) => track.id === trackId);
+  const track = tracks[trackIndex];
+  const layerIndex = track?.layers.findIndex((layer) => layer.id === layerId) ?? -1;
+  if (trackIndex < 0 || layerIndex < 0)
+    throw new Error(`Cannot derive SeqViewSpec precedence for '${trackId}/${layerId}'.`);
+  // Explicitly leave space for a future document with many layers or dense values.
+  return trackIndex * 1_000_000 + layerIndex * 10_000 + itemIndex;
 };
 
 export const generateUniProtAnnotationMvs = async (options: {
@@ -604,11 +632,15 @@ export const generateUniProtAnnotationMvs = async (options: {
         ? []
         : [
             {
+              label_entity_id: "3",
               label_asym_id: "C",
               auth_asym_id: "A",
               label_seq_id: Number(match[1]),
               auth_seq_id: Number(match[2]),
-            },
+              ...(target.position.insertionCode === undefined
+                ? {}
+                : { pdbx_PDB_ins_code: target.position.insertionCode }),
+            } as MvsResidueSelector,
           ];
     });
     const status = associations.some((entry) => entry.status === "ambiguous")
@@ -639,18 +671,25 @@ export const generateUniProtAnnotationMvs = async (options: {
     .download({ url: options.structureUrl })
     .parse({ format: "mmcif" })
     .modelStructure();
-  structure
-    .component({ selector: { label_entity_id: "3", label_asym_id: "C", auth_asym_id: "A" } })
-    .representation({ type: "cartoon" })
-    .color({ color: "#CBD5E1" });
-  for (const item of mapped) {
-    if (item.status === "unmapped" || item.status === "ambiguous" || item.selectors.length === 0)
-      continue;
-    structure
-      .component({ selector: [...item.selectors] })
-      .representation({ type: "ball_and_stick" })
-      .color({ color: item.color as `#${string}` });
-  }
+  const residueColors: MvsResidueColorGroup[] = mapped.flatMap((item, itemIndex) =>
+    item.status === "unmapped" || item.status === "ambiguous" || item.selectors.length === 0
+      ? []
+      : [
+          {
+            semanticId: item.itemId,
+            color: item.color as `#${string}`,
+            precedence: semanticPrecedence(view, track.id, layer.id, itemIndex),
+            selectors: item.selectors,
+          },
+        ],
+  );
+  appendMvsCartoonPresentation(structure, [
+    {
+      componentSelector: p53ChainSelector,
+      baseColor: "#CBD5E1",
+      residueColors,
+    },
+  ]);
   const document = fixedTimestamp(
     builder.getState({
       title: `${track.label ?? track.id} on 1TUP`,
