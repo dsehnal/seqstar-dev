@@ -1,5 +1,5 @@
-import { Check, ChevronDown, SlidersHorizontal } from "lucide-react";
-import type { ComponentProps, ReactNode } from "react";
+import { Box, Check, ChevronDown, Layers3, SlidersHorizontal } from "lucide-react";
+import type { ComponentProps, ReactNode, Ref } from "react";
 
 type Tone = "neutral" | "info" | "success" | "warning";
 
@@ -75,6 +75,47 @@ export function VisualizationCard({
       </div>
       <div className="visualization-card__body">{children}</div>
     </section>
+  );
+}
+
+/** A host frame for an embedded renderer; the card owns the only visible border. */
+export function ViewerPanel({
+  id,
+  title,
+  kind = "sequence",
+  hidden = false,
+  children,
+  hostRef,
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly kind?: "sequence" | "structure";
+  readonly hidden?: boolean;
+  readonly children?: ReactNode;
+  readonly hostRef?: Ref<HTMLDivElement>;
+}) {
+  const Icon = kind === "structure" ? Box : Layers3;
+  const panelTestId = id.includes("nightingale")
+    ? "nightingale"
+    : id.includes("reference")
+      ? "reference-viewer"
+      : id;
+  return (
+    <VisualizationCard
+      className="visualization-card--flush"
+      data-testid={`visualizer-panel-${panelTestId}`}
+      hidden={hidden}
+      title={title}
+      toolbar={<Icon aria-hidden="true" size={16} strokeWidth={1.8} />}
+    >
+      <section
+        aria-label={`${title} visualizer`}
+        className="viewer-host"
+        data-testid={`${id}-host`}
+        ref={hostRef}
+      />
+      {children}
+    </VisualizationCard>
   );
 }
 

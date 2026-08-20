@@ -77,31 +77,34 @@ describe("P70 CDS/protein plugin", () => {
       locus: unknown,
       interaction: "hover" | "select" = "hover",
       phase: "set" | "clear" = "set",
+      lease?: { readonly correlationId: string; readonly interactionId: string },
     ) => {
       const id = crypto.randomUUID();
+      const correlationId = lease?.correlationId ?? id;
+      const interactionId = lease?.interactionId ?? crypto.randomUUID();
       harness.fabric.publish({
         id,
         type: "interaction.native",
         version: "0.1.0",
         source: { component: componentId },
-        correlationId: id,
+        correlationId,
         timestamp: new Date().toISOString(),
         payload: {
-          interactionId: crypto.randomUUID(),
+          interactionId,
           interaction,
           phase,
           origin: { componentId },
           loci: phase === "clear" ? [] : [locus],
         } as never,
       });
-      return id;
+      return { id, correlationId, interactionId };
     };
-    const forwardId = send("nucleotide", {
+    const forward = send("nucleotide", {
       kind: "point",
       space: cdsNucleotideSpace,
       position: { kind: "index", value: 4 },
     });
-    const reverseId = send(
+    const reverse = send(
       "protein",
       { kind: "point", space: cdsProteinSpace, position: { kind: "index", value: 0 } },
       "select",
@@ -109,20 +112,36 @@ describe("P70 CDS/protein plugin", () => {
     await new Promise((resolve) => setTimeout(resolve, 30));
     const reflected = (id: string, type: string) =>
       observed.find((message) => message.correlationId === id && message.type === type);
-    expect(reflected(forwardId, "interaction.highlight.apply")?.target).toEqual({
+    expect(reflected(forward.correlationId, "interaction.highlight.apply")?.target).toEqual({
       component: "protein",
     });
-    const reverse = reflected(reverseId, "interaction.selection.apply");
-    expect(reverse?.target).toEqual({ component: "nucleotide" });
-    if (reverse === undefined)
+    const reverseReflection = reflected(reverse.correlationId, "interaction.selection.apply");
+    expect(reverseReflection?.target).toEqual({ component: "nucleotide" });
+    if (reverseReflection === undefined)
       throw new Error("Expected protein selection to reach nucleotide viewer.");
     expect(
-      (reverse.payload as { loci?: readonly { start?: number; end?: number }[] }).loci?.[0],
+      (reverseReflection.payload as { loci?: readonly { start?: number; end?: number }[] })
+        .loci?.[0],
     ).toMatchObject({ start: 3, end: 6 });
     expect(observed.some((message) => message.type === "cds-protein.mapping")).toBe(true);
-    const clearId = send("nucleotide", undefined, "hover", "clear");
+    const clear = send("nucleotide", undefined, "hover", "clear", forward);
     await new Promise((resolve) => setTimeout(resolve, 10));
-    expect(reflected(clearId, "interaction.highlight.clear")?.target).toEqual({
+    const reflectedClear = observed.find(
+      (message) =>
+        message.causationId === clear.id && message.type === "interaction.highlight.clear",
+    );
+    expect(reflectedClear).toMatchObject({
+      correlationId: forward.correlationId,
+      causationId: clear.id,
+      payload: {
+        interactionId: forward.interactionId,
+        owner: {
+          correlationId: forward.correlationId,
+          sourceComponent: "nucleotide",
+        },
+      },
+    });
+    expect(reflectedClear?.target).toEqual({
       component: "protein",
     });
     const mappingCountBeforeDispose = observed.filter(

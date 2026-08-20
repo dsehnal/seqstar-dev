@@ -27,6 +27,7 @@ import {
   type RendererMode,
   rendererSearch,
 } from "../components/case-renderer-chooser";
+import { ViewerPanel } from "../components/presentation";
 import { InspectPanel, useInspectPanelState } from "../inspect-panel";
 
 const sequenceComponent = "uniprot-tracks";
@@ -98,21 +99,6 @@ const createPageHarness = (
     },
   );
 
-function ViewerPanel({ id, title }: { readonly id: string; readonly title: string }) {
-  const host = useHarnessHost(id);
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
-      <section
-        aria-label={`${title} visualizer`}
-        className="relative mt-3 h-96 overflow-auto rounded border border-slate-200"
-        data-testid={`${id}-host`}
-        ref={host}
-      />
-    </section>
-  );
-}
-
 function UniProtStructureContent({
   initialMode,
   onModeChange,
@@ -121,6 +107,8 @@ function UniProtStructureContent({
   readonly onModeChange: (mode: RendererMode) => void;
 }) {
   const { harness, status } = useHarness();
+  const sequenceHost = useHarnessHost(sequenceComponent);
+  const structureHost = useHarnessHost(structureComponent);
   const inspect = useInspectPanelState({ sequenceComponent, structureComponent });
   const transition = inspect.datasetStatus;
   const requestedDatasetId =
@@ -208,6 +196,7 @@ function UniProtStructureContent({
               ? `${displayedDataset.label} tracks`
               : `Sequence tracks — ${transitionLabel}`
           }
+          hostRef={sequenceHost}
         />
         <ViewerPanel
           id={structureComponent}
@@ -216,6 +205,8 @@ function UniProtStructureContent({
               ? `${displayedDataset.structureId} / MolViewSpec`
               : `Mol* / MolViewSpec — ${transitionLabel}`
           }
+          hostRef={structureHost}
+          kind="structure"
         />
       </div>
       <section data-testid="inspect-panel-container">

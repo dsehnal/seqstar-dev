@@ -47,7 +47,7 @@ const context = (): {
 };
 
 describe("checked fixture and translator plugins", () => {
-  it("publishes byte-equivalent P04637 documents to both renderer instances", async () => {
+  it("publishes one frozen P04637 document through target-specific renderer envelopes", async () => {
     expect(rendererPortabilityDocument.sequences[0]?.residues).toHaveLength(393);
     expect(rendererPortabilityDocument.id).toBe("uniprot-P04637-renderer-portability");
     expect(rendererPortabilityDocumentDigest()).resolves.toMatch(/^sha256-[a-f0-9]{64}$/u);
@@ -73,7 +73,23 @@ describe("checked fixture and translator plugins", () => {
       "base-sequence",
       "nightingale-sequence",
     ]);
+    expect(requests[0]?.payload.document).toBe(rendererPortabilityDocument);
+    expect(requests[1]?.payload.document).toBe(rendererPortabilityDocument);
     expect(requests[0]?.payload.document).toEqual(requests[1]?.payload.document);
+    expect(Object.isFrozen(rendererPortabilityDocument)).toBe(true);
+    expect(Object.isFrozen(rendererPortabilityDocument.annotations)).toBe(true);
+    expect(Object.isFrozen(rendererPortabilityDocument.views[0]?.sections[0]?.tracks)).toBe(true);
+    expect(
+      (requests.map((entry) => entry.payload as { readonly requestId?: string }) ?? []).map(
+        (payload) => payload.requestId,
+      ),
+    ).toEqual(["P04637-reference-initial", "P04637-nightingale-initial"]);
+    const variantLayer = rendererPortabilityDocument.views[0]?.sections
+      .flatMap((section) => section.tracks)
+      .find((track) => track.id === "variant-bars")?.layers[0];
+    if (variantLayer?.representation !== "bars") throw new Error("Missing variant bars layer.");
+    expect(variantLayer.fallback?.representation).toBe("heatmap");
+    expect(variantLayer.fallback?.color).toEqual(variantLayer.color);
     expect(
       harness.translators.findPaths(
         rendererPortabilitySequenceSpace,

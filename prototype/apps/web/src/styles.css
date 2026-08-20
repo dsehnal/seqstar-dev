@@ -238,6 +238,24 @@ select {
   min-height: 0;
   padding: 0;
 }
+.visualization-card--flush .visualization-card__body {
+  padding: 0;
+}
+.viewer-host {
+  position: relative;
+  min-height: 18rem;
+  height: 24rem;
+  min-width: 0;
+  overflow: auto;
+  background: rgba(255, 255, 255, 0.32);
+}
+.viewer-note {
+  margin: 0;
+  padding: 8px 14px 12px;
+  color: var(--shell-muted);
+  font-size: 0.76rem;
+  line-height: 1.45;
+}
 .compact-toolbar {
   display: flex;
   flex-wrap: wrap;
@@ -277,6 +295,22 @@ select {
   color: var(--shell-muted);
   font-size: 0.78rem;
   font-weight: 650;
+}
+.case-renderer-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--shell-line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.48);
+}
+.case-renderer-controls__status {
+  margin: 0;
+  color: var(--shell-muted);
+  font-size: 0.76rem;
 }
 .renderer-chooser__label {
   white-space: nowrap;

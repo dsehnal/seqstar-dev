@@ -37,7 +37,7 @@ export function CaseRendererChooser({
     <RendererChooserHost descriptor={descriptor} modeComponents={modeComponents}>
       {(state) => (
         <>
-          <div className="flex flex-wrap items-end justify-between gap-3">
+          <div className="case-renderer-controls">
             <RendererChooser
               choices={descriptor.modes.map((value) => ({
                 value,
@@ -57,7 +57,7 @@ export function CaseRendererChooser({
             />
             <p
               aria-live="polite"
-              className="text-slate-500 text-sm"
+              className="case-renderer-controls__status"
               data-testid="renderer-chooser-status"
               role={state.state === "failed" ? "alert" : "status"}
             >

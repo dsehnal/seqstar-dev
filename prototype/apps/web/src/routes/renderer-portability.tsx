@@ -20,6 +20,8 @@ import {
   type RendererMode,
   rendererSearch,
 } from "../components/case-renderer-chooser";
+import { ViewerPanel } from "../components/presentation";
+import { InspectPanel, useInspectPanelState } from "../inspect-panel";
 
 const referenceId = "base-sequence";
 const nightingaleId = "nightingale-sequence";
@@ -100,37 +102,6 @@ const lifecycle = (message: HarnessMessage): Lifecycle | undefined => {
     : undefined;
 };
 
-function RendererPanel({
-  id,
-  title,
-  hidden = false,
-  children,
-}: {
-  readonly id: string;
-  readonly title: string;
-  readonly hidden?: boolean;
-  readonly children?: React.ReactNode;
-}) {
-  const host = useHarnessHost(id);
-  const panelTestId = id === referenceId ? "reference-viewer" : "nightingale";
-  return (
-    <section
-      className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
-      data-testid={`visualizer-panel-${panelTestId}`}
-      hidden={hidden}
-    >
-      <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
-      <section
-        aria-label={`${title} renderer`}
-        className="relative mt-4 h-72 overflow-auto rounded border border-slate-200 p-2"
-        data-testid={`${id}-host`}
-        ref={host}
-      />
-      {children}
-    </section>
-  );
-}
-
 function RendererPortabilityContent({
   initialMode,
   onModeChange,
@@ -139,6 +110,12 @@ function RendererPortabilityContent({
   readonly onModeChange: (mode: RendererMode) => void;
 }) {
   const { status } = useHarness();
+  const referenceHost = useHarnessHost(referenceId);
+  const nightingaleHost = useHarnessHost(nightingaleId);
+  const inspect = useInspectPanelState({
+    sequenceComponent: referenceId,
+    structureComponent: nightingaleId,
+  });
   const [digest, setDigest] = useState("Computing RFC 8785 digest…");
   const [events, setEvents] = useState<readonly Lifecycle[]>([]);
   useEffect(() => {
@@ -200,19 +177,21 @@ function RendererPortabilityContent({
       >
         {(chooser) => (
           <div className="grid gap-5 xl:grid-cols-2">
-            <RendererPanel
+            <ViewerPanel
               hidden={!chooser.mountedComponentIds.includes(referenceId)}
               id={referenceId}
               title="Seq* reference viewer"
+              hostRef={referenceHost}
             >
               <p className="mt-3 text-slate-600 text-sm" data-testid="base-sequence-lifecycle">
                 {byComponent.get(referenceId)?.status ?? "awaiting lifecycle"}
               </p>
-            </RendererPanel>
-            <RendererPanel
+            </ViewerPanel>
+            <ViewerPanel
               hidden={!chooser.mountedComponentIds.includes(nightingaleId)}
               id={nightingaleId}
               title="Vendored Nightingale"
+              hostRef={nightingaleHost}
             >
               <p
                 className="mt-3 text-slate-600 text-sm"
@@ -220,14 +199,11 @@ function RendererPortabilityContent({
               >
                 {byComponent.get(nightingaleId)?.status ?? "awaiting lifecycle"}
               </p>
-              <p className="mt-1 text-amber-700 text-xs" data-testid="nightingale-fallback-status">
-                {byComponent
-                  .get(nightingaleId)
-                  ?.diagnostics?.map((entry) => entry.code)
-                  .filter(Boolean)
-                  .join(", ") ?? "awaiting fallback report"}
+              <p className="viewer-note" data-testid="nightingale-fallback-status">
+                Some richer track styles are shown with a compatible heatmap or marker treatment in
+                this renderer. Exact compatibility diagnostics are available in the inspect panel.
               </p>
-            </RendererPanel>
+            </ViewerPanel>
           </div>
         )}
       </CaseRendererChooser>
@@ -237,11 +213,10 @@ function RendererPortabilityContent({
       >
         <h2 className="font-semibold text-lg">Capability and fallback comparison</h2>
         <p className="mt-2 text-slate-300 text-sm">
-          The reference viewer supports every core representation. This Nightingale subset renders
-          sequence, blocks, markers, heatmap, and swatch exactly. This document declares a
-          bars-to-heatmap fallback that preserves its per-value color encoding. Links require an
-          explicit marker/block fallback, while unsupported layers without a compatible declared
-          fallback reject the replacement instead of being silently omitted.
+          The reference viewer supports the complete track vocabulary. Nightingale renders the
+          shared sequence, blocks, markers, heatmap, and swatch vocabulary; when a bars track is not
+          available, its values are displayed as a color-preserving heatmap so the pattern remains
+          readable. Exact fallback codes are kept in the inspect panel.
         </p>
         <ul
           className="mt-3 grid gap-1 text-slate-300 text-sm"
@@ -254,6 +229,9 @@ function RendererPortabilityContent({
             </li>
           ))}
         </ul>
+      </section>
+      <section data-testid="inspect-panel-container">
+        <InspectPanel state={inspect} />
       </section>
     </main>
   );

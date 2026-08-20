@@ -34,7 +34,7 @@ const variantDensity = [
   0, 0, 1, 3, 2, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 2, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
 ] as const;
 
-export const rendererPortabilityDocument: SeqViewSpec = {
+const rendererPortabilityDocumentValue: SeqViewSpec = {
   kind: "seq-view-spec",
   version: "0.1.0",
   id: "uniprot-P04637-renderer-portability",
@@ -289,11 +289,20 @@ export const rendererPortabilityDocument: SeqViewSpec = {
   ],
 };
 
-const checked = validateSeqViewSpec(rendererPortabilityDocument);
+const checked = validateSeqViewSpec(rendererPortabilityDocumentValue);
 if (!checked.ok)
   throw new Error(
     `Renderer portability document is invalid: ${checked.diagnostics.map((entry) => entry.code).join(", ")}`,
   );
+
+/** One static JSON document is shared by target-specific request envelopes. */
+const freezeJsonTree = <Value>(value: Value): Value => {
+  if (value === null || typeof value !== "object" || Object.isFrozen(value)) return value;
+  for (const child of Object.values(value as Record<string, unknown>)) freezeJsonTree(child);
+  return Object.freeze(value);
+};
+
+export const rendererPortabilityDocument = freezeJsonTree(rendererPortabilityDocumentValue);
 
 export const rendererPortabilityDocumentDigest = (): Promise<string> =>
   digestSeqViewSpec(rendererPortabilityDocument);

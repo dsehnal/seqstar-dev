@@ -3,6 +3,7 @@ import {
   createApplicationHarness,
   type HarnessMessage,
 } from "@seq-star/harness-core";
+import type { CoordinateLocus } from "@seq-star/seq-coords";
 import { MVSData } from "molstar/lib/extensions/mvs/index.js";
 import { describe, expect, it } from "vitest";
 import mappingText from "../../../fixtures/uniprot-structure/mappings/P04637-1TUP-chain-A.tsv?raw";
@@ -209,6 +210,78 @@ describe("P41 P04637 / 1TUP integration", () => {
       kind: "sequence",
       length: 393,
     });
+  });
+
+  it("maps every authored P04637 semantic region, site, variant, and score locus", async () => {
+    const document = createUniProtStructureSeqViewSpec(rows);
+    const [forward] = createP04637MappingTranslators(rows);
+    const signal = new AbortController().signal;
+    const loci = (annotationId: string): readonly CoordinateLocus[] => {
+      const annotation = document.annotations?.find((item) => item.id === annotationId);
+      if (annotation === undefined) throw new Error(`Missing '${annotationId}'.`);
+      if (annotation.kind === "loci")
+        return annotation.items.flatMap((item) =>
+          item.loci.map((locus) =>
+            locus.kind === "point"
+              ? {
+                  kind: "point" as const,
+                  space: uniprotSequenceSpace,
+                  position: { kind: "index" as const, value: locus.position },
+                }
+              : locus.kind === "interval"
+                ? {
+                    kind: "interval" as const,
+                    space: uniprotSequenceSpace,
+                    start: locus.start,
+                    end: locus.end,
+                  }
+                : {
+                    kind: "boundary" as const,
+                    space: uniprotSequenceSpace,
+                    position: locus.position,
+                  },
+          ),
+        );
+      if (annotation.kind === "relationships")
+        throw new Error(`'${annotationId}' is not a one-sequence annotation.`);
+      const positions =
+        annotation.values.encoding === "dense"
+          ? annotation.values.data.map((_, position) => position)
+          : annotation.values.data.map(({ position }) => position);
+      return positions.map((position) => ({
+        kind: "point" as const,
+        space: uniprotSequenceSpace,
+        position: { kind: "index" as const, value: position },
+      }));
+    };
+    const mapped = async (annotationId: string) =>
+      forward.map({ loci: loci(annotationId), target: p53StructureSpace }, signal);
+
+    const regions = await mapped("p53-regions");
+    expect(regions.associations.map((item) => item.status)).toEqual([
+      "unmapped",
+      "partial",
+      "unmapped",
+    ]);
+    expect(regions.associations.flatMap((item) => item.targets)).toHaveLength(196);
+
+    const sites = await mapped("p53-sites");
+    expect(sites.associations.map((item) => item.status)).toEqual(["unmapped", "exact", "exact"]);
+    expect(sites.associations.flatMap((item) => item.targets)).toHaveLength(2);
+
+    const variants = await mapped("p53-variants");
+    expect(variants.associations.map((item) => item.status)).toEqual([
+      "exact",
+      "exact",
+      "unmapped",
+    ]);
+    expect(variants.associations.flatMap((item) => item.targets)).toHaveLength(2);
+
+    const score = await mapped("p53-synthetic-score");
+    expect(score.associations).toHaveLength(393);
+    expect(score.associations.filter((item) => item.status === "exact")).toHaveLength(196);
+    expect(score.associations.filter((item) => item.status === "unmapped")).toHaveLength(197);
+    expect(score.associations.flatMap((item) => item.targets)).toHaveLength(196);
   });
 
   it("uses one cartoon-only profile for variants while retaining exact mapped selectors", async () => {
@@ -492,8 +565,14 @@ describe("P41 P04637 / 1TUP integration", () => {
       interaction: "hover" | "select",
       phase: "set" | "clear",
       loci: readonly unknown[],
-    ): string => {
+      semanticTarget?: {
+        readonly annotationId?: string;
+        readonly itemId?: string;
+        readonly trackId?: string;
+      },
+    ): { readonly messageId: string; readonly interactionId: string } => {
       const id = crypto.randomUUID();
+      const interactionId = crypto.randomUUID();
       harness.fabric.publish({
         id,
         type: "interaction.native",
@@ -502,14 +581,15 @@ describe("P41 P04637 / 1TUP integration", () => {
         correlationId: id,
         timestamp: new Date().toISOString(),
         payload: {
-          interactionId: crypto.randomUUID(),
+          interactionId,
           interaction,
           phase,
           origin: { componentId },
+          ...(semanticTarget === undefined ? {} : { semanticTarget }),
           loci,
         } as never,
       });
-      return id;
+      return { messageId: id, interactionId };
     };
     const sourcePoint = {
       kind: "point",
@@ -525,10 +605,12 @@ describe("P41 P04637 / 1TUP integration", () => {
         value: `label:${row120?.labelSeqId}|auth:${row120?.authSeqId}`,
       },
     } as const;
-    const forwardHover = publishInteraction("sequence", "hover", "set", [sourcePoint]);
-    const reverseHover = publishInteraction("structure", "hover", "set", [structurePoint]);
-    const forwardSelect = publishInteraction("sequence", "select", "set", [sourcePoint]);
-    await new Promise((resolve) => setTimeout(resolve, 40));
+    const dnaBindingRange = {
+      kind: "interval",
+      space: uniprotSequenceSpace,
+      start: 93,
+      end: 293,
+    } as const;
     const reflected = (correlationId: string, type: string, target: string) =>
       observed.filter(
         (item) =>
@@ -538,28 +620,102 @@ describe("P41 P04637 / 1TUP integration", () => {
           "component" in item.target &&
           item.target.component === target,
       );
-    const forwardReflected = reflected(forwardHover, "interaction.highlight.apply", "structure");
-    const reverseReflected = reflected(reverseHover, "interaction.highlight.apply", "sequence");
-    expect(forwardReflected).toHaveLength(1);
-    expect(reverseReflected).toHaveLength(1);
-    const forwardMessage = forwardReflected[0];
-    const reverseMessage = reverseReflected[0];
-    if (forwardMessage === undefined || reverseMessage === undefined)
-      throw new Error("Expected bidirectional hover reflections.");
-    expect(
-      (forwardMessage.payload as { loci?: readonly { readonly space: unknown }[] }).loci?.[0]
-        ?.space,
-    ).toEqual(actualMolstarSpace);
-    expect(
-      (reverseMessage.payload as { loci?: readonly { readonly space: unknown }[] }).loci?.[0]
-        ?.space,
-    ).toEqual(uniprotSequenceSpace);
-    expect(reflected(forwardSelect, "interaction.selection.apply", "structure")).toHaveLength(1);
-    const hoverClear = publishInteraction("sequence", "hover", "clear", []);
-    const selectClear = publishInteraction("structure", "select", "clear", []);
+    // These are the public native-envelope shapes emitted by the two renderer
+    // wrappers. A structure hover first reflects to the sequence renderer.
+    const molstarHover = publishInteraction("structure", "hover", "set", [structurePoint]);
     await new Promise((resolve) => setTimeout(resolve, 20));
-    expect(reflected(hoverClear, "interaction.highlight.clear", "structure")).toHaveLength(1);
-    expect(reflected(selectClear, "interaction.selection.clear", "sequence")).toHaveLength(1);
+    const initialReflection = reflected(
+      molstarHover.messageId,
+      "interaction.highlight.apply",
+      "sequence",
+    );
+    expect(initialReflection).toHaveLength(1);
+    const initialMessage = initialReflection[0];
+    if (initialMessage === undefined) throw new Error("Expected initial Mol* hover reflection.");
+    expect(
+      (initialMessage.payload as { loci?: readonly { readonly space: unknown }[] }).loci,
+    ).toEqual([sourcePoint]);
+
+    // A Reference or Nightingale feature hit carries the complete semantic
+    // interval, never just the pointer column. The globally replace-only hover
+    // lease must clear the previous sequence reflection before applying all
+    // mappable DNA-binding residues to Mol*.
+    const sequenceHover = publishInteraction("sequence", "hover", "set", [dnaBindingRange], {
+      annotationId: "p53-regions",
+      itemId: "dna-binding",
+      trackId: "regions",
+    });
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const transferClear = observed.filter(
+      (item) =>
+        item.type === "interaction.highlight.clear" &&
+        item.target !== undefined &&
+        "component" in item.target &&
+        item.target.component === "sequence" &&
+        item.causationId === sequenceHover.messageId,
+    );
+    expect(transferClear).toHaveLength(1);
+    const fullFeature = reflected(
+      sequenceHover.messageId,
+      "interaction.highlight.apply",
+      "structure",
+    );
+    expect(fullFeature).toHaveLength(1);
+    const fullFeaturePayload = fullFeature[0]?.payload as {
+      readonly loci: readonly { readonly space: unknown }[];
+      readonly semanticTarget?: unknown;
+    };
+    expect(fullFeaturePayload.semanticTarget).toEqual({
+      annotationId: "p53-regions",
+      itemId: "dna-binding",
+      trackId: "regions",
+    });
+    expect(fullFeaturePayload.loci).toHaveLength(196);
+    expect(
+      fullFeaturePayload.loci.every(
+        (locus) => JSON.stringify(locus.space) === JSON.stringify(actualMolstarSpace),
+      ),
+    ).toBe(true);
+    expect(
+      observed.some(
+        (item) =>
+          item.type === "harness.diagnostic" &&
+          JSON.stringify(item.payload).includes("harness.translation.partial"),
+      ),
+    ).toBe(true);
+
+    // Transfer back to Mol* proves that the feature highlight was retired;
+    // there is no stale 196-residue union alongside the current one-residue
+    // structure hover in the sequence renderer.
+    const latestMolstarHover = publishInteraction("structure", "hover", "set", [structurePoint]);
+    await new Promise((resolve) => setTimeout(resolve, 30));
+    const latestSequence = reflected(
+      latestMolstarHover.messageId,
+      "interaction.highlight.apply",
+      "sequence",
+    );
+    expect(latestSequence).toHaveLength(1);
+    const latestMessage = latestSequence[0];
+    if (latestMessage === undefined) throw new Error("Expected latest Mol* hover reflection.");
+    expect((latestMessage.payload as { readonly loci: readonly unknown[] }).loci).toEqual([
+      sourcePoint,
+    ]);
+    expect(
+      observed.filter(
+        (item) =>
+          item.type === "interaction.highlight.clear" &&
+          item.target !== undefined &&
+          "component" in item.target &&
+          item.target.component === "structure" &&
+          item.causationId === latestMolstarHover.messageId,
+      ),
+    ).toHaveLength(1);
+
+    const forwardSelect = publishInteraction("sequence", "select", "set", [sourcePoint]);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(
+      reflected(forwardSelect.messageId, "interaction.selection.apply", "structure"),
+    ).toHaveLength(1);
     const activate = (trackId: string, layerId: string): void => {
       const id = crypto.randomUUID();
       harness.fabric.publish({

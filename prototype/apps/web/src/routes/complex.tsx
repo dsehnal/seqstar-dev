@@ -18,6 +18,7 @@ import {
   type RendererMode,
   rendererSearch,
 } from "../components/case-renderer-chooser";
+import { ViewerPanel } from "../components/presentation";
 import { InspectPanel, useInspectPanelState } from "../inspect-panel";
 
 const sequenceComponent = "complex-sequence";
@@ -82,21 +83,6 @@ const createPageHarness = (
     },
   );
 
-function Panel({ id, title }: { readonly id: string; readonly title: string }) {
-  const host = useHarnessHost(id);
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
-      <section
-        aria-label={`${title} visualizer`}
-        className="relative mt-3 h-96 overflow-auto rounded border border-slate-200"
-        data-testid={`${id}-host`}
-        ref={host}
-      />
-    </section>
-  );
-}
-
 function ComplexContent({
   initialMode,
   onModeChange,
@@ -105,6 +91,8 @@ function ComplexContent({
   readonly onModeChange: (mode: RendererMode) => void;
 }) {
   const { status } = useHarness();
+  const sequenceHost = useHarnessHost(sequenceComponent);
+  const structureHost = useHarnessHost(structureComponent);
   const inspect = useInspectPanelState({ sequenceComponent, structureComponent });
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-complex">
@@ -135,8 +123,13 @@ function ComplexContent({
         Synthetic confidence — deterministic prototype values, not a biological prediction.
       </p>
       <div className="grid gap-5 xl:grid-cols-2">
-        <Panel id={sequenceComponent} title="Named complex assembly" />
-        <Panel id={structureComponent} title="Mol* / generated MVS" />
+        <ViewerPanel hostRef={sequenceHost} id={sequenceComponent} title="Named complex assembly" />
+        <ViewerPanel
+          hostRef={structureHost}
+          id={structureComponent}
+          kind="structure"
+          title="Mol* / generated MVS"
+        />
       </div>
       <section className="grid gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-slate-700">
         <h2 className="font-semibold text-slate-950 text-lg">Track profiles and navigation</h2>

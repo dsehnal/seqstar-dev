@@ -22,6 +22,9 @@ test("renders the offline P04637 portability case with one shared document", asy
   await expect(page.getByTestId("base-sequence-lifecycle")).toHaveText("rendered");
   await expect(page.getByTestId("nightingale-sequence-lifecycle")).toHaveText("degraded");
   await expect(page.getByTestId("nightingale-fallback-status")).toContainText(
+    "Some richer track styles",
+  );
+  await expect(page.getByTestId("nightingale-fallback-status")).not.toContainText(
     "wrapper.nightingale.fallback.bars-heatmap",
   );
   const hostHeights = async () =>
@@ -33,11 +36,19 @@ test("renders the offline P04637 portability case with one shared document", asy
         .querySelector<HTMLElement>('[data-testid="nightingale-sequence-host"]')
         ?.getBoundingClientRect().height,
     }));
-  await expect.poll(hostHeights).toEqual({ reference: 288, nightingale: 288 });
+  await expect.poll(hostHeights).toEqual({ reference: 384, nightingale: 384 });
   await page.waitForTimeout(250);
-  expect(await hostHeights()).toEqual({ reference: 288, nightingale: 288 });
+  expect(await hostHeights()).toEqual({ reference: 384, nightingale: 384 });
   await expect(page.getByTestId("renderer-portability-capabilities")).toContainText(
-    "bars-to-heatmap fallback",
+    "color-preserving heatmap",
+  );
+  await expect(page.getByTestId("renderer-portability-capabilities")).not.toContainText(
+    "wrapper.nightingale.fallback.bars-heatmap",
+  );
+  await page.getByTestId("inspect-tab-messages").click();
+  await page.getByTestId("inspect-message-lifecycle.visualization").last().click();
+  await expect(page.getByTestId("inspect-message-json")).toContainText(
+    "wrapper.nightingale.fallback.bars-heatmap",
   );
   expect(external).toEqual([]);
 });

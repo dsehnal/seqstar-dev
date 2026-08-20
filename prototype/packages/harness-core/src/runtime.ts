@@ -4,11 +4,16 @@ import type {
   CoordinateTranslator,
   MappingAssociation,
 } from "@seq-star/seq-coords";
-import { coordinateSpaceEquals, coordinateSpaceMatches } from "@seq-star/seq-coords";
+import {
+  CoordinateLocusSchema,
+  coordinateSpaceEquals,
+  coordinateSpaceMatches,
+} from "@seq-star/seq-coords";
 import type { Diagnostic, JsonObject } from "@seq-star/seq-core";
 import { diagnostic, isJsonSafeValue } from "@seq-star/seq-core";
 import { Observable, Subject, Subscription } from "rxjs";
 import { Type } from "typebox";
+import { Value } from "typebox/value";
 import {
   type ApplicationHarnessSpec,
   type Capability,
@@ -56,6 +61,32 @@ const now = (): string => new Date().toISOString();
 const newId = (): string => globalThis.crypto.randomUUID();
 const sameEndpoint = (left: EndpointRef | undefined, right: EndpointRef | undefined): boolean =>
   left?.component === right?.component && left?.plugin === right?.plugin;
+/**
+ * Translators may efficiently reuse one coordinate-space descriptor for every
+ * expanded target locus. Fabric payloads intentionally reject object graphs,
+ * so detach only the validated synchronization output before publication.
+ * This preserves every JSON locus value and order while keeping malformed
+ * native input fail-closed at the fabric boundary.
+ */
+class SynchronizationOutputError extends Error {
+  readonly code = "harness.translation.output.invalid";
+
+  constructor(index: number, reason: "json" | "schema") {
+    super(
+      `Synchronization translator output locus ${String(index)} ${
+        reason === "json" ? "is not an acyclic JSON value" : "does not match CoordinateLocus"
+      }.`,
+    );
+    this.name = "SynchronizationOutputError";
+  }
+}
+const detachSynchronizationLoci = (loci: readonly CoordinateLocus[]): readonly CoordinateLocus[] =>
+  loci.map((locus, index) => {
+    if (!isJsonSafeValue(locus)) throw new SynchronizationOutputError(index, "json");
+    if (!Value.Check(CoordinateLocusSchema, locus))
+      throw new SynchronizationOutputError(index, "schema");
+    return JSON.parse(JSON.stringify(locus)) as CoordinateLocus;
+  });
 
 const runtimeDiagnostic = (code: string, message: string): Diagnostic =>
   diagnostic(code, message, "");
@@ -637,7 +668,11 @@ export const createApplicationHarness = (
       return addRoute(route);
     },
   };
-  const diagnosis = (message: string, parent?: HarnessMessage<string, unknown>): void => {
+  const diagnosis = (
+    message: string,
+    parent?: HarnessMessage<string, unknown>,
+    code = "harness.runtime",
+  ): void => {
     const diagnosticId = newId();
     fabric.publish({
       id: diagnosticId,
@@ -648,7 +683,7 @@ export const createApplicationHarness = (
       ...(parent === undefined ? {} : { causationId: parent.id }),
       timestamp: now(),
       payload: {
-        diagnostics: [runtimeDiagnostic("harness.runtime", message)],
+        diagnostics: [runtimeDiagnostic(code, message)],
       } as unknown as JsonObject,
     });
   };
@@ -1103,9 +1138,10 @@ export const createApplicationHarness = (
                   );
                   return;
                 }
-                if (loci.length > 0)
+                const detachedLoci = loci.length === 0 ? loci : detachSynchronizationLoci(loci);
+                if (detachedLoci.length > 0)
                   if (event.interaction === "hover") hoverLease?.destinations.add(destination);
-                if (loci.length > 0)
+                if (detachedLoci.length > 0)
                   fabric.publish({
                     ...message,
                     id: newId(),
@@ -1116,13 +1152,13 @@ export const createApplicationHarness = (
                       interactionId,
                       owner,
                       mode: event.mode ?? "replace",
-                      loci,
+                      loci: detachedLoci,
                       ...(event.semanticTarget === undefined
                         ? {}
                         : { semanticTarget: event.semanticTarget }),
                     } as unknown as JsonObject,
                   });
-                if (loci.length > 0)
+                if (detachedLoci.length > 0)
                   reflectedInteractionLeases.set(
                     reflectionLeaseKey(
                       rule.id,
@@ -1140,10 +1176,19 @@ export const createApplicationHarness = (
                     },
                   );
               })
-              .catch(() => {
+              .catch((error: unknown) => {
                 if (signal?.aborted || disposed) return;
-                diagnosis(`Synchronization '${rule.id}' failed.`, message);
-                if (event.interaction === "hover" && unmappedPolicy === "clear") {
+                diagnosis(
+                  error instanceof SynchronizationOutputError
+                    ? `Synchronization '${rule.id}' rejected translator output: ${error.message}`
+                    : `Synchronization '${rule.id}' failed.`,
+                  message,
+                  error instanceof SynchronizationOutputError ? error.code : "harness.runtime",
+                );
+                if (
+                  event.interaction === "hover" &&
+                  (error instanceof SynchronizationOutputError || unmappedPolicy === "clear")
+                ) {
                   hoverLease?.destinations.delete(destination);
                   fabric.publish({
                     ...message,
@@ -1153,6 +1198,14 @@ export const createApplicationHarness = (
                     type: "interaction.highlight.clear",
                     payload: { interactionId, owner },
                   });
+                  reflectedInteractionLeases.delete(
+                    reflectionLeaseKey(
+                      rule.id,
+                      rule.interaction,
+                      event.origin.componentId,
+                      destination,
+                    ),
+                  );
                 }
               })
               .finally(() => {

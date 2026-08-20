@@ -1,4 +1,4 @@
-import type { CoordinateSpace, CoordinateTranslator } from "@seq-star/seq-coords";
+import type { CoordinateLocus, CoordinateSpace, CoordinateTranslator } from "@seq-star/seq-coords";
 import { createTableTranslator } from "@seq-star/seq-coords";
 import { Type } from "typebox";
 import { describe, expect, it, vi } from "vitest";
@@ -1313,6 +1313,284 @@ describe("harness runtime", () => {
     expect(appliedPositions).toEqual([2]);
     await harness.disposeAsync();
   });
+
+  it("detaches shared coordinate-space references from expanded synchronization output", async () => {
+    const source: CoordinateSpace = { id: "source-space", kind: "sequence", length: 1 };
+    const target: CoordinateSpace = { id: "target-space", kind: "structure-residue" };
+    const received: HarnessMessage[] = [];
+    const observed: HarnessMessage[] = [];
+    const translated: CoordinateLocus[] = [];
+    const harness = createApplicationHarness(
+      {
+        id: "shared-reference-expansion",
+        components: [
+          { id: "source", type: "mock" },
+          { id: "target", type: "mock" },
+        ],
+        synchronization: [{ id: "hover", interaction: "hover", between: ["source", "target"] }],
+      },
+      {
+        componentFactories: [
+          {
+            type: "mock",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                if (id === "source") {
+                  context.reportCoordinateSpaces([source]);
+                  context.translators.register({
+                    id: "expand-shared-target",
+                    source: { id: source.id, kind: source.kind },
+                    target: { id: target.id, kind: target.kind },
+                    async map(request) {
+                      const targets = Array.from({ length: 196 }, (_, position) => ({
+                        kind: "point" as const,
+                        space: target,
+                        position: { kind: "index" as const, value: position },
+                      }));
+                      translated.push(...targets);
+                      return {
+                        translatorIds: ["expand-shared-target"],
+                        diagnostics: [],
+                        associations: request.loci.map((locus) => ({
+                          source: locus,
+                          // Deliberately reuse `target`: checked translator
+                          // implementations commonly do this for long ranges.
+                          targets,
+                          status: "exact" as const,
+                        })),
+                      };
+                    },
+                  });
+                  return;
+                }
+                context.reportCoordinateSpaces([target]);
+                context.fabric.observe({ targetComponent: id }).subscribe((message) => {
+                  if (message.type === "interaction.highlight.apply") received.push(message);
+                });
+              },
+              dispose() {},
+            }),
+          },
+        ],
+      },
+    );
+    harness.fabric.observe().subscribe((message) => observed.push(message));
+    await harness.start();
+    const native = message("interaction.native", {
+      interactionId: "shared-reference-hover",
+      interaction: "hover",
+      phase: "set",
+      origin: { componentId: "source" },
+      loci: [{ kind: "point", space: source, position: { kind: "index", value: 0 } }],
+    });
+    harness.fabric.publish(native);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(received).toHaveLength(1);
+    const command = received[0]?.payload as {
+      readonly interactionId: string;
+      readonly owner: { readonly correlationId: string; readonly sourceComponent: string };
+      readonly loci: readonly {
+        readonly space: CoordinateSpace;
+        readonly position: { readonly value: number };
+      }[];
+    };
+    expect(received[0]?.correlationId).toBe(native.correlationId);
+    expect(received[0]?.causationId).toBe(native.id);
+    expect(command.interactionId).toBe("shared-reference-hover");
+    expect(command.owner).toEqual({
+      correlationId: native.correlationId,
+      sourceComponent: "source",
+    });
+    expect(command.loci).toHaveLength(196);
+    expect(command.loci.map((locus) => locus.position.value)).toEqual(
+      Array.from({ length: 196 }, (_, position) => position),
+    );
+    expect(
+      command.loci.every((locus) => JSON.stringify(locus.space) === JSON.stringify(target)),
+    ).toBe(true);
+    expect(command.loci.every((locus) => locus.space !== target)).toBe(true);
+    expect(new Set(command.loci.map((locus) => locus.space)).size).toBe(196);
+    for (const [index, locus] of command.loci.entries()) {
+      const raw = translated[index];
+      if (raw?.kind !== "point") throw new Error("Missing raw translated point.");
+      expect(locus).not.toBe(raw);
+      expect(locus.space).not.toBe(raw.space);
+      expect(locus.position).not.toBe(raw.position);
+    }
+    expect(
+      observed.some(
+        (item) =>
+          item.type === "harness.diagnostic" &&
+          JSON.stringify(item.payload).includes("harness.message.invalid"),
+      ),
+    ).toBe(false);
+    await harness.disposeAsync();
+  });
+
+  it.each(["malformed", "cyclic"] as const)(
+    "rejects %s synchronization output and owner-correctly clears the resident hover",
+    async (failure) => {
+      const source: CoordinateSpace = { id: "source-space", kind: "sequence", length: 3 };
+      const target: CoordinateSpace = {
+        id: "target-space",
+        kind: "structure-residue",
+        length: 3,
+      };
+      const commands: HarnessMessage[] = [];
+      const observed: HarnessMessage[] = [];
+      const harness = createApplicationHarness(
+        {
+          id: `invalid-output-${failure}`,
+          components: [
+            { id: "source", type: "mock" },
+            { id: "target", type: "mock" },
+          ],
+          synchronization: [
+            {
+              id: "hover",
+              interaction: "hover",
+              between: ["source", "target"],
+              // Invalid translator output is a fail-closed boundary violation,
+              // not an ordinary unmapped result; it must retire stale hover
+              // state even when ordinary unmapped loci would be preserved.
+              unmapped: "preserve",
+            },
+          ],
+        },
+        {
+          componentFactories: [
+            {
+              type: "mock",
+              create: ({ id }) => ({
+                id,
+                capabilities: [],
+                async start(context) {
+                  if (id === "source") {
+                    context.reportCoordinateSpaces([source]);
+                    context.translators.register({
+                      id: `invalid-output-${failure}`,
+                      source: { id: source.id, kind: source.kind },
+                      target: { id: target.id, kind: target.kind },
+                      async map(request) {
+                        const position =
+                          request.loci[0]?.kind === "point" &&
+                          request.loci[0].position.kind === "index"
+                            ? request.loci[0].position.value
+                            : -1;
+                        let output: CoordinateLocus;
+                        if (position === 0) {
+                          output = {
+                            kind: "point",
+                            space: target,
+                            position: { kind: "index", value: 0 },
+                          };
+                        } else if (failure === "malformed") {
+                          output = {
+                            kind: "point",
+                            space: target,
+                            position: { kind: "index", value: -1 },
+                          } as CoordinateLocus;
+                        } else {
+                          const cyclic = {
+                            kind: "point",
+                            space: target,
+                            position: { kind: "index", value: 1 },
+                          } as Record<string, unknown>;
+                          cyclic.self = cyclic;
+                          output = cyclic as unknown as CoordinateLocus;
+                        }
+                        return {
+                          translatorIds: [`invalid-output-${failure}`],
+                          diagnostics: [],
+                          associations: request.loci.map((locus) => ({
+                            source: locus,
+                            targets: [output],
+                            status: "exact" as const,
+                          })),
+                        };
+                      },
+                    });
+                    return;
+                  }
+                  context.reportCoordinateSpaces([target]);
+                  context.fabric.observe({ targetComponent: id }).subscribe((entry) => {
+                    if (entry.type.startsWith("interaction.highlight.")) commands.push(entry);
+                  });
+                },
+                dispose() {},
+              }),
+            },
+          ],
+        },
+      );
+      harness.fabric.observe().subscribe((entry) => observed.push(entry));
+      await harness.start();
+      const native = (position: number, interactionId: string) =>
+        message("interaction.native", {
+          interactionId,
+          interaction: "hover",
+          phase: "set",
+          origin: { componentId: "source" },
+          loci: [{ kind: "point", space: source, position: { kind: "index", value: position } }],
+        });
+      const prior = native(0, "prior-hover");
+      harness.fabric.publish(prior);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(commands.map((entry) => entry.type)).toEqual(["interaction.highlight.apply"]);
+      const priorOwner = {
+        correlationId: prior.correlationId,
+        sourceComponent: "source",
+      };
+      expect(commands[0]?.payload).toMatchObject({
+        interactionId: "prior-hover",
+        owner: priorOwner,
+      });
+
+      const replacement = native(1, `${failure}-replacement`);
+      harness.fabric.publish(replacement);
+      await new Promise((resolve) => setTimeout(resolve, 20));
+      expect(commands.map((entry) => entry.type)).toEqual([
+        "interaction.highlight.apply",
+        "interaction.highlight.clear",
+      ]);
+      expect(commands[1]).toMatchObject({
+        correlationId: replacement.correlationId,
+        causationId: replacement.id,
+        payload: { interactionId: "prior-hover", owner: priorOwner },
+      });
+      const outputDiagnostics = observed.filter(
+        (entry) =>
+          entry.type === "harness.diagnostic" &&
+          (entry.payload as { readonly diagnostics?: readonly { readonly code?: string }[] })
+            .diagnostics?.[0]?.code === "harness.translation.output.invalid",
+      );
+      expect(outputDiagnostics).toHaveLength(1);
+      expect(outputDiagnostics[0]).toMatchObject({
+        correlationId: replacement.correlationId,
+        causationId: replacement.id,
+      });
+      expect(JSON.stringify(outputDiagnostics[0]?.payload)).toContain(
+        failure === "cyclic" ? "not an acyclic JSON value" : "does not match CoordinateLocus",
+      );
+      expect(
+        observed.some(
+          (entry) =>
+            entry.type === "harness.diagnostic" &&
+            JSON.stringify(entry.payload).includes("Synchronization 'hover' failed."),
+        ),
+      ).toBe(false);
+      expect(
+        observed.some(
+          (entry) =>
+            entry.type === "harness.diagnostic" &&
+            JSON.stringify(entry.payload).includes("harness.message.invalid"),
+        ),
+      ).toBe(false);
+      await harness.disposeAsync();
+    },
+  );
 
   it("replaces one synchronized native hover lease without disturbing unrelated owners", async () => {
     const space: CoordinateSpace = { id: "shared", kind: "index", length: 4 };
