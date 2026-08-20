@@ -279,7 +279,7 @@ describe("live cryo-ET adapters", () => {
     );
     expect(mapped.associations[0]?.targets[0]).toMatchObject({
       space: dynamicStructure,
-      position: { kind: "label", value: "label:39|auth:40" },
+      position: { kind: "label", value: "label:39|auth:39" },
     });
     const roundTrip = await reverse.map(
       { loci: mapped.associations[0]?.targets ?? [], target: pp7SequenceSpace },
@@ -380,7 +380,7 @@ describe("live cryo-ET adapters", () => {
     publish("structure", {
       kind: "point",
       space: dynamicStructure,
-      position: { kind: "label", value: "label:67|auth:68" },
+      position: { kind: "label", value: "label:67|auth:67" },
     });
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(
@@ -397,7 +397,7 @@ describe("live cryo-ET adapters", () => {
         locus: {
           kind: "point",
           space: dynamicStructure,
-          position: { kind: "label", value: "label:39|auth:40" },
+          position: { kind: "label", value: "label:39|auth:39" },
         },
       },
       {

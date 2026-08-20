@@ -1,5 +1,19 @@
 import { readFile } from "node:fs/promises";
-import { expect, test } from "@playwright/test";
+import { expect, type Page, test } from "@playwright/test";
+
+const inspectLatestMessageWithoutPointerMove = async (
+  page: Page,
+  type: string,
+): Promise<string> => {
+  await page
+    .getByTestId("inspect-tab-messages")
+    .evaluate((element: HTMLButtonElement) => element.click());
+  await page
+    .getByTestId(`inspect-message-${type}`)
+    .last()
+    .evaluate((element: HTMLButtonElement) => element.click());
+  return (await page.getByTestId("inspect-message-json").textContent()) ?? "";
+};
 
 const sequence =
   "MSKTIVLSVGEATRTLTEIQSTADRQIFEEKVGPLVGRLRLTASLRQNGAKTAYRVNLKLDQADVVDCSTSVCGELPKVRYTQVWSHDVTIVANSTEASRKSLYDLTKSLVATSQVEDLVVNLVPLGR";
@@ -78,7 +92,9 @@ test("links a live-shaped tomogram particle to density, representative structure
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
     "base64",
   );
-  const structure = await readFile("fixtures/complex/input/1BRS.cif");
+  const structure = (await readFile("fixtures/complex/input/1BRS.cif", "utf8"))
+    .replace("data_1BRS", "data_1DWN")
+    .replace("_entry.id   1BRS", "_entry.id   1DWN");
   const seen = new Set<string>();
   await page.route("https://files.cryoetdataportal.cziscience.com/**", async (route) => {
     const url = route.request().url();
@@ -160,6 +176,50 @@ test("links a live-shaped tomogram particle to density, representative structure
   });
   await expect(page.getByTestId("cryoet-sequence-host").locator("canvas")).toBeVisible();
   await expect(page.getByTestId("cryoet-structure-host").locator("canvas")).toBeVisible();
+
+  const sequenceCanvas = page
+    .getByTestId("cryoet-sequence-host")
+    .locator('[data-seq-viewer="canvas"]');
+  await sequenceCanvas.scrollIntoViewIfNeeded();
+  const sequenceBox = await sequenceCanvas.boundingBox();
+  if (sequenceBox === null) throw new Error("Expected the P03630 sequence canvas.");
+  const sequenceCell = (sequenceBox.width - 152) / 128;
+  await page.mouse.move(sequenceBox.x + 152 + 39.5 * sequenceCell, sequenceBox.y + 32);
+  const structureHover = await inspectLatestMessageWithoutPointerMove(
+    page,
+    "interaction.highlight.apply",
+  );
+  expect(structureHover).toContain('"component": "cryoet-structure"');
+  expect(structureHover).toContain('"value": "label:38|auth:38"');
+
+  await page.getByTestId("inspect-tab-summary").click();
+  const structureCanvas = page.getByTestId("cryoet-structure-host").locator("canvas").first();
+  await structureCanvas.scrollIntoViewIfNeeded();
+  const structureBox = await structureCanvas.boundingBox();
+  if (structureBox === null) throw new Error("Expected the 1DWN Mol* canvas.");
+  let nativeStructureHover = "";
+  for (const yFraction of [0.35, 0.5, 0.65]) {
+    for (const xFraction of [0.35, 0.5, 0.65]) {
+      await page.mouse.move(
+        structureBox.x + structureBox.width * xFraction,
+        structureBox.y + structureBox.height * yFraction,
+      );
+      await page.waitForTimeout(100);
+      const latest = await inspectLatestMessageWithoutPointerMove(page, "interaction.native");
+      if (latest.includes('"component": "cryoet-structure"') && latest.includes('"phase": "set"')) {
+        nativeStructureHover = latest;
+        break;
+      }
+    }
+    if (nativeStructureHover.length > 0) break;
+  }
+  expect(nativeStructureHover).toContain('"value": "label:');
+  const sequenceHover = await inspectLatestMessageWithoutPointerMove(
+    page,
+    "interaction.highlight.apply",
+  );
+  expect(sequenceHover).toContain('"component": "cryoet-sequence"');
+  expect(sequenceHover).toContain('"kind": "index"');
 
   await page.getByRole("button", { name: "EMD-77085", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Subtomogram average density" })).toBeVisible();

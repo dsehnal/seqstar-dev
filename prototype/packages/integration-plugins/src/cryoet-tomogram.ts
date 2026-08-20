@@ -857,7 +857,7 @@ const sequenceToStructure = (): CoordinateTranslator => ({
                     space: target,
                     position: {
                       kind: "label" as const,
-                      value: `label:${index}|auth:${index + 1}`,
+                      value: `label:${index}|auth:${index}`,
                     },
                   },
                 ],
@@ -891,7 +891,7 @@ const structureToSequence = (): CoordinateTranslator => ({
         const auth = match === null ? undefined : Number(match[2]);
         return exactAssociation(
           source,
-          label === undefined || auth !== label + 1 || label < 1 || label > 127
+          label === undefined || auth !== label || label < 1 || label > 127
             ? []
             : [{ kind: "point", space: target, position: { kind: "index", value: label } }],
         );
