@@ -1,0 +1,316 @@
+{
+  "root": {
+    "kind": "root",
+    "children": [
+      {
+        "kind": "canvas",
+        "params": {
+          "background_color": "white"
+        }
+      },
+      {
+        "kind": "download",
+        "params": {
+          "url": "/input/1A3N.cif"
+        },
+        "children": [
+          {
+            "kind": "parse",
+            "params": {
+              "format": "mmcif"
+            },
+            "children": [
+              {
+                "kind": "structure",
+                "params": {
+                  "type": "model"
+                },
+                "children": [
+                  {
+                    "kind": "transform",
+                    "params": {
+                      "matrix": [
+                        1,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1,
+                        0,
+                        0,
+                        0,
+                        0,
+                        1
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "component",
+                    "params": {
+                      "selector": {
+                        "label_entity_id": "1",
+                        "label_asym_id": "A",
+                        "auth_asym_id": "A"
+                      }
+                    },
+                    "children": [
+                      {
+                        "kind": "focus",
+                        "params": {}
+                      },
+                      {
+                        "kind": "representation",
+                        "params": {
+                          "type": "cartoon"
+                        },
+                        "children": [
+                          {
+                            "kind": "color",
+                            "params": {
+                              "color": "#2563EB"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "download",
+        "params": {
+          "url": "/input/AF-P02197-F1-model_v6.cif"
+        },
+        "children": [
+          {
+            "kind": "parse",
+            "params": {
+              "format": "mmcif"
+            },
+            "children": [
+              {
+                "kind": "structure",
+                "params": {
+                  "type": "model"
+                },
+                "children": [
+                  {
+                    "kind": "transform",
+                    "params": {
+                      "matrix": [
+                        0.015407807107543192,
+                        0.8029557972080248,
+                        -0.5958393911279458,
+                        0,
+                        0.06435613366159387,
+                        -0.5954708975375027,
+                        -0.8007950340719816,
+                        0,
+                        -0.9978080378258269,
+                        -0.026007427097667346,
+                        -0.060850025789505935,
+                        0,
+                        3.1799646353801707,
+                        12.84965636083059,
+                        20.918204885168862,
+                        1
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "component",
+                    "params": {
+                      "selector": {
+                        "label_entity_id": "1",
+                        "label_asym_id": "A",
+                        "auth_asym_id": "A"
+                      }
+                    },
+                    "children": [
+                      {
+                        "kind": "representation",
+                        "params": {
+                          "type": "cartoon"
+                        },
+                        "children": [
+                          {
+                            "kind": "color",
+                            "params": {
+                              "color": "#F97316"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "download",
+        "params": {
+          "url": "/input/AF-A0A5E4C8D4-F1-model_v6.cif"
+        },
+        "children": [
+          {
+            "kind": "parse",
+            "params": {
+              "format": "mmcif"
+            },
+            "children": [
+              {
+                "kind": "structure",
+                "params": {
+                  "type": "model"
+                },
+                "children": [
+                  {
+                    "kind": "transform",
+                    "params": {
+                      "matrix": [
+                        0.6458628042209593,
+                        0.030824185451429287,
+                        0.7628310537261456,
+                        0,
+                        0.7249891828789075,
+                        -0.33791734677399354,
+                        -0.6001691116281513,
+                        0,
+                        0.23927396775717114,
+                        0.9406711154464169,
+                        -0.24059551556440084,
+                        0,
+                        3.6712298676517627,
+                        12.449150129713718,
+                        19.99815011392363,
+                        1
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "component",
+                    "params": {
+                      "selector": {
+                        "label_entity_id": "1",
+                        "label_asym_id": "A",
+                        "auth_asym_id": "A"
+                      }
+                    },
+                    "children": [
+                      {
+                        "kind": "representation",
+                        "params": {
+                          "type": "cartoon"
+                        },
+                        "children": [
+                          {
+                            "kind": "color",
+                            "params": {
+                              "color": "#10B981"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "kind": "download",
+        "params": {
+          "url": "/input/AF-A0A2Y9DEZ0-F1-model_v6.cif"
+        },
+        "children": [
+          {
+            "kind": "parse",
+            "params": {
+              "format": "mmcif"
+            },
+            "children": [
+              {
+                "kind": "structure",
+                "params": {
+                  "type": "model"
+                },
+                "children": [
+                  {
+                    "kind": "transform",
+                    "params": {
+                      "matrix": [
+                        -0.3302063473298986,
+                        -0.14113939366048456,
+                        0.9332968628409137,
+                        0,
+                        0.39244603746864115,
+                        0.8787182923953654,
+                        0.271735594482454,
+                        0,
+                        -0.8584576112462994,
+                        0.45599758463255213,
+                        -0.2347687288545086,
+                        0,
+                        2.7524593758959286,
+                        14.255020206641968,
+                        20.888049678545165,
+                        1
+                      ]
+                    }
+                  },
+                  {
+                    "kind": "component",
+                    "params": {
+                      "selector": {
+                        "label_entity_id": "1",
+                        "label_asym_id": "A",
+                        "auth_asym_id": "A"
+                      }
+                    },
+                    "children": [
+                      {
+                        "kind": "representation",
+                        "params": {
+                          "type": "cartoon"
+                        },
+                        "children": [
+                          {
+                            "kind": "color",
+                            "params": {
+                              "color": "#A855F7"
+                            }
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "metadata": {
+    "title": "PF00042.29 experimental 1A3N plus three AlphaFold DB v6 predictions",
+    "description": "One experimental PDB 1A3N chain A cartoon (blue) and three clearly labeled AlphaFold DB v6 predicted-model cartoons (orange, green, purple), fitted into the P69905/1A3N frame using only frozen PF00042.29 alignment-column C-alpha pairs.",
+    "description_format": "plaintext",
+    "version": "1",
+    "timestamp": "2026-08-20T00:00:00.000Z"
+  }
+}

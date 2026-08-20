@@ -1,13 +1,21 @@
 {
   "schemaVersion": 1,
   "caseId": "alignment-structure",
-  "title": "PF00042 globin alignment with P69905 and PDB 1A3N chain A",
+  "title": "PF00042 globin alignment with experimental P69905/1A3N and three AlphaFold DB v6 predictions",
   "status": "approved",
-  "retrievalDate": "2026-08-19",
+  "retrievalDate": "2026-08-20",
+  "independentReview": {
+    "required": true,
+    "state": "approved-for-m50-use",
+    "reviewedDate": "2026-08-20",
+    "downstreamM50UseAllowed": true,
+    "meaning": "An independent reviewer approved the retained fixture packet for downstream M50 use. This approval does not change the experimental-plus-predicted interpretation."
+  },
   "selectionDecision": {
     "rejectedCandidate": "AlphaFold DB P69905 A3M",
     "reason": "No stable, versioned AlphaFold DB endpoint exposing a P69905 MSA was available for deterministic redistribution. The implementation-plan-mandated PF00042 fallback was therefore used explicitly.",
-    "selectedCandidate": "InterPro 109.0 downloadable PF00042.29 full alignment, CC0 1.0"
+    "selectedCandidate": "InterPro 109.0 downloadable PF00042.29 full alignment, CC0 1.0",
+    "ensembleDecision": "Retain exactly the three M01-screened AlphaFold DB v6 members P02197, A0A5E4C8D4, and A0A2Y9DEZ0. The comparative display is not evidence of a biological ensemble."
   },
   "identifiers": {
     "uniprotAccession": "P69905",
@@ -25,7 +33,8 @@
     "pdbRevisionDate": "2026-08-12",
     "selectedLabelAsymId": "A",
     "selectedAuthAsymId": "A",
-    "selectedEntityId": "1"
+    "selectedEntityId": "1",
+    "ensembleId": "PF00042.29-P69905-1A3N-plus-AFDB-v6-3"
   },
   "sources": [
     {
@@ -56,6 +65,101 @@
       "recordUrl": "https://www.ebi.ac.uk/pdbe/docs/sifts/quick.html",
       "usageTerms": "The downloaded XML embeds its PDBe-UniProt copyright and licence notice; retain the raw record and cite SIFTS.",
       "usageTermsUrl": "https://www.ebi.ac.uk/pdbe/docs/sifts/quick.html"
+    },
+    {
+      "name": "AlphaFold Protein Structure Database",
+      "apiUrl": "https://alphafold.ebi.ac.uk/api/prediction/{accession}",
+      "recordUrl": "https://alphafold.ebi.ac.uk/entry/{accession}",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "attribution": "AlphaFold Protein Structure Database (EMBL-EBI), DeepMind, and the AlphaFold consortium. Each retained model is a theoretical AlphaFold DB v6 prediction, not an experimental structure."
+    },
+    {
+      "name": "UniProtKB retained prediction-member records",
+      "url": "https://rest.uniprot.org/uniprotkb/{accession}.json",
+      "recordUrl": "https://www.uniprot.org/uniprotkb/{accession}/entry",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://www.uniprot.org/help/license/"
+    }
+  ],
+  "predictedMembers": [
+    {
+      "accession": "P02197",
+      "accessionVersion": "P02197.4",
+      "alignmentRow": "MYG_CHICK/27-143",
+      "uniprotRecordPath": "input/P02197.uniprot.json.raw",
+      "uniprotUrl": "https://rest.uniprot.org/uniprotkb/P02197.json",
+      "afdbApiRecordPath": "input/P02197.afdb.json.raw",
+      "afdbApiUrl": "https://alphafold.ebi.ac.uk/api/prediction/P02197",
+      "modelId": "AF-P02197-F1-model_v6",
+      "modelEntityId": "AF-P02197-F1",
+      "modelVersion": 6,
+      "mmcifPath": "input/AF-P02197-F1-model_v6.cif",
+      "cifUrl": "https://alphafold.ebi.ac.uk/files/AF-P02197-F1-model_v6.cif",
+      "recordUrl": "https://alphafold.ebi.ac.uk/entry/P02197",
+      "modelCreatedDate": "2025-08-01T00:00:00Z",
+      "modelLicense": "CC BY 4.0",
+      "modelLicenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "modelAttribution": "AlphaFold Protein Structure Database (EMBL-EBI), DeepMind, and the AlphaFold consortium.",
+      "uniprotCoverage": "154/154 exact sequence residues",
+      "observedCaCoverage": "154/154 exact model label_seq_id residues",
+      "predicted": true,
+      "requiredDisplayLabel": "AlphaFold DB v6 predicted model - theoretical; not experimental",
+      "confidenceSemantics": "Any AlphaFold confidence value is predicted-model confidence, not experimental evidence.",
+      "mappingPath": "mappings/PF00042.29-P02197-AF-P02197-F1-model_v6.tsv",
+      "transformPath": "transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.transform.json"
+    },
+    {
+      "accession": "A0A5E4C8D4",
+      "accessionVersion": "A0A5E4C8D4.1",
+      "alignmentRow": "A0A5E4C8D4_MARMO/27-137",
+      "uniprotRecordPath": "input/A0A5E4C8D4.uniprot.json.raw",
+      "uniprotUrl": "https://rest.uniprot.org/uniprotkb/A0A5E4C8D4.json",
+      "afdbApiRecordPath": "input/A0A5E4C8D4.afdb.json.raw",
+      "afdbApiUrl": "https://alphafold.ebi.ac.uk/api/prediction/A0A5E4C8D4",
+      "modelId": "AF-A0A5E4C8D4-F1-model_v6",
+      "modelEntityId": "AF-A0A5E4C8D4-F1",
+      "modelVersion": 6,
+      "mmcifPath": "input/AF-A0A5E4C8D4-F1-model_v6.cif",
+      "cifUrl": "https://alphafold.ebi.ac.uk/files/AF-A0A5E4C8D4-F1-model_v6.cif",
+      "recordUrl": "https://alphafold.ebi.ac.uk/entry/A0A5E4C8D4",
+      "modelCreatedDate": "2022-06-01T00:00:00Z",
+      "modelLicense": "CC BY 4.0",
+      "modelLicenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "modelAttribution": "AlphaFold Protein Structure Database (EMBL-EBI), DeepMind, and the AlphaFold consortium.",
+      "uniprotCoverage": "142/142 exact sequence residues",
+      "observedCaCoverage": "142/142 exact model label_seq_id residues",
+      "predicted": true,
+      "requiredDisplayLabel": "AlphaFold DB v6 predicted model - theoretical; not experimental",
+      "confidenceSemantics": "Any AlphaFold confidence value is predicted-model confidence, not experimental evidence.",
+      "mappingPath": "mappings/PF00042.29-A0A5E4C8D4-AF-A0A5E4C8D4-F1-model_v6.tsv",
+      "transformPath": "transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.transform.json"
+    },
+    {
+      "accession": "A0A2Y9DEZ0",
+      "accessionVersion": "A0A2Y9DEZ0.1",
+      "alignmentRow": "A0A2Y9DEZ0_TRIMA/27-137",
+      "uniprotRecordPath": "input/A0A2Y9DEZ0.uniprot.json.raw",
+      "uniprotUrl": "https://rest.uniprot.org/uniprotkb/A0A2Y9DEZ0.json",
+      "afdbApiRecordPath": "input/A0A2Y9DEZ0.afdb.json.raw",
+      "afdbApiUrl": "https://alphafold.ebi.ac.uk/api/prediction/A0A2Y9DEZ0",
+      "modelId": "AF-A0A2Y9DEZ0-F1-model_v6",
+      "modelEntityId": "AF-A0A2Y9DEZ0-F1",
+      "modelVersion": 6,
+      "mmcifPath": "input/AF-A0A2Y9DEZ0-F1-model_v6.cif",
+      "cifUrl": "https://alphafold.ebi.ac.uk/files/AF-A0A2Y9DEZ0-F1-model_v6.cif",
+      "recordUrl": "https://alphafold.ebi.ac.uk/entry/A0A2Y9DEZ0",
+      "modelCreatedDate": "2022-06-01T00:00:00Z",
+      "modelLicense": "CC BY 4.0",
+      "modelLicenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+      "modelAttribution": "AlphaFold Protein Structure Database (EMBL-EBI), DeepMind, and the AlphaFold consortium.",
+      "uniprotCoverage": "142/142 exact sequence residues",
+      "observedCaCoverage": "142/142 exact model label_seq_id residues",
+      "predicted": true,
+      "requiredDisplayLabel": "AlphaFold DB v6 predicted model - theoretical; not experimental",
+      "confidenceSemantics": "Any AlphaFold confidence value is predicted-model confidence, not experimental evidence.",
+      "mappingPath": "mappings/PF00042.29-A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-model_v6.tsv",
+      "transformPath": "transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.transform.json"
     }
   ],
   "transformations": [
@@ -67,7 +171,22 @@
     {
       "id": "query-centric-normalization",
       "classification": "transformed-real",
-      "description": "Pfam full alignment dots are insert-state padding. Retain every source column where the P69905 query is not a dot, uppercase residue letters, and serialize dot/hyphen gaps as '-'. The ungapped query is exactly UniProt P69905 positions 27–137."
+      "description": "Pfam full alignment dots are insert-state padding. Retain every source column where the P69905 query is not a dot, uppercase residue letters, and serialize dot/hyphen gaps as '-'. The ungapped query is exactly UniProt P69905 positions 27-137."
+    },
+    {
+      "id": "source-column-aware-predicted-member-mapping",
+      "classification": "transformed-real",
+      "description": "For each retained candidate, use the frozen source Stockholm row to retain the UniProt position consumed by every real source residue, then project only the frozen query-centric columns. Mol* parses the local model and supplies label_seq_id/auth_seq_id/C-alpha coordinates. SIFTS is not used for any predicted member and this process makes no experimental mutation claim."
+    },
+    {
+      "id": "frozen-alignment-column-rigid-transform",
+      "classification": "transformed-real",
+      "description": "For each mobile model, pair only ordered frozen PF00042 query-centric columns that have exact observed P69905/1A3N and mobile C-alpha mappings. Mol* MinimizeRmsd.compute calculates the deterministic mobile-to-1A3N transform. No automatic sequence or structure alignment is used."
+    },
+    {
+      "id": "four-root-local-mvs",
+      "classification": "verification",
+      "description": "The checked MVSJ is one experimental 1A3N cartoon and three individually colored AlphaFold DB v6 predicted-model cartoons, all from local fixture URLs with frozen transforms and focus on experimental 1A3N chain A."
     }
   ],
   "alignmentAudit": {
@@ -83,39 +202,99 @@
       "package": "molstar@5.11.0",
       "schemeRows": 141,
       "observedResidues": 141,
-      "result": "P69905 positions 2–142 map exactly to observed 1A3N chain A label/auth residues 1–141; the query-column and sequence/structure tables are frozen."
+      "result": "P69905 positions 2-142 map exactly to observed 1A3N chain A label/auth residues 1-141; the query-column and sequence/structure tables are frozen."
+    },
+    "predictedMemberMappings": {
+      "P02197": {
+        "frozenAlignmentResidues": 112,
+        "frozenAlignmentGaps": 6,
+        "exactObservedMappings": 112,
+        "fullModelObservedCaResidues": 154,
+        "sequenceExactness": "Every non-gap frozen row residue exactly matches the retained UniProt record and Mol*-parsed model label_seq_id. Source query-dot columns explain omitted row positions where applicable.",
+        "siftsUsed": false,
+        "experimentalMutationClaim": false
+      },
+      "A0A5E4C8D4": {
+        "frozenAlignmentResidues": 111,
+        "frozenAlignmentGaps": 7,
+        "exactObservedMappings": 111,
+        "fullModelObservedCaResidues": 142,
+        "sequenceExactness": "Every non-gap frozen row residue exactly matches the retained UniProt record and Mol*-parsed model label_seq_id. Source query-dot columns explain omitted row positions where applicable.",
+        "siftsUsed": false,
+        "experimentalMutationClaim": false
+      },
+      "A0A2Y9DEZ0": {
+        "frozenAlignmentResidues": 110,
+        "frozenAlignmentGaps": 8,
+        "exactObservedMappings": 110,
+        "fullModelObservedCaResidues": 142,
+        "sequenceExactness": "Every non-gap frozen row residue exactly matches the retained UniProt record and Mol*-parsed model label_seq_id. Source query-dot columns explain omitted row positions where applicable.",
+        "siftsUsed": false,
+        "experimentalMutationClaim": false
+      }
     }
+  },
+  "ensemble": {
+    "biologicalEnsembleClaim": false,
+    "label": "Comparative experimental-plus-predicted structural display",
+    "mvsPath": "expected/PF00042.29-4-root-ensemble.mvsj",
+    "structureRoots": 4,
+    "focus": "P69905/1A3N experimental chain A",
+    "colors": {
+      "experimentalP69905_1A3N": "#2563EB",
+      "predictedP02197": "#F97316",
+      "predictedA0A5E4C8D4": "#10B981",
+      "predictedA0A2Y9DEZ0": "#A855F7"
+    },
+    "transformConvention": "column-major 4x4 homogeneous matrix, mobile-to-P69905/1A3N chain A frame",
+    "transforms": [
+      {
+        "member": "P02197",
+        "pairCount": 108,
+        "rmsdAngstrom": 1.685969014466101,
+        "pairTablePath": "transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+        "transformPath": "transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.transform.json"
+      },
+      {
+        "member": "A0A5E4C8D4",
+        "pairCount": 111,
+        "rmsdAngstrom": 0.33601757542522814,
+        "pairTablePath": "transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+        "transformPath": "transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.transform.json"
+      },
+      {
+        "member": "A0A2Y9DEZ0",
+        "pairCount": 110,
+        "rmsdAngstrom": 0.5357812930315486,
+        "pairTablePath": "transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+        "transformPath": "transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.transform.json"
+      }
+    ]
   },
   "files": [
     {
-      "path": "input/P69905.uniprot.json.raw",
-      "bytes": 269400,
-      "sha256": "a9de50570a2c69e3b5593c82e290c31403682bcdecb19ba04e5632ac8771601a",
-      "classification": "real"
+      "path": "expected/molstar-ensemble-audit.json",
+      "bytes": 4453,
+      "sha256": "795086e1372b732c17a943c4355fd5f06fd39c731e34800911ccc7e343da0994",
+      "classification": "verification"
     },
     {
-      "path": "input/P69905.fasta",
-      "bytes": 233,
-      "sha256": "aecc3cb75f840f242f6b4489d501384d0c50cf0d61a8dab5a1dab81a80aa4bae",
-      "classification": "real"
-    },
-    {
-      "path": "input/PF00042.29-32rows.source.sto",
-      "bytes": 25467,
-      "sha256": "6ad12ec174fd84af4a5182948085d61da3cbf1e00c2d370f488333de14696a01",
-      "classification": "transformed-real-source-extract"
-    },
-    {
-      "path": "mappings/PF00042.29-32rows.selection.tsv",
-      "bytes": 2509,
-      "sha256": "191ac79ddd491e516a7994b2933679d972fedcb84dda33f3cc1880c36bff45cc",
-      "classification": "transformed-real"
+      "path": "expected/molstar-mapping-audit.json",
+      "bytes": 827,
+      "sha256": "8d3271247ef9665c6663137bfa4454ecea7f9bdf9c35bbda49d78d1188799847",
+      "classification": "verification"
     },
     {
       "path": "expected/PF00042.29-32rows.query-centric.afa",
       "bytes": 5554,
       "sha256": "df9d6c9cb89012620d8dd335ca70d0048704abc59239127af12c9a359af9f8e7",
       "classification": "transformed-real"
+    },
+    {
+      "path": "expected/PF00042.29-4-root-ensemble.mvsj",
+      "bytes": 9499,
+      "sha256": "3e00d3736fb28f2ccd5b78c42c99ab3d8074f3516d41c4471827078264dc50c9",
+      "classification": "verification"
     },
     {
       "path": "input/1A3N.cif",
@@ -130,6 +309,78 @@
       "classification": "real"
     },
     {
+      "path": "input/A0A2Y9DEZ0.afdb.json.raw",
+      "bytes": 1818,
+      "sha256": "91b9dd8a96aad0c8c2ef6082b43dc46fa4320ac5ee5b5826bf0e79d755bf16fd",
+      "classification": "real"
+    },
+    {
+      "path": "input/A0A2Y9DEZ0.uniprot.json.raw",
+      "bytes": 8305,
+      "sha256": "a35c8f305757aa46dbf8fec4726301700db312b678e6da0c9744552f59bf24b8",
+      "classification": "real"
+    },
+    {
+      "path": "input/A0A5E4C8D4.afdb.json.raw",
+      "bytes": 1792,
+      "sha256": "7256e503622dd66caae33a9d501908aeb7dfbc069c686d3f4aa6320e4c0ed148",
+      "classification": "real"
+    },
+    {
+      "path": "input/A0A5E4C8D4.uniprot.json.raw",
+      "bytes": 7988,
+      "sha256": "c6a2ee250a377f50253f962ea7d724583725217489cbfcfdf4d8dd13af8e3a31",
+      "classification": "real"
+    },
+    {
+      "path": "input/AF-A0A2Y9DEZ0-F1-model_v6.cif",
+      "bytes": 145013,
+      "sha256": "f254c99c3ce4fafdcc847e21c69e66ce443ce85e5a0c6d8ecb93b559714bb175",
+      "classification": "real"
+    },
+    {
+      "path": "input/AF-A0A5E4C8D4-F1-model_v6.cif",
+      "bytes": 141027,
+      "sha256": "d9ae2fa3eec9af90c982f50bc77b2db1c4125f865d6e5b888c8aa1beb44a0206",
+      "classification": "real"
+    },
+    {
+      "path": "input/AF-P02197-F1-model_v6.cif",
+      "bytes": 153621,
+      "sha256": "add1eaa81d25e5243ae572beebb46bff297832bf4349a8b61eb1df8cd6c3e77f",
+      "classification": "real"
+    },
+    {
+      "path": "input/P02197.afdb.json.raw",
+      "bytes": 1743,
+      "sha256": "8e761628996a9c5b93305435e324f4351b51875f4b2848e9ac88bfd519bc92a9",
+      "classification": "real"
+    },
+    {
+      "path": "input/P02197.uniprot.json.raw",
+      "bytes": 14454,
+      "sha256": "77cc3f7f18f20361b32a047152450ae8882a104d4f27a0c3a7a3b9de0c2efa39",
+      "classification": "real"
+    },
+    {
+      "path": "input/P69905.fasta",
+      "bytes": 233,
+      "sha256": "aecc3cb75f840f242f6b4489d501384d0c50cf0d61a8dab5a1dab81a80aa4bae",
+      "classification": "real"
+    },
+    {
+      "path": "input/P69905.uniprot.json.raw",
+      "bytes": 269400,
+      "sha256": "a9de50570a2c69e3b5593c82e290c31403682bcdecb19ba04e5632ac8771601a",
+      "classification": "real"
+    },
+    {
+      "path": "input/PF00042.29-32rows.source.sto",
+      "bytes": 25467,
+      "sha256": "6ad12ec174fd84af4a5182948085d61da3cbf1e00c2d370f488333de14696a01",
+      "classification": "transformed-real-source-extract"
+    },
+    {
       "path": "mappings/P69905-1A3N-chain-A.tsv",
       "bytes": 8048,
       "sha256": "535233812d4661d5c88c13ad97b816013f2f021a44738c2d0ecb3f69c4969d2c",
@@ -142,14 +393,77 @@
       "classification": "transformed-real"
     },
     {
-      "path": "expected/molstar-mapping-audit.json",
-      "bytes": 827,
-      "sha256": "8d3271247ef9665c6663137bfa4454ecea7f9bdf9c35bbda49d78d1188799847",
-      "classification": "verification"
+      "path": "mappings/PF00042.29-32rows.selection.tsv",
+      "bytes": 2509,
+      "sha256": "191ac79ddd491e516a7994b2933679d972fedcb84dda33f3cc1880c36bff45cc",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "mappings/PF00042.29-A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-model_v6.tsv",
+      "bytes": 16605,
+      "sha256": "e84f532026d95b50274d71267a879b9729c0be5ea29afc2834d3fa06b5b188d5",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "mappings/PF00042.29-A0A5E4C8D4-AF-A0A5E4C8D4-F1-model_v6.tsv",
+      "bytes": 16605,
+      "sha256": "810b9efa6ed17c4adc99bc0176d216032d399ec910731ad286060dd3f84c8d56",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "mappings/PF00042.29-P02197-AF-P02197-F1-model_v6.tsv",
+      "bytes": 14375,
+      "sha256": "8cecf05e6a6faf32a43fc9e940b6ec49313b88f2a8397f4f6256ddaceee30ad6",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+      "bytes": 18379,
+      "sha256": "b8e77aba781623047c31aa5824eb730cf74caee8507cb6650e4cc3502a7c75be",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.transform.json",
+      "bytes": 2330,
+      "sha256": "93925ed1f83cef171badc5728f022a0e965fd2e7faa41ae9c738f4124bcb9ae3",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+      "bytes": 18466,
+      "sha256": "7b91b71fec33fc40746b4605dca2d8b9299e69835005bfc587f967f887c472db",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.transform.json",
+      "bytes": 2332,
+      "sha256": "17768f017ba516af15e470380558360c412a312ffe09841b02bc1c444801f8ff",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+      "bytes": 17533,
+      "sha256": "77364651b06e0c1b2a781f26a6ec35fb2852bb03242baa847c0cf6e272f26e6f",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.transform.json",
+      "bytes": 2307,
+      "sha256": "cbeb38ee8a395262cd685b90866e85054662390454caae0b6a4551f3626772ac",
+      "classification": "transformed-real"
     }
   ],
   "sizeBudget": {
-    "checkedInBytes": 935489,
+    "checkedInBytes": 1534134,
+    "browserFixtureInputScope": "The local four-root MVSJ plus its one experimental and three predicted raw mmCIF downloads. This excludes source JSON, mapping/pair tables, and the application/runtime bundle.",
+    "browserFixtureInputFiles": [
+      "expected/PF00042.29-4-root-ensemble.mvsj",
+      "input/1A3N.cif",
+      "input/AF-P02197-F1-model_v6.cif",
+      "input/AF-A0A5E4C8D4-F1-model_v6.cif",
+      "input/AF-A0A2Y9DEZ0-F1-model_v6.cif"
+    ],
+    "browserFixtureInputBytes": 1010080,
     "browserInputBudgetBytes": 1048576,
     "withinBudget": true
   },

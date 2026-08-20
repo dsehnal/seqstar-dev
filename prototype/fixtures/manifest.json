@@ -1,8 +1,8 @@
 {
   "schemaVersion": 1,
-  "packId": "seq-star-p01c-fixtures-2026-08-19",
+  "packId": "seq-star-m50-fixtures-2026-08-20",
   "status": "approved",
-  "retrievalDate": "2026-08-19",
+  "retrievalDate": "2026-08-20",
   "structureParserValidation": {
     "package": "molstar@5.11.0",
     "allSelectedSchemeAndObservedRowsMatchedSifts": true,
@@ -165,39 +165,33 @@
     {
       "caseId": "alignment-structure",
       "status": "approved",
-      "metadataSha256": "5c1b3af6048c7777fa1c579b187e6bf92e45ccb20ae4c035f990ac8b9bd10291",
-      "metadataBytes": 6222,
-      "contentBytes": 935489,
+      "metadataSha256": "650ca075f73eab58a9e63aa004ff09fec3db85684d8d09faa1f9fd20e0ebca73",
+      "metadataBytes": 21516,
+      "contentBytes": 1534134,
       "files": [
         {
-          "path": "alignment-structure/input/P69905.uniprot.json.raw",
-          "bytes": 269400,
-          "sha256": "a9de50570a2c69e3b5593c82e290c31403682bcdecb19ba04e5632ac8771601a",
-          "classification": "real"
+          "path": "alignment-structure/expected/molstar-ensemble-audit.json",
+          "bytes": 4453,
+          "sha256": "795086e1372b732c17a943c4355fd5f06fd39c731e34800911ccc7e343da0994",
+          "classification": "verification"
         },
         {
-          "path": "alignment-structure/input/P69905.fasta",
-          "bytes": 233,
-          "sha256": "aecc3cb75f840f242f6b4489d501384d0c50cf0d61a8dab5a1dab81a80aa4bae",
-          "classification": "real"
-        },
-        {
-          "path": "alignment-structure/input/PF00042.29-32rows.source.sto",
-          "bytes": 25467,
-          "sha256": "6ad12ec174fd84af4a5182948085d61da3cbf1e00c2d370f488333de14696a01",
-          "classification": "transformed-real-source-extract"
-        },
-        {
-          "path": "alignment-structure/mappings/PF00042.29-32rows.selection.tsv",
-          "bytes": 2509,
-          "sha256": "191ac79ddd491e516a7994b2933679d972fedcb84dda33f3cc1880c36bff45cc",
-          "classification": "transformed-real"
+          "path": "alignment-structure/expected/molstar-mapping-audit.json",
+          "bytes": 827,
+          "sha256": "8d3271247ef9665c6663137bfa4454ecea7f9bdf9c35bbda49d78d1188799847",
+          "classification": "verification"
         },
         {
           "path": "alignment-structure/expected/PF00042.29-32rows.query-centric.afa",
           "bytes": 5554,
           "sha256": "df9d6c9cb89012620d8dd335ca70d0048704abc59239127af12c9a359af9f8e7",
           "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/expected/PF00042.29-4-root-ensemble.mvsj",
+          "bytes": 9499,
+          "sha256": "3e00d3736fb28f2ccd5b78c42c99ab3d8074f3516d41c4471827078264dc50c9",
+          "classification": "verification"
         },
         {
           "path": "alignment-structure/input/1A3N.cif",
@@ -212,6 +206,78 @@
           "classification": "real"
         },
         {
+          "path": "alignment-structure/input/A0A2Y9DEZ0.afdb.json.raw",
+          "bytes": 1818,
+          "sha256": "91b9dd8a96aad0c8c2ef6082b43dc46fa4320ac5ee5b5826bf0e79d755bf16fd",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/A0A2Y9DEZ0.uniprot.json.raw",
+          "bytes": 8305,
+          "sha256": "a35c8f305757aa46dbf8fec4726301700db312b678e6da0c9744552f59bf24b8",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/A0A5E4C8D4.afdb.json.raw",
+          "bytes": 1792,
+          "sha256": "7256e503622dd66caae33a9d501908aeb7dfbc069c686d3f4aa6320e4c0ed148",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/A0A5E4C8D4.uniprot.json.raw",
+          "bytes": 7988,
+          "sha256": "c6a2ee250a377f50253f962ea7d724583725217489cbfcfdf4d8dd13af8e3a31",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/AF-A0A2Y9DEZ0-F1-model_v6.cif",
+          "bytes": 145013,
+          "sha256": "f254c99c3ce4fafdcc847e21c69e66ce443ce85e5a0c6d8ecb93b559714bb175",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/AF-A0A5E4C8D4-F1-model_v6.cif",
+          "bytes": 141027,
+          "sha256": "d9ae2fa3eec9af90c982f50bc77b2db1c4125f865d6e5b888c8aa1beb44a0206",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/AF-P02197-F1-model_v6.cif",
+          "bytes": 153621,
+          "sha256": "add1eaa81d25e5243ae572beebb46bff297832bf4349a8b61eb1df8cd6c3e77f",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/P02197.afdb.json.raw",
+          "bytes": 1743,
+          "sha256": "8e761628996a9c5b93305435e324f4351b51875f4b2848e9ac88bfd519bc92a9",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/P02197.uniprot.json.raw",
+          "bytes": 14454,
+          "sha256": "77cc3f7f18f20361b32a047152450ae8882a104d4f27a0c3a7a3b9de0c2efa39",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/P69905.fasta",
+          "bytes": 233,
+          "sha256": "aecc3cb75f840f242f6b4489d501384d0c50cf0d61a8dab5a1dab81a80aa4bae",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/P69905.uniprot.json.raw",
+          "bytes": 269400,
+          "sha256": "a9de50570a2c69e3b5593c82e290c31403682bcdecb19ba04e5632ac8771601a",
+          "classification": "real"
+        },
+        {
+          "path": "alignment-structure/input/PF00042.29-32rows.source.sto",
+          "bytes": 25467,
+          "sha256": "6ad12ec174fd84af4a5182948085d61da3cbf1e00c2d370f488333de14696a01",
+          "classification": "transformed-real-source-extract"
+        },
+        {
           "path": "alignment-structure/mappings/P69905-1A3N-chain-A.tsv",
           "bytes": 8048,
           "sha256": "535233812d4661d5c88c13ad97b816013f2f021a44738c2d0ecb3f69c4969d2c",
@@ -224,12 +290,74 @@
           "classification": "transformed-real"
         },
         {
-          "path": "alignment-structure/expected/molstar-mapping-audit.json",
-          "bytes": 827,
-          "sha256": "8d3271247ef9665c6663137bfa4454ecea7f9bdf9c35bbda49d78d1188799847",
-          "classification": "verification"
+          "path": "alignment-structure/mappings/PF00042.29-32rows.selection.tsv",
+          "bytes": 2509,
+          "sha256": "191ac79ddd491e516a7994b2933679d972fedcb84dda33f3cc1880c36bff45cc",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/mappings/PF00042.29-A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-model_v6.tsv",
+          "bytes": 16605,
+          "sha256": "e84f532026d95b50274d71267a879b9729c0be5ea29afc2834d3fa06b5b188d5",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/mappings/PF00042.29-A0A5E4C8D4-AF-A0A5E4C8D4-F1-model_v6.tsv",
+          "bytes": 16605,
+          "sha256": "810b9efa6ed17c4adc99bc0176d216032d399ec910731ad286060dd3f84c8d56",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/mappings/PF00042.29-P02197-AF-P02197-F1-model_v6.tsv",
+          "bytes": 14375,
+          "sha256": "8cecf05e6a6faf32a43fc9e940b6ec49313b88f2a8397f4f6256ddaceee30ad6",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+          "bytes": 18379,
+          "sha256": "b8e77aba781623047c31aa5824eb730cf74caee8507cb6650e4cc3502a7c75be",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.transform.json",
+          "bytes": 2330,
+          "sha256": "93925ed1f83cef171badc5728f022a0e965fd2e7faa41ae9c738f4124bcb9ae3",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+          "bytes": 18466,
+          "sha256": "7b91b71fec33fc40746b4605dca2d8b9299e69835005bfc587f967f887c472db",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.transform.json",
+          "bytes": 2332,
+          "sha256": "17768f017ba516af15e470380558360c412a312ffe09841b02bc1c444801f8ff",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+          "bytes": 17533,
+          "sha256": "77364651b06e0c1b2a781f26a6ec35fb2852bb03242baa847c0cf6e272f26e6f",
+          "classification": "transformed-real"
+        },
+        {
+          "path": "alignment-structure/transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.transform.json",
+          "bytes": 2307,
+          "sha256": "cbeb38ee8a395262cd685b90866e85054662390454caae0b6a4551f3626772ac",
+          "classification": "transformed-real"
         }
       ]
     }
-  ]
+  ],
+  "alignmentEnsembleValidation": {
+    "package": "molstar@5.11.0",
+    "fixtureAudit": "tests/m50-fixtures/derive-ensemble.mjs",
+    "independentReviewRequired": true,
+    "independentReviewState": "approved-for-m50-use",
+    "reviewedDate": "2026-08-20",
+    "downstreamM50UseAllowed": true
+  }
 }

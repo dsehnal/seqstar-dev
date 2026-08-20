@@ -1,0 +1,53 @@
+{
+  "schemaVersion": 1,
+  "transformId": "AF-P02197-F1-to-P69905-1A3N-chain-A",
+  "generatedDate": "2026-08-20",
+  "reference": {
+    "accession": "P69905",
+    "structureId": "1A3N",
+    "entityId": "1",
+    "labelAsymId": "A",
+    "authAsymId": "A",
+    "coordinateFrame": "P69905/1A3N chain A"
+  },
+  "mobile": {
+    "accession": "P02197",
+    "accessionVersion": "P02197.4",
+    "modelId": "AF-P02197-F1-model_v6",
+    "modelEntityId": "AF-P02197-F1",
+    "labelAsymId": "A",
+    "authAsymId": "A",
+    "entityId": "1",
+    "sourceKind": "predicted",
+    "sourceLabel": "AlphaFold DB v6 predicted model; not an experimental structure"
+  },
+  "coordinatePairs": {
+    "sourceAlignment": "PF00042.29-32rows.query-centric.afa",
+    "rule": "Ordered one-to-one C-alpha pairs from columns where both the frozen P69905 query row and the frozen member row have exact observed mappings; no sequence or structure alignment is performed.",
+    "pairTablePath": "transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+    "pairTableSha256": "77364651b06e0c1b2a781f26a6ec35fb2852bb03242baa847c0cf6e272f26e6f",
+    "pairCount": 108
+  },
+  "algorithm": {
+    "package": "molstar@5.11.0",
+    "api": "MinimizeRmsd.compute",
+    "method": "Mol* quaternion eigenvalue Kabsch-style rigid least-squares fit",
+    "mobileToReference": true
+  },
+  "matrix": {
+    "convention": "column-major 4x4 homogeneous matrix; post-transform mobile coordinates are in the P69905/1A3N chain A frame",
+    "values": [
+      0.015407807107543192, 0.8029557972080248, -0.5958393911279458, 0, 0.06435613366159387,
+      -0.5954708975375027, -0.8007950340719816, 0, -0.9978080378258269, -0.026007427097667346,
+      -0.060850025789505935, 0, 3.1799646353801707, 12.84965636083059, 20.918204885168862, 1
+    ]
+  },
+  "rmsdAngstrom": 1.685969014466101,
+  "sourceAssetSha256": {
+    "referenceMmcif": "7cd2eb16d3469a3ef32864f33ee2ca09258b1b1fff2c1c83214b9af3087f93dd",
+    "mobileMmcif": "add1eaa81d25e5243ae572beebb46bff297832bf4349a8b61eb1df8cd6c3e77f",
+    "frozenAlignment": "df9d6c9cb89012620d8dd335ca70d0048704abc59239127af12c9a359af9f8e7",
+    "referenceMapping": "b16d450e42370f16e1e5166c8b3b65cb46c92a2ce24df9ee5ba667324468df50",
+    "mobileMapping": "8cecf05e6a6faf32a43fc9e940b6ec49313b88f2a8397f4f6256ddaceee30ad6"
+  }
+}
