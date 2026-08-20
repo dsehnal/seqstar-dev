@@ -15,7 +15,9 @@ import {
   type NightingaleLoadResult,
   type NightingaleNativeDriver,
   type NightingaleNativeInteraction,
+  NightingalePresentationError,
   NightingaleWrapper,
+  snapshotNightingalePresentation,
 } from "../../packages/wrapper-nightingale/src/index.js";
 import { createHarnessContext, message, runWrapperConformance, uuid } from "./contract-kit.js";
 
@@ -378,5 +380,151 @@ describe("Nightingale wrapper boundaries", () => {
     expect(native.appliedCommands[1]?.loci).toEqual(loci);
     expect(native.appliedCommands.map(({ family }) => family)).toEqual(["highlight", "selection"]);
     await wrapper.dispose();
+  });
+
+  it("toggles an identical native selection once, replaces a different one, and does not echo applies", async () => {
+    const harness = createHarnessContext();
+    const native = new ControlledDriver();
+    const wrapper = new NightingaleWrapper({
+      id: "nightingale",
+      target: {} as HTMLElement,
+      driverFactory: () => native,
+    });
+    await wrapper.start(harness.context);
+    harness.fabric.publish(
+      message("visualization.seqviewspec.request", request("active"), { component: "nightingale" }),
+    );
+    native.loads[0]?.resolve(result());
+    await Promise.resolve();
+    native.emit({ interaction: "select", phase: "set", loci: [locus] });
+    native.emit({ interaction: "select", phase: "set", loci: [locus] });
+    const alternate: CoordinateLocus = {
+      kind: "point",
+      space: locus.space,
+      position: { kind: "index", value: 3 },
+    };
+    native.emit({ interaction: "select", phase: "set", loci: [locus] });
+    native.emit({ interaction: "select", phase: "set", loci: [alternate] });
+    const nativeEvents = harness.messages.filter((entry) => entry.type === "interaction.native");
+    expect(nativeEvents.map((entry) => (entry.payload as { phase: string }).phase)).toEqual([
+      "set",
+      "clear",
+      "set",
+      "clear",
+      "set",
+    ]);
+    const [firstSet, firstClear, secondSet, secondClear, replacementSet] = nativeEvents;
+    if (
+      firstSet === undefined ||
+      firstClear === undefined ||
+      secondSet === undefined ||
+      secondClear === undefined ||
+      replacementSet === undefined
+    )
+      throw new Error("Expected the complete native toggle event sequence.");
+    expect(firstClear?.correlationId).toBe(firstSet?.correlationId);
+    expect((firstClear.payload as { interactionId: string }).interactionId).toBe(
+      (firstSet.payload as { interactionId: string }).interactionId,
+    );
+    expect(secondClear?.correlationId).toBe(secondSet?.correlationId);
+    expect(replacementSet?.correlationId).not.toBe(secondSet?.correlationId);
+    const owner = { correlationId: uuid(), sourceComponent: "remote" };
+    harness.fabric.publish(
+      message(
+        "interaction.selection.apply",
+        { interactionId: "remote", owner, mode: "replace", loci: [alternate] },
+        { component: "nightingale" },
+      ),
+    );
+    expect(harness.messages.filter((entry) => entry.type === "interaction.native")).toHaveLength(5);
+    await wrapper.dispose();
+  });
+
+  it("publishes annotation identity for semantic native loci", async () => {
+    const harness = createHarnessContext();
+    const native = new ControlledDriver();
+    const wrapper = new NightingaleWrapper({
+      id: "nightingale",
+      target: {} as HTMLElement,
+      driverFactory: () => native,
+    });
+    await wrapper.start(harness.context);
+    harness.fabric.publish(
+      message("visualization.seqviewspec.request", request("active"), { component: "nightingale" }),
+    );
+    native.loads[0]?.resolve(result());
+    await Promise.resolve();
+    native.emit({
+      interaction: "select",
+      phase: "set",
+      loci: [locus],
+      identity: {
+        documentId: document.id,
+        viewId: "main",
+        sectionId: "section",
+        trackId: "track",
+        layerId: "letters",
+        annotationId: "contract-annotation",
+        generation: 1,
+        itemId: "contract-item",
+        nativeId: "contract-native",
+      },
+    });
+    const published = harness.messages.find((entry) => entry.type === "interaction.native");
+    if (published === undefined) throw new Error("Expected a semantic native event.");
+    expect((published.payload as { semanticTarget?: unknown }).semanticTarget).toEqual({
+      annotationId: "contract-annotation",
+      itemId: "contract-item",
+      trackId: "track",
+    });
+    await wrapper.dispose();
+  });
+
+  it("fails closed and detaches the wrapper presentation snapshot", () => {
+    const presentation = {
+      initialViewport: { start: 2, end: 4 },
+      trackActions: [{ trackId: "track", label: "Show track in 3D", kind: "structure" }],
+    };
+    const snapshot = snapshotNightingalePresentation(presentation);
+    presentation.trackActions[0].label = "mutated";
+    expect(snapshot).toEqual({
+      initialViewport: { start: 2, end: 4 },
+      trackActions: [{ trackId: "track", label: "Show track in 3D", kind: "structure" }],
+    });
+    expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.trackActions)).toBe(true);
+    expect(Object.isFrozen(snapshot.trackActions?.[0])).toBe(true);
+    expect(() =>
+      snapshotNightingalePresentation({
+        trackActions: [
+          { trackId: "a", label: "A" },
+          { trackId: "a", label: "B" },
+        ],
+      }),
+    ).toThrow(NightingalePresentationError);
+    expect(() =>
+      snapshotNightingalePresentation({ initialViewport: { start: 4, end: 2 } }),
+    ).toThrow("cannot exceed end");
+    const cyclic: { trackActions?: unknown[] } = {};
+    cyclic.trackActions = [cyclic];
+    expect(() => snapshotNightingalePresentation(cyclic)).toThrow("cannot contain cycles");
+    expect(() =>
+      snapshotNightingalePresentation({ trackActions: [{ trackId: "a", label: () => "x" }] }),
+    ).toThrow("JSON-safe");
+    expect(() =>
+      snapshotNightingalePresentation({ trackActions: [{ trackId: "", label: "A" }] }),
+    ).toThrow("non-empty string");
+    expect(() =>
+      snapshotNightingalePresentation({
+        trackActions: [{ trackId: "a", label: "A", kind: "dynamic" }],
+      }),
+    ).toThrow("must be structure or layers");
+    expect(() => snapshotNightingalePresentation({ initialViewport: { start: Infinity } })).toThrow(
+      "JSON-safe",
+    );
+    expect(() => snapshotNightingalePresentation(new Date())).toThrow("plain objects");
+    const accessor = {} as { trackActions?: unknown };
+    Object.defineProperty(accessor, "trackActions", { enumerable: true, get: () => [] });
+    expect(() => snapshotNightingalePresentation(accessor)).toThrow("cannot contain accessors");
   });
 });

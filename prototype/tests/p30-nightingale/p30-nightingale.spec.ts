@@ -106,3 +106,96 @@ test("normalizes actual sequence and linegraph D3 click paths to exact non-empty
     }),
   ]);
 });
+
+test("keeps native tracks in one pixel-aligned viewport with fixed compact headers", async ({
+  page,
+}) => {
+  const result = await run<{
+    viewport: { start?: string; end?: string };
+    wrapperViewport?: { start: number; end: number; length: number };
+    headerBefore: number;
+    headerAfter: number;
+    headerPosition: string;
+    action: { radius: string; hasSvg: boolean };
+    navigationWidth: number;
+    rootWidth: number;
+    lettersVisible: boolean;
+    trackActivations: number;
+    absentActionDiagnostic: boolean;
+    positions: number[];
+  }>(page, "viewportStress");
+  expect(Number(result.viewport.start)).toBeGreaterThan(1);
+  expect(Number(result.viewport.end)).toBeGreaterThan(Number(result.viewport.start));
+  expect(result.wrapperViewport).toEqual({ start: 239, end: 240, length: 240 });
+  expect(result.headerAfter).toBeCloseTo(result.headerBefore, 1);
+  expect(result.headerPosition).toBe("sticky");
+  expect(result.action).toEqual({ radius: "0px", hasSvg: true });
+  expect(result.navigationWidth).toBeLessThanOrEqual(result.rootWidth + 0.5);
+  expect(result.lettersVisible).toBe(true);
+  expect(result.trackActivations).toBe(2);
+  expect(result.absentActionDiagnostic).toBe(true);
+  expect(Math.max(...result.positions) - Math.min(...result.positions)).toBeLessThanOrEqual(1);
+});
+
+test("resolves complete semantic loci and toggle leases from native Nightingale identities", async ({
+  page,
+}) => {
+  const events = await run<
+    Array<{
+      interaction: string;
+      phase: string;
+      semanticTarget?: {
+        annotationId?: string;
+        itemId?: string;
+        endpointRole?: string;
+        locusIndex?: number;
+      };
+      loci: unknown[];
+      interactionId: string;
+    }>
+  >(page, "semanticLoci");
+  const hoverSets = events.filter(
+    (event) => event.interaction === "hover" && event.phase === "set",
+  );
+  expect(hoverSets[0]).toMatchObject({
+    semanticTarget: { annotationId: "features", itemId: "shared" },
+    loci: [
+      { kind: "interval", space: { id: "space", kind: "sequence", length: 5 }, start: 1, end: 4 },
+    ],
+  });
+  expect(hoverSets[1]).toMatchObject({
+    semanticTarget: {
+      annotationId: "relationships",
+      itemId: "paired",
+      endpointRole: "source",
+      locusIndex: 0,
+    },
+    loci: [
+      { kind: "interval", space: { id: "space", kind: "sequence", length: 5 }, start: 0, end: 1 },
+      {
+        kind: "point",
+        space: { id: "space", kind: "sequence", length: 5 },
+        position: { kind: "index", value: 4 },
+      },
+    ],
+  });
+  const selection = events.filter((event) => event.interaction === "select");
+  expect(selection.map((event) => event.phase)).toEqual(["set", "clear"]);
+  expect(selection[0]).toMatchObject({
+    semanticTarget: {
+      annotationId: "relationships",
+      itemId: "paired",
+      endpointRole: "source",
+      locusIndex: 0,
+    },
+    loci: [
+      { kind: "interval", space: { id: "space", kind: "sequence", length: 5 }, start: 0, end: 1 },
+      {
+        kind: "point",
+        space: { id: "space", kind: "sequence", length: 5 },
+        position: { kind: "index", value: 4 },
+      },
+    ],
+  });
+  expect(selection[1]?.interactionId).toBe(selection[0]?.interactionId);
+});

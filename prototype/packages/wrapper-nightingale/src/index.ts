@@ -24,6 +24,21 @@ import {
   type SeqViewSpec,
   validateSeqViewSpec,
 } from "@seq-star/seq-view-spec";
+import {
+  createNightingaleTrackActionIcon,
+  type NightingalePresentation,
+  NightingaleViewportController,
+  type NightingaleViewportDescriptor,
+  type NightingaleViewportElement,
+  snapshotNightingalePresentation,
+} from "./viewport.js";
+
+export type {
+  NightingalePresentation,
+  NightingaleTrackAction,
+  NightingaleViewportDescriptor,
+} from "./viewport.js";
+export { NightingalePresentationError, snapshotNightingalePresentation } from "./viewport.js";
 
 export const nightingaleWrapperType = "seqstar.nightingale";
 
@@ -31,7 +46,7 @@ type Subscription = { unsubscribe(): void };
 type AppliedFamily = "highlight" | "selection";
 type Layer = SeqViewSpec["views"][number]["sections"][number]["tracks"][number]["layers"][number];
 type Annotation = NonNullable<SeqViewSpec["annotations"]>[number];
-type NativeElement = HTMLElement & {
+type NativeElement = NightingaleViewportElement & {
   data?: unknown;
   height?: number;
   length?: number;
@@ -102,6 +117,7 @@ export interface NightingaleIdentity {
   readonly sectionId: string;
   readonly trackId: string;
   readonly layerId: string;
+  readonly annotationId?: string;
   readonly generation: number;
   readonly itemId?: string;
   readonly endpointRole?: string;
@@ -122,6 +138,7 @@ export class NightingaleIdentityTable {
       identity.sectionId,
       identity.trackId,
       identity.layerId,
+      identity.annotationId ?? "",
       identity.itemId ?? "",
       identity.endpointRole ?? "",
       identity.endpointIndex ?? -1,
@@ -170,6 +187,7 @@ export interface NightingaleNativeDriver {
   interactions: { subscribe(next: (event: NightingaleNativeInteraction) => void): Subscription };
   setApplied(family: AppliedFamily, owner: string, loci: readonly CoordinateLocus[]): void;
   clearApplied(family: AppliedFamily, owner: string): void;
+  getViewport?(): NightingaleViewportDescriptor | undefined;
   resize(): void;
   dispose(): void;
 }
@@ -247,6 +265,7 @@ type NativeTree = {
   readonly cleanups: Array<() => void>;
   readonly generation: number;
   readonly abort: AbortController;
+  readonly viewport: NightingaleViewportController;
 };
 
 export class NativeNightingaleDriver implements NightingaleNativeDriver {
@@ -263,9 +282,11 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
   private stagingTree: NativeTree | undefined;
   private resizeObserver: ResizeObserver | undefined;
   private disposed = false;
+  private readonly presentation: NightingalePresentation;
 
-  constructor(target: HTMLElement) {
+  constructor(target: HTMLElement, presentation: NightingalePresentation = {}) {
     this.target = target;
+    this.presentation = presentation;
     if (typeof ResizeObserver !== "undefined") {
       this.resizeObserver = new ResizeObserver(() => this.resize());
       this.resizeObserver.observe(target);
@@ -284,7 +305,13 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     return cleanups;
   }
 
-  private createTree(generation: number): NativeTree {
+  private get viewport(): NightingaleViewportController {
+    const viewport = this.stagingTree?.viewport ?? this.activeTree?.viewport;
+    if (viewport === undefined) throw new Error("Nightingale viewport is unavailable.");
+    return viewport;
+  }
+
+  private createTree(generation: number, length: number): NativeTree {
     const root = document.createElement("div");
     root.dataset.seqstarNightingaleStaging = String(generation);
     root.style.display = "grid";
@@ -295,13 +322,19 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     root.style.pointerEvents = "none";
     root.style.insetInlineStart = "-100000px";
     root.style.width = `${Math.max(1, Math.floor(this.target.getBoundingClientRect().width || 760))}px`;
-    return { root, cleanups: [], generation, abort: new AbortController() };
+    const viewport = new NightingaleViewportController(
+      root,
+      length,
+      this.presentation.initialViewport,
+    );
+    return { root, cleanups: [], generation, abort: new AbortController(), viewport };
   }
 
   private disposeTree(tree: NativeTree | undefined): void {
     if (tree === undefined) return;
     tree.abort.abort();
     for (const cleanup of tree.cleanups.splice(0)) cleanup();
+    tree.viewport.dispose();
     tree.root.remove();
   }
 
@@ -316,7 +349,8 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     if (options.signal.aborted) throw new DOMException("superseded", "AbortError");
     await registerNightingaleElements();
     this.disposeTree(this.stagingTree);
-    const staging = this.createTree(options.generation);
+    const sequenceLength = [...(options.document.sequences[0]?.residues ?? "")].length;
+    const staging = this.createTree(options.generation, Math.max(1, sequenceLength));
     this.stagingTree = staging;
     this.target.append(staging.root);
     try {
@@ -333,7 +367,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       staging.root.style.position = "relative";
       staging.root.style.visibility = "";
       staging.root.style.pointerEvents = "";
-      staging.root.style.insetInlineStart = "";
+      staging.root.style.removeProperty("inset-inline-start");
       staging.root.style.width = "";
       const previous = this.activeTree;
       this.activeTree = staging;
@@ -362,33 +396,115 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     if (firstSpace === undefined) throw new Error("A SeqViewSpec needs a sequence space.");
     const style = document.createElement("style");
     style.textContent = `
+      [data-seqstar-nightingale="root"], [data-seqstar-nightingale-staging] {
+        --seqstar-nightingale-label-width: 10rem;
+        display: grid;
+        gap: 0.25rem;
+        min-width: 0;
+        overflow: clip;
+      }
+      .seqstar-nightingale-row {
+        display: grid;
+        grid-template-columns: var(--seqstar-nightingale-label-width) minmax(0, 1fr);
+        align-items: center;
+        column-gap: 0.5rem;
+        min-width: 0;
+      }
+      .seqstar-nightingale-track-header {
+        position: sticky;
+        inset-inline-start: 0;
+        z-index: 3;
+        display: flex;
+        align-items: center;
+        min-width: 0;
+        gap: 0.25rem;
+        padding: 0.125rem 0.25rem;
+        background: #fff;
+      }
       .seqstar-nightingale-track-label {
         box-sizing: border-box;
-        width: 100%;
+        flex: 1 1 auto;
         min-width: 0;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
-        cursor: pointer;
-        border: 1px solid #cbd5e1;
-        border-radius: 0.375rem;
-        background: #f8fafc;
-        padding: 0.375rem 0.5rem;
+        border: 0;
+        border-radius: 0;
+        background: transparent;
+        padding: 0.125rem;
         color: #334155;
         font: inherit;
         font-weight: 600;
         line-height: 1.25;
         text-align: left;
-        transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
       }
-      .seqstar-nightingale-track-label:hover {
+      button.seqstar-nightingale-track-label { cursor: pointer; }
+      button.seqstar-nightingale-track-label:hover { color: #0369a1; }
+      .seqstar-nightingale-track-action {
+        display: inline-grid;
+        place-items: center;
+        flex: 0 0 1.75rem;
+        inline-size: 1.75rem;
+        block-size: 1.75rem;
+        padding: 0;
+        border: 1px solid #cbd5e1;
+        border-radius: 0;
+        background: #f8fafc;
+        color: #334155;
+        cursor: pointer;
+      }
+      .seqstar-nightingale-track-action:hover {
         border-color: #38bdf8;
         background: #e0f2fe;
         color: #0369a1;
       }
-      .seqstar-nightingale-track-label:focus-visible {
+      .seqstar-nightingale-track-label:focus-visible,
+      .seqstar-nightingale-track-action:focus-visible,
+      .seqstar-nightingale-viewport-slider:focus-visible {
         outline: 2px solid #0ea5e9;
         outline-offset: 2px;
+      }
+      .seqstar-nightingale-plot { min-width: 0; overflow: clip; }
+      .seqstar-nightingale-viewport {
+        display: grid;
+        grid-template-columns: var(--seqstar-nightingale-label-width) minmax(0, 1fr);
+        column-gap: 0.5rem;
+        min-width: 0;
+        margin-block-start: 0.125rem;
+      }
+      .seqstar-nightingale-viewport-overview {
+        position: relative;
+        min-width: 0;
+        block-size: 0.75rem;
+        border: 1px solid #cbd5e1;
+        border-radius: 0;
+        background: repeating-linear-gradient(90deg, #f8fafc 0 0.25rem, #e2e8f0 0.25rem 0.5rem);
+        cursor: ew-resize;
+      }
+      .seqstar-nightingale-viewport-window {
+        position: absolute;
+        inset-block: -1px;
+        inset-inline-start: 0;
+        min-inline-size: 0.5rem;
+        box-sizing: border-box;
+        border: 1px solid #0284c7;
+        border-radius: 0;
+        background: rgb(14 165 233 / 28%);
+        pointer-events: none;
+      }
+      .seqstar-nightingale-viewport-slider {
+        position: absolute;
+        inset: 0;
+        inline-size: 100%;
+        block-size: 100%;
+        margin: 0;
+        opacity: 0;
+        cursor: ew-resize;
+      }
+      @media (max-width: 480px) {
+        [data-seqstar-nightingale="root"], [data-seqstar-nightingale-staging] {
+          --seqstar-nightingale-label-width: 6.5rem;
+        }
       }
     `;
     this.root.append(style);
@@ -439,7 +555,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       const loci =
         detail.phase === "clear"
           ? []
-          : detail.kind === "hover" || identity.itemId === undefined
+          : identity.itemId === undefined
             ? detail.regions.map<CoordinateLocus>((region) =>
                 region.start === region.end
                   ? pointAt(space, region.start - 1)
@@ -464,29 +580,43 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       for (const track of section.tracks) {
         const row = document.createElement("section");
         row.dataset.seqstarTrack = track.id;
-        row.style.display = "grid";
-        row.style.gridTemplateColumns = "10rem minmax(0, 1fr)";
-        row.style.alignItems = "center";
-        row.style.gap = "0.5rem";
-        row.style.minWidth = "0";
+        row.className = "seqstar-nightingale-row";
+        const header = document.createElement("div");
+        header.className = "seqstar-nightingale-track-header";
+        const configuredAction = this.presentation.trackActions?.find(
+          (action) => action.trackId === track.id,
+        );
         const label = document.createElement("button");
         label.type = "button";
         const trackLabel = track.label ?? track.id;
         label.textContent = trackLabel;
         label.title = trackLabel;
+        label.className = "seqstar-nightingale-track-label";
         label.setAttribute("aria-label", `Activate ${trackLabel}`);
         label.dataset.seqstarTrackActivate = track.id;
-        label.className = "seqstar-nightingale-track-label";
-        row.append(label);
+        header.append(label);
         const stack = document.createElement("div");
+        stack.className = "seqstar-nightingale-plot";
         stack.style.display = "grid";
         stack.style.gap = "0.2rem";
-        row.append(stack);
+        row.append(header, stack);
         this.root.append(row);
         const activate = (): void =>
           stack.querySelector<NativeElement>("[data-seqstar-native-id]")?.activateSeqstarTrack();
         label.addEventListener("click", activate);
         this.cleanups.push(() => label.removeEventListener("click", activate));
+        if (configuredAction !== undefined) {
+          const action = document.createElement("button");
+          action.type = "button";
+          action.className = "seqstar-nightingale-track-action";
+          action.dataset.seqstarTrackActivate = track.id;
+          action.setAttribute("aria-label", configuredAction.label);
+          action.title = configuredAction.label;
+          action.append(createNightingaleTrackActionIcon(configuredAction.kind));
+          action.addEventListener("click", activate);
+          this.cleanups.push(() => action.removeEventListener("click", activate));
+          header.append(action);
+        }
         for (const layer of track.layers) {
           const nativeId = composeNightingaleNativeId(
             ["document", options.document.id],
@@ -508,6 +638,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
             layerId: layer.id,
             generation: options.generation,
             nativeId,
+            ...("annotation" in layer ? { annotationId: layer.annotation } : {}),
           };
           identities.add(identity);
           if ("annotation" in layer) {
@@ -559,6 +690,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
           rendered.dataset.seqstarTrack = track.id;
           const renderedSpace = this.spaceForIdentity(options.document, identity);
           if (renderedSpace !== undefined) rendered.dataset.seqstarSpace = renderedSpace.id;
+          this.viewport.register(rendered, stack);
           const ready = rendered.waitForSeqstarFirstRender(options.generation, options.signal);
           // A later layer can reject the staged view before Promise.all is
           // reached; attach rejection handling immediately so staging abort is
@@ -569,8 +701,22 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         }
       }
     }
+    for (const action of this.presentation.trackActions ?? [])
+      if (
+        !view.sections.some((section) =>
+          section.tracks.some((track) => track.id === action.trackId),
+        )
+      )
+        diagnostics.push(
+          warning(
+            "wrapper.nightingale.presentation.track-action.absent",
+            `Configured Nightingale track action '${action.trackId}' is absent from view '${view.id}'.`,
+          ),
+        );
     await Promise.all(readiness);
     if (options.signal.aborted) throw new DOMException("superseded", "AbortError");
+    this.root.append(this.viewport.navigation);
+    this.viewport.resize();
     return { status: diagnostics.length === 0 ? "rendered" : "degraded", diagnostics, identities };
   }
 
@@ -791,16 +937,19 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     const item = annotation(documentValue, layer.annotation);
     if (item?.kind === "relationships") {
       const selected = item.items.find((value) => value.id === identity.itemId);
-      const endpoint = selected?.endpoints.find((value) => value.role === identity.endpointRole);
-      const locus = endpoint?.loci[identity.locusIndex ?? 0];
-      if (locus === undefined) return [];
-      const space = sequenceSpace(documentValue, locus.space);
-      if (space === undefined) return [];
-      if (locus.kind === "point")
-        return [{ kind: "point", space, position: { kind: "index", value: locus.position } }];
-      if (locus.kind === "interval")
-        return [{ kind: "interval", space, start: locus.start, end: locus.end }];
-      return [{ kind: "boundary", space, position: locus.position }];
+      return (
+        selected?.endpoints.flatMap((endpoint) =>
+          endpoint.loci.flatMap<CoordinateLocus>((locus) => {
+            const space = sequenceSpace(documentValue, locus.space);
+            if (space === undefined) return [];
+            if (locus.kind === "point")
+              return [{ kind: "point", space, position: { kind: "index", value: locus.position } }];
+            if (locus.kind === "interval")
+              return [{ kind: "interval", space, start: locus.start, end: locus.end }];
+            return [{ kind: "boundary", space, position: locus.position }];
+          }),
+        ) ?? []
+      );
     }
     if (item?.kind !== "loci") return [];
     const selected = item.items.find((value) => value.id === identity.itemId);
@@ -880,6 +1029,10 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     this.updateAppliedCounts();
   }
 
+  getViewport(): NightingaleViewportDescriptor | undefined {
+    return this.activeTree?.viewport.value;
+  }
+
   private reapply(): void {
     for (const element of this.nativeElements())
       for (const family of ["highlight", "selection"] as const)
@@ -935,11 +1088,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     const width = Math.max(1, Math.floor(this.target.getBoundingClientRect().width ?? 0));
     if (width <= 1) return;
     for (const tree of [this.activeTree, this.stagingTree])
-      if (tree !== undefined)
-        for (const element of this.nativeElements(tree.root)) {
-          element.width = width;
-          element.setAttribute("width", String(width));
-        }
+      if (tree !== undefined) tree.viewport.resize();
   }
 
   dispose(): void {
@@ -958,13 +1107,17 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
 
 export interface NightingaleWrapperConfig extends JsonObject {
   readonly failureViewPolicy?: "retain" | "clear";
+  readonly presentation?: NightingalePresentation;
 }
 
 export interface NightingaleWrapperOptions {
   readonly id: string;
   readonly target: HTMLElement;
   readonly config?: NightingaleWrapperConfig;
-  readonly driverFactory?: (target: HTMLElement) => NightingaleNativeDriver;
+  readonly driverFactory?: (
+    target: HTMLElement,
+    presentation?: NightingalePresentation,
+  ) => NightingaleNativeDriver;
 }
 
 type NativeLease = {
@@ -975,6 +1128,7 @@ type NativeLease = {
   readonly viewId: string;
   readonly generation: number;
   readonly identity?: NightingaleIdentity;
+  readonly semanticFingerprint: string;
 };
 
 /** Production Nightingale wrapper. Coordinate translation is intentionally owned by the harness. */
@@ -982,8 +1136,12 @@ export class NightingaleWrapper implements HarnessComponent {
   readonly id: string;
   readonly element: HTMLElement;
   readonly capabilities = capabilities;
-  private readonly driverFactory: (target: HTMLElement) => NightingaleNativeDriver;
+  private readonly driverFactory: (
+    target: HTMLElement,
+    presentation?: NightingalePresentation,
+  ) => NightingaleNativeDriver;
   private readonly failureViewPolicy: "retain" | "clear";
+  private readonly presentation: NightingalePresentation;
   private driver: NightingaleNativeDriver | undefined;
   private context: ComponentContext | undefined;
   private subscription: Subscription | undefined;
@@ -1002,7 +1160,9 @@ export class NightingaleWrapper implements HarnessComponent {
   constructor(options: NightingaleWrapperOptions) {
     this.id = options.id;
     this.element = options.target;
-    this.driverFactory = options.driverFactory ?? ((target) => new NativeNightingaleDriver(target));
+    this.presentation = snapshotNightingalePresentation(options.config?.presentation);
+    this.driverFactory =
+      options.driverFactory ?? ((target) => new NativeNightingaleDriver(target, this.presentation));
     this.failureViewPolicy = options.config?.failureViewPolicy ?? "retain";
     this.applied.set("highlight", new Map());
     this.applied.set("selection", new Map());
@@ -1012,7 +1172,7 @@ export class NightingaleWrapper implements HarnessComponent {
     if (this.disposed) throw new Error(`Wrapper '${this.id}' has been disposed.`);
     if (this.context !== undefined) return;
     this.context = context;
-    this.driver = this.driverFactory(this.element);
+    this.driver = this.driverFactory(this.element, this.presentation);
     this.nativeSubscription = this.driver.interactions.subscribe((event) =>
       this.publishNative(event),
     );
@@ -1020,6 +1180,12 @@ export class NightingaleWrapper implements HarnessComponent {
       .observe({ targetComponent: this.id })
       .subscribe((message) => this.receive(message));
     context.reportCapabilities(this.capabilities);
+  }
+
+  /** JSON-safe snapshot; callers never receive native D3 or web-component state. */
+  getViewport(): NightingaleViewportDescriptor | undefined {
+    const viewport = this.driver?.getViewport?.();
+    return viewport === undefined ? undefined : Object.freeze({ ...viewport });
   }
 
   private receive(message: HarnessMessage): void {
@@ -1155,7 +1321,7 @@ export class NightingaleWrapper implements HarnessComponent {
     this.clearNativeLeases();
     this.nativeSubscription?.unsubscribe();
     this.driver?.dispose();
-    this.driver = this.driverFactory(this.element);
+    this.driver = this.driverFactory(this.element, this.presentation);
     this.nativeSubscription = this.driver.interactions.subscribe((event) =>
       this.publishNative(event),
     );
@@ -1205,8 +1371,34 @@ export class NightingaleWrapper implements HarnessComponent {
     const generation = identity?.generation ?? this.visibleGeneration;
     if (documentId !== this.visibleDocument.id || generation !== this.visibleGeneration) return;
     const key = `${documentId}\u0000${generation}\u0000${event.interaction}`;
-    const existingLease = this.nativeLeases.get(key);
+    let existingLease = this.nativeLeases.get(key);
     if (event.phase === "clear" && existingLease === undefined) return;
+    const semanticFingerprint = this.nativeSemanticFingerprint(
+      documentId,
+      viewId,
+      identity,
+      event.loci,
+    );
+    if (event.interaction === "select" && event.phase === "set" && existingLease !== undefined) {
+      if (existingLease.semanticFingerprint === semanticFingerprint) {
+        this.publishLeaseEvent(existingLease, "clear", []);
+        this.nativeLeases.delete(key);
+        return;
+      }
+      this.publishLeaseEvent(existingLease, "clear", []);
+      this.nativeLeases.delete(key);
+      existingLease = undefined;
+    }
+    if (
+      event.interaction === "hover" &&
+      event.phase === "set" &&
+      existingLease !== undefined &&
+      existingLease.semanticFingerprint !== semanticFingerprint
+    ) {
+      this.publishLeaseEvent(existingLease, "clear", []);
+      this.nativeLeases.delete(key);
+      existingLease = undefined;
+    }
     const lease:
       | NativeLease
       | (Omit<NativeLease, "interaction"> & { interaction: "track-activate" }) = existingLease ?? {
@@ -1217,11 +1409,50 @@ export class NightingaleWrapper implements HarnessComponent {
       viewId,
       generation,
       ...(identity === undefined ? {} : { identity }),
+      semanticFingerprint,
     };
     if (event.phase === "set" && event.interaction !== "track-activate")
       this.nativeLeases.set(key, lease as NativeLease);
     this.publishLeaseEvent(lease, event.phase, event.loci);
     if (event.phase === "clear") this.nativeLeases.delete(key);
+  }
+
+  private nativeSemanticFingerprint(
+    documentId: string,
+    viewId: string,
+    identity: NightingaleIdentity | undefined,
+    loci: readonly CoordinateLocus[],
+  ): string {
+    return JSON.stringify({
+      documentId,
+      viewId,
+      origin:
+        identity === undefined
+          ? undefined
+          : {
+              sectionId: identity.sectionId,
+              trackId: identity.trackId,
+              layerId: identity.layerId,
+            },
+      semanticTarget:
+        identity?.itemId === undefined
+          ? undefined
+          : {
+              itemId: identity.itemId,
+              trackId: identity.trackId,
+              annotationId: identity.annotationId,
+              endpointRole: identity.endpointRole,
+              endpointIndex: identity.endpointIndex,
+              locusIndex: identity.locusIndex,
+            },
+      loci: loci.map((locus) => {
+        if (locus.kind === "point")
+          return { kind: locus.kind, space: locus.space, position: locus.position };
+        if (locus.kind === "interval")
+          return { kind: locus.kind, space: locus.space, start: locus.start, end: locus.end };
+        return { kind: locus.kind, space: locus.space, position: locus.position };
+      }),
+    });
   }
 
   private publishLeaseEvent(
@@ -1253,6 +1484,9 @@ export class NightingaleWrapper implements HarnessComponent {
             semanticTarget: {
               itemId: identity.itemId,
               trackId: identity.trackId,
+              ...(identity.annotationId === undefined
+                ? {}
+                : { annotationId: identity.annotationId }),
               ...(identity.endpointRole === undefined
                 ? {}
                 : { relationshipId: identity.itemId, endpointRole: identity.endpointRole }),
