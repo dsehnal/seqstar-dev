@@ -441,6 +441,10 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
       loci: event.loci,
       ...(event.viewport === undefined ? {} : { viewport: normalizeViewport(event.viewport) }),
     };
+    // Relationship hits can share a coordinate-space object across endpoint loci.
+    // The event fabric accepts JSON trees, not object graphs, so detach repeated
+    // references before publishing across this wrapper boundary.
+    const serializedPayload = JSON.parse(JSON.stringify(payload)) as JsonObject;
     context.fabric.publish({
       id: id(),
       type: "interaction.native",
@@ -448,7 +452,7 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
       source: { component: this.id },
       correlationId: lease.correlationId,
       timestamp: timestamp(),
-      payload: payload as unknown as JsonObject,
+      payload: serializedPayload,
     });
     if (event.phase === "clear") this.nativeLeases.delete(leaseKey);
   }

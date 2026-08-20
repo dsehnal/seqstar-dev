@@ -1,15 +1,10 @@
-import { createApplicationHarness, type HarnessMessage } from "@seq-star/harness-core";
-import {
-  HarnessProvider,
-  useHarness,
-  useHarnessHost,
-  useHarnessMessages,
-} from "@seq-star/harness-react";
-import { type ComplexMvsGeneration, createComplexPlugin } from "@seq-star/integration-plugins";
+import { createApplicationHarness } from "@seq-star/harness-core";
+import { HarnessProvider, useHarness, useHarnessHost } from "@seq-star/harness-react";
+import { createComplexPlugin } from "@seq-star/integration-plugins";
 import { createMolstarWrapperFactory } from "@seq-star/wrapper-molstar";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
+import { useCallback } from "react";
 import confidenceTsv from "../../../../fixtures/complex/expected/synthetic-confidence.tsv?raw";
 import structureUrl from "../../../../fixtures/complex/input/1BRS.cif?url";
 import barnaseFasta from "../../../../fixtures/complex/input/P00648.fasta?raw";
@@ -17,6 +12,7 @@ import barstarFasta from "../../../../fixtures/complex/input/P11540.fasta?raw";
 import contactsTsv from "../../../../fixtures/complex/mappings/1BRS-chain-A-D-heavy-atom-contacts.tsv?raw";
 import barnaseMappingTsv from "../../../../fixtures/complex/mappings/P00648-1BRS-chain-A.tsv?raw";
 import barstarMappingTsv from "../../../../fixtures/complex/mappings/P11540-1BRS-chain-D.tsv?raw";
+import { InspectPanel, useInspectPanelState } from "../inspect-panel";
 
 const sequenceComponent = "complex-sequence";
 const structureComponent = "complex-structure";
@@ -88,43 +84,7 @@ function Panel({ id, title }: { readonly id: string; readonly title: string }) {
 
 function ComplexContent() {
   const { status } = useHarness();
-  const [generated, setGenerated] = useState<ComplexMvsGeneration>();
-  const [lifecycleByRequest, setLifecycleByRequest] = useState<Readonly<Record<string, string>>>(
-    {},
-  );
-  useHarnessMessages(
-    useCallback((event: HarnessMessage) => {
-      if (event.type === "document.generated.mvs")
-        setGenerated(event.payload as unknown as ComplexMvsGeneration);
-      if (event.type === "lifecycle.visualization") {
-        const value = event.payload as { requestId?: string; status?: string };
-        const requestId = value.requestId;
-        const lifecycleStatus = value.status;
-        if (requestId !== undefined && lifecycleStatus !== undefined)
-          setLifecycleByRequest((current) => ({
-            ...current,
-            [requestId]: lifecycleStatus,
-          }));
-      }
-    }, []),
-  );
-  const lifecycle =
-    generated === undefined
-      ? "awaiting activation"
-      : (lifecycleByRequest[generated.requestId] ?? "awaiting render");
-  const download = () => {
-    if (generated === undefined) return;
-    const href = URL.createObjectURL(
-      new Blob([JSON.stringify(generated.document, null, 2)], {
-        type: "application/vnd.molstar.mvsj+json",
-      }),
-    );
-    const link = document.createElement("a");
-    link.href = href;
-    link.download = `${generated.requestId}.mvsj`;
-    link.click();
-    URL.revokeObjectURL(href);
-  };
+  const inspect = useInspectPanelState({ sequenceComponent, structureComponent });
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-complex">
       <section>
@@ -132,7 +92,9 @@ function ComplexContent() {
         <h1 className="mt-2 font-bold text-3xl text-slate-950">Barnase–barstar complex</h1>
         <p className="mt-3 max-w-4xl text-lg text-slate-600">
           An explicit two-polymer assembly: barnase P00648 / chain A and barstar P11540 / chain D.
-          The gap separates coordinate spaces and cannot select a fabricated biological position.
+          The visible gap separates coordinate spaces and cannot select a fabricated biological
+          position. Hover residues to reflect an exact chain locus; select a contact to focus both
+          named endpoints.
         </p>
         <p className="mt-2 text-slate-500 text-sm" data-testid="p50-harness-status">
           Harness: {status} · local 1BRS fixture only
@@ -148,53 +110,20 @@ function ComplexContent() {
         <Panel id={sequenceComponent} title="Named complex assembly" />
         <Panel id={structureComponent} title="Mol* / generated MVS" />
       </div>
-      <section
-        className="grid gap-3 rounded-lg bg-slate-950 p-5 text-slate-100"
-        data-testid="p50-mvs-inspector"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-lg">MVS and frozen mapping summary</h2>
-            <p className="text-slate-300 text-sm" data-testid="p50-request-id">
-              {generated?.requestId ?? "Activate Interface residues or 43 frozen contacts."}
-            </p>
-            <p
-              className="text-slate-300 text-sm"
-              data-request-id={generated?.requestId}
-              data-testid="p50-lifecycle"
-            >
-              {lifecycle}
-            </p>
-          </div>
-          <button
-            className="rounded border border-slate-500 px-3 py-2 text-sm disabled:opacity-50"
-            disabled={generated === undefined}
-            onClick={download}
-            type="button"
-          >
-            Download validated MVSJ
-          </button>
-        </div>
-        {generated === undefined ? null : (
-          <>
-            <p className="text-slate-300 text-sm" data-testid="p50-role-summary">
-              {generated.activation} · {generated.relationshipId ?? "43 contacts"} ·{" "}
-              {generated.endpointRoles
-                .map((endpoint) => `${endpoint.role}: ${endpoint.selectors.length}`)
-                .join(" · ")}
-            </p>
-            <pre
-              className="max-h-80 overflow-auto rounded bg-black/30 p-3 text-xs"
-              data-testid="p50-mvs-json"
-            >
-              {JSON.stringify(generated.document, null, 2)}
-            </pre>
-          </>
-        )}
-        <p className="text-slate-400 text-xs">
-          Frozen source transforms: 19 barnase interface residues, 16 barstar interface residues, 43
-          contacts; barstar C41A/C83A remain explicit construct conflicts.
+      <section className="grid gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-slate-700">
+        <h2 className="font-semibold text-slate-950 text-lg">Track profiles and navigation</h2>
+        <p className="text-sm">
+          Track headers replace the lifecycle-bound MVS profile: named polymers → neutral, regions →
+          regions, synthetic confidence → confidence, interface → interface, contacts → contacts.
+          The sequence navigation band supports wheel/drag and keyboard pan, zoom, and reset.
         </p>
+        <p className="text-xs">
+          Frozen source transforms: 19 barnase interface residues, 16 barstar interface residues,
+          and 43 contacts; barstar C41A/C83A remain explicit construct conflicts.
+        </p>
+      </section>
+      <section data-testid="inspect-panel-container">
+        <InspectPanel state={inspect} />
       </section>
     </main>
   );

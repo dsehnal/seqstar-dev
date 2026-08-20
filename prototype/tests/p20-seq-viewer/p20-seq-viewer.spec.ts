@@ -67,6 +67,27 @@ test("places boundary markers exactly at 0, internal, and length boundaries", as
   expect(hits[3]).toBeUndefined();
 });
 
+test("publishes a real pointer event for a non-first track", async ({ page }) => {
+  await page.goto("/");
+  const canvas = page.locator('[data-seq-viewer="canvas"]');
+  const markerHeader = page.locator("[data-seq-viewer-track]").nth(1);
+  const box = await canvas.boundingBox();
+  const marker = await markerHeader.boundingBox();
+  if (box === null || marker === null) throw new Error("Expected the marker track geometry.");
+  await page.mouse.move(box.x + 156, marker.y + marker.height / 2);
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (
+          window as typeof window & {
+            __p20: { events: readonly { readonly layerId?: string; readonly itemId?: string }[] };
+          }
+        ).__p20.events.at(-1),
+      ),
+    )
+    .toMatchObject({ layerId: "boundary-layer", itemId: "boundary-zero" });
+});
+
 test("preserves relationship endpoint and locus identity for boundary links", async ({ page }) => {
   await page.goto("/");
   const hits = await page.evaluate(() => {

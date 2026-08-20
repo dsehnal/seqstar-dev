@@ -191,6 +191,7 @@ function P01FeasibilityPage() {
           Nightingale renderer-output feasibility
         </h2>
         <output
+          className="mt-3 block max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950 p-3 font-mono text-slate-100 text-xs"
           data-session={session}
           data-source="workspace-local"
           data-status={nightingaleStatus}
@@ -208,6 +209,7 @@ function P01FeasibilityPage() {
           Mol* interaction-stream/locus normalization feasibility
         </h2>
         <output
+          className="mt-3 block max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950 p-3 font-mono text-slate-100 text-xs"
           data-session={session}
           data-source="synthetic-data-uri"
           data-status={molstarStatus}

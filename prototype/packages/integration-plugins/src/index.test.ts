@@ -98,6 +98,36 @@ describe("checked fixture and translator plugins", () => {
     expect(() => ((first.value.document as { id: string }).id = "mutation")).toThrow();
   });
 
+  it("keeps the reference diagnostic relationship explicit and endpoint-complete", () => {
+    expect(referenceViewerDiagnosticFixture.sha256).toBe(
+      "sha256:79a04a43408bcf0e92bfbaf9bcf4d5596b5fa32572bd8e92c4c75b2c04602d2f",
+    );
+    const document = referenceViewerDiagnosticFixture.value.document as {
+      readonly annotations?: readonly {
+        readonly id?: string;
+        readonly kind?: string;
+        readonly items?: readonly {
+          readonly id?: string;
+          readonly endpoints?: readonly {
+            readonly role?: string;
+            readonly loci?: readonly unknown[];
+          }[];
+        }[];
+      }[];
+    };
+    const relationship = document.annotations?.find(
+      (annotation) => annotation.id === "diagnostic-relationship",
+    );
+    expect(relationship?.kind).toBe("relationships");
+    expect(relationship?.items?.[0]).toMatchObject({
+      id: "diagnostic-pair",
+      endpoints: [
+        { role: "upstream", loci: [{ kind: "point", position: 18 }] },
+        { role: "downstream", loci: [{ kind: "point", position: 29 }] },
+      ],
+    });
+  });
+
   it("publishes one deterministic checked request during plugin setup and nothing after cleanup", () => {
     const provider = createCheckedFixtureProvider([referenceViewerDiagnosticFixture]);
     const harness = context();

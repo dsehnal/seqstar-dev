@@ -176,6 +176,26 @@ const referenceDocument: SeqViewSpec = {
         },
       ],
     },
+    {
+      id: "diagnostic-relationship",
+      kind: "relationships",
+      semanticType: "seqstar:diagnostic-relationship",
+      items: [
+        {
+          id: "diagnostic-pair",
+          endpoints: [
+            {
+              role: "upstream",
+              loci: [{ kind: "point", space: "diagnostic-protein-space", position: 18 }],
+            },
+            {
+              role: "downstream",
+              loci: [{ kind: "point", space: "diagnostic-protein-space", position: 29 }],
+            },
+          ],
+        },
+      ],
+    },
   ],
   views: [
     {
@@ -187,6 +207,18 @@ const referenceDocument: SeqViewSpec = {
         {
           id: "sequence-section",
           tracks: [
+            {
+              id: "relationship",
+              label: "Relationship endpoint diagnostic",
+              layers: [
+                {
+                  id: "relationship-links",
+                  representation: "links",
+                  annotation: "diagnostic-relationship",
+                  color: { kind: "fixed", color: "#7C3AED" },
+                },
+              ],
+            },
             {
               id: "residues",
               label: "Diagnostic sequence",
@@ -211,7 +243,7 @@ const referenceDocument: SeqViewSpec = {
 export const referenceViewerDiagnosticFixture: CheckedFixture = {
   id: "reference-viewer-diagnostic",
   mediaType: "application/vnd.seqstar.seqviewspec+json",
-  sha256: "sha256:e68ef46a83db0aa65b277c2c6cdd56c623a0c6b68b34a00bcf2798b9209add1e",
+  sha256: "sha256:79a04a43408bcf0e92bfbaf9bcf4d5596b5fa32572bd8e92c4c75b2c04602d2f",
   value: {
     format: "seqviewspec",
     requestId: "reference-diagnostic-initial",

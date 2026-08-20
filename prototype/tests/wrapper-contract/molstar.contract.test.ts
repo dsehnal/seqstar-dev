@@ -1,4 +1,17 @@
-import type { InteractionCommand, InteractionOwner } from "@seq-star/harness-core";
+import {
+  type ComponentContext,
+  createApplicationHarness,
+  type HarnessComponent,
+  type HarnessMessage,
+  type InteractionCommand,
+  type InteractionOwner,
+} from "@seq-star/harness-core";
+import {
+  barnaseSequenceSpace,
+  barstarSequenceSpace,
+  type ComplexMappingRow,
+  createComplexMappingTranslators,
+} from "@seq-star/integration-plugins";
 import type { CoordinateLocus } from "@seq-star/seq-coords";
 import { coordinateLocusEquals } from "@seq-star/seq-coords";
 import { describe, expect, it, vi } from "vitest";
@@ -47,6 +60,58 @@ const sameLabelsOtherModel = {
   instanceId: "instance-b",
 } as const;
 const locus = residueLocus(residue);
+const complexBarnaseResidue = {
+  ...residue,
+  structureId: "1BRS-complex",
+  modelEntryId: "1BRS",
+  modelId: "1BRS-model",
+  unitId: 31,
+  instanceId: "1BRS-A",
+  entityId: "1",
+  labelAsymId: "A",
+  authAsymId: "A",
+  labelSeqId: 27,
+  authSeqId: 27,
+  componentId: "LYS",
+} as const;
+const complexBarstarResidue = {
+  ...complexBarnaseResidue,
+  unitId: 42,
+  instanceId: "1BRS-D",
+  entityId: "2",
+  labelAsymId: "D",
+  authAsymId: "D",
+  labelSeqId: 38,
+  authSeqId: 38,
+  componentId: "ASP",
+} as const;
+
+const complexBarnaseRow: ComplexMappingRow = {
+  accession: "P00648",
+  sourceIndex: 26,
+  sourceResidue: "K",
+  labelAsymId: "A",
+  authAsymId: "A",
+  labelSeqId: 27,
+  authSeqId: 27,
+  structureResidue: "LYS",
+  observed: true,
+  residueMatch: true,
+  status: "exact",
+};
+const complexBarstarRow: ComplexMappingRow = {
+  accession: "P11540",
+  sourceIndex: 37,
+  sourceResidue: "D",
+  labelAsymId: "D",
+  authAsymId: "D",
+  labelSeqId: 38,
+  authSeqId: 38,
+  structureResidue: "ASP",
+  observed: true,
+  residueMatch: true,
+  status: "exact",
+};
 
 class ControlledMolstarDriver implements MolstarNativeDriver {
   readonly loads: Array<{
@@ -162,6 +227,45 @@ class ControlledMolstarDriver implements MolstarNativeDriver {
   }
 }
 
+class RecordingSequenceComponent implements HarnessComponent {
+  readonly capabilities = ["seqstar:coordinates/sequence"] as const;
+  readonly received: HarnessMessage[] = [];
+  readonly highlights = new Map<string, readonly CoordinateLocus[]>();
+  readonly selections = new Map<string, readonly CoordinateLocus[]>();
+  private subscription: { unsubscribe(): void } | undefined;
+
+  constructor(
+    readonly id: string,
+    private readonly spaces: readonly [typeof barnaseSequenceSpace, typeof barstarSequenceSpace],
+  ) {}
+
+  async start(context: ComponentContext): Promise<void> {
+    context.reportCoordinateSpaces(this.spaces);
+    this.subscription = context.fabric
+      .observe({ targetComponent: this.id })
+      .subscribe((message) => {
+        this.received.push(message);
+        const command = message.payload as unknown as InteractionCommand;
+        const states = message.type.startsWith("interaction.highlight")
+          ? this.highlights
+          : message.type.startsWith("interaction.selection")
+            ? this.selections
+            : undefined;
+        if (states === undefined) return;
+        const owner = command.owner;
+        if (owner === undefined) return;
+        const key = `${owner.correlationId}\u0000${owner.sourceComponent}`;
+        if (message.type.endsWith(".apply")) states.set(key, command.loci);
+        else if (message.type.endsWith(".clear")) states.delete(key);
+      });
+  }
+
+  dispose(): void {
+    this.subscription?.unsubscribe();
+    this.subscription = undefined;
+  }
+}
+
 const request = (requestId: string) => ({
   format: "mvs",
   requestId,
@@ -222,6 +326,147 @@ runWrapperConformance({
 });
 
 describe("Mol* wrapper production boundary", () => {
+  it("maps production Mol* native chain A/D hover and selection to their exact sequence columns without echoes", async () => {
+    const driver = new ControlledMolstarDriver([complexBarnaseResidue, complexBarstarResidue]);
+    let sequence: RecordingSequenceComponent | undefined;
+    const native: HarnessMessage[] = [];
+    const harness = createApplicationHarness(
+      {
+        id: "complex-wrapper-reverse-interaction",
+        components: [
+          { id: "complex-structure", type: "seqstar.molstar-mvs" },
+          { id: "complex-sequence", type: "test.recording-sequence" },
+        ],
+        synchronization: [
+          {
+            id: "complex-hover",
+            interaction: "hover",
+            between: ["complex-sequence", "complex-structure"],
+            unmapped: "clear",
+          },
+          {
+            id: "complex-select",
+            interaction: "select",
+            between: ["complex-sequence", "complex-structure"],
+            unmapped: "preserve",
+          },
+        ],
+      },
+      {
+        componentFactories: [
+          {
+            type: "seqstar.molstar-mvs",
+            create: ({ id }) =>
+              new MolstarWrapper({
+                id,
+                target: {} as HTMLElement,
+                driverFactory: async () => driver,
+              }),
+          },
+          {
+            type: "test.recording-sequence",
+            create: ({ id }) => {
+              sequence = new RecordingSequenceComponent(id, [
+                barnaseSequenceSpace,
+                barstarSequenceSpace,
+              ]);
+              return sequence;
+            },
+          },
+        ],
+        frame: (callback) => {
+          queueMicrotask(callback);
+          return { dispose() {} };
+        },
+      },
+    );
+    const subscription = harness.fabric.observe().subscribe((message) => {
+      if (message.type === "interaction.native") native.push(message);
+    });
+    await harness.start();
+    for (const translator of [
+      ...createComplexMappingTranslators([complexBarnaseRow]),
+      ...createComplexMappingTranslators([complexBarstarRow]),
+    ])
+      harness.translators.register(translator);
+    harness.fabric.publish(
+      message("visualization.mvs.request", request("complex-native-interaction"), {
+        component: "complex-structure",
+      }),
+    );
+    await tick();
+    driver.loads[0]?.resolve();
+    await tick();
+    if (sequence === undefined) throw new Error("Expected the recording sequence component.");
+
+    const flush = async (): Promise<void> => {
+      await tick();
+      await new Promise((resolve) => setTimeout(resolve, 0));
+      await tick();
+    };
+    const current = (states: ReadonlyMap<string, readonly CoordinateLocus[]>) => [
+      ...states.values(),
+    ];
+    const barnaseColumn: CoordinateLocus = {
+      kind: "point",
+      space: barnaseSequenceSpace,
+      position: { kind: "index", value: 26 },
+    };
+    const barstarColumn: CoordinateLocus = {
+      kind: "point",
+      space: barstarSequenceSpace,
+      position: { kind: "index", value: 37 },
+    };
+
+    // These events enter through the production MolstarWrapper driver's native
+    // subscription. No test or React code publishes interaction.native.
+    driver.emit({ kind: "hover", residues: [complexBarnaseResidue] });
+    await flush();
+    expect(current(sequence.highlights)).toEqual([[barnaseColumn]]);
+    driver.emit({ kind: "hover", residues: [complexBarstarResidue] });
+    await flush();
+    expect(current(sequence.highlights)).toEqual([[barstarColumn]]);
+    driver.emit({ kind: "hover", residues: [] });
+    await flush();
+    expect(current(sequence.highlights)).toEqual([]);
+
+    driver.emit({ kind: "selection-add", residues: [complexBarnaseResidue] });
+    await flush();
+    expect(current(sequence.selections)).toEqual([[barnaseColumn]]);
+    driver.emit({ kind: "selection-clear", residues: [] });
+    await flush();
+    expect(current(sequence.selections)).toEqual([]);
+    driver.emit({ kind: "selection-add", residues: [complexBarstarResidue] });
+    await flush();
+    expect(current(sequence.selections)).toEqual([[barstarColumn]]);
+    driver.emit({ kind: "selection-clear", residues: [] });
+    await flush();
+    expect(current(sequence.selections)).toEqual([]);
+
+    expect(native).toHaveLength(7);
+    expect(native.every((event) => event.source.component === "complex-structure")).toBe(true);
+    // Mol* renders its own current native mark, but its synchronous imperative
+    // callback cannot feed a second interaction.native event back into the
+    // harness while the wrapper is applying that mark.
+    expect(driver.calls.map((call) => [call.action, call.schemas])).toEqual([
+      ["highlight", 1],
+      ["highlight", 1],
+      ["highlight", 0],
+      ["select", 1],
+      ["select", 0],
+      ["select", 1],
+      ["select", 0],
+    ]);
+    expect(
+      sequence.received.filter((event) => event.type === "interaction.highlight.apply"),
+    ).toHaveLength(2);
+    expect(
+      sequence.received.filter((event) => event.type === "interaction.selection.apply"),
+    ).toHaveLength(2);
+    await harness.disposeAsync();
+    subscription.unsubscribe();
+  });
+
   it("filters a real multi-model Mol* candidate to the one requested unit and residue", async () => {
     const structure = await createSyntheticMultiModelStructure();
     const entries = [{ transform: { ref: "multi-model-root" }, obj: { data: structure } }];

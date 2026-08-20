@@ -167,6 +167,7 @@ function DocumentSection({
 
 export function InspectPanel({ state }: { readonly state: InspectPanelState }) {
   const [tab, setTab] = useState<Tab>("summary");
+  const [selectedMessageId, setSelectedMessageId] = useState<string>();
   const sequenceValidation = useValidation(state.sequenceDocument);
   const structureValidation = useValidation(state.structureDocument);
   const activeDataset = state.catalog?.datasets.find(
@@ -178,6 +179,7 @@ export function InspectPanel({ state }: { readonly state: InspectPanelState }) {
     { id: "mvs", label: "MolViewSpec" },
     { id: "messages", label: `Messages (${state.rows.length})` },
   ];
+  const selectedMessage = state.rows.find((row) => row.message.id === selectedMessageId);
   return (
     <aside
       aria-labelledby="inspect-heading"
@@ -365,11 +367,26 @@ export function InspectPanel({ state }: { readonly state: InspectPanelState }) {
         <ol className="mt-2 grid gap-2" data-testid="inspect-message-list">
           {state.rows.slice(-100).map((row) => (
             <li className="rounded border border-slate-700 p-2 text-xs" key={row.message.id}>
-              <span className="font-medium">{row.message.type}</span>
-              <span className="ml-2 text-slate-400">{row.message.timestamp}</span>
+              <button
+                className="w-full text-left"
+                data-testid={`inspect-message-${row.message.type}`}
+                onClick={() => setSelectedMessageId(row.message.id)}
+                type="button"
+              >
+                <span className="font-medium">{row.message.type}</span>
+                <span className="ml-2 text-slate-400">{row.message.timestamp}</span>
+              </button>
             </li>
           ))}
         </ol>
+        <pre
+          className="mt-3 max-h-80 overflow-auto rounded bg-black/30 p-3 text-xs"
+          data-testid="inspect-message-json"
+        >
+          {selectedMessage === undefined
+            ? "Select a message to inspect its redacted JSON-safe payload."
+            : safeInspectJson(selectedMessage.message)}
+        </pre>
       </section>
     </aside>
   );

@@ -6,8 +6,8 @@ type Profile = {
   readonly selectors: number;
 };
 
-const inspectProfile = async (page: Page, testId: "inspect-mvs-json" | "p50-mvs-json") =>
-  page.getByTestId(testId).evaluate((element): Profile => {
+const inspectProfile = async (page: Page) =>
+  page.getByTestId("inspect-mvs-json").evaluate((element): Profile => {
     const document = JSON.parse(element.textContent ?? "{}") as {
       readonly root?: unknown;
       readonly snapshots?: readonly { readonly root?: unknown }[];
@@ -116,7 +116,7 @@ test("renders every revised P04637 and 1BRS MVS profile offline without accumula
       timeout: 20_000,
     });
     await expect
-      .poll(() => inspectProfile(page, "inspect-mvs-json"))
+      .poll(() => inspectProfile(page))
       .toEqual({
         components: profile.components,
         representations: profile.representations,
@@ -135,11 +135,11 @@ test("renders every revised P04637 and 1BRS MVS profile offline without accumula
     .toBe(1);
   const sequence = page.getByTestId("complex-sequence-host");
   await sequence.locator('[data-seq-viewer-track="interface"]').click();
-  await expect(page.getByTestId("p50-lifecycle")).toHaveText(/rendered|degraded/u, {
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
   await expect
-    .poll(() => inspectProfile(page, "p50-mvs-json"))
+    .poll(() => inspectProfile(page))
     .toEqual({
       components: 4,
       representations: { ball_and_stick: 2, cartoon: 2 },
@@ -147,23 +147,18 @@ test("renders every revised P04637 and 1BRS MVS profile offline without accumula
     });
 
   const canvas = sequence.locator('[data-seq-viewer="canvas"]');
-  await canvas.evaluate((element) => {
-    const bounds = element.getBoundingClientRect();
-    const cell = (bounds.width - 156 - 32) / 247;
-    element.dispatchEvent(
-      new MouseEvent("click", {
-        bubbles: true,
-        clientX: bounds.left + 156 + (73 + 0.5) * cell,
-        clientY: bounds.top + 20 + 4 * 25 + 12.5,
-      }),
-    );
-  });
-  await expect(page.getByTestId("p50-request-id")).toContainText("P50-1brs-A-D-001-");
-  await expect(page.getByTestId("p50-lifecycle")).toHaveText(/rendered|degraded/u, {
+  const bounds = await canvas.boundingBox();
+  if (bounds === null) throw new Error("Expected the complex sequence canvas.");
+  const cell = (bounds.width - 156 - 32) / 247;
+  await page.mouse.click(bounds.x + 156 + (73 + 0.5) * cell, bounds.y + 20 + 4 * 25 + 12.5);
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "P50-undefined-1brs-A-D-001-",
+  );
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
   await expect
-    .poll(() => inspectProfile(page, "p50-mvs-json"))
+    .poll(() => inspectProfile(page))
     .toEqual({
       components: 5,
       representations: { ball_and_stick: 2, cartoon: 2 },

@@ -14,6 +14,10 @@ test("proves offline Nightingale renderer output and Mol* MVS/locus feasibility"
   const molstar = page.getByTestId("p01b-status");
   await expect(nightingale).toHaveAttribute("data-status", "ready", { timeout: 30_000 });
   await expect(molstar).toHaveAttribute("data-status", "ready", { timeout: 30_000 });
+  await expect(nightingale).toHaveCSS("overflow-y", "auto");
+  await expect(nightingale).toHaveCSS("white-space", "pre-wrap");
+  await expect(molstar).toHaveCSS("overflow-y", "auto");
+  await expect(molstar).toHaveCSS("overflow-wrap", "break-word");
   await page.getByRole("button", { name: "Prove Nightingale highlight" }).click();
   await expect
     .poll(
