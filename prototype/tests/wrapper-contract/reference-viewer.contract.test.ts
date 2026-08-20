@@ -403,4 +403,49 @@ describe("reference viewer wrapper common contract", () => {
     );
     await wrapper.dispose();
   });
+
+  it("normalizes native viewport descriptors into portable interaction payloads", async () => {
+    const harness = createHarnessContext();
+    const viewer = new ControlledNativeMock();
+    const wrapper = new ReferenceViewerWrapper({
+      id: "reference",
+      target: {} as HTMLElement,
+      viewerFactory: () => viewer as unknown as SeqViewer,
+    });
+    await wrapper.start(harness.context);
+    harness.fabric.publish(
+      message("visualization.seqviewspec.request", request("active"), { component: "reference" }),
+    );
+    viewer.loads[0]?.resolve(rendered(1));
+    await tick();
+    viewer.emit({
+      kind: "viewport-change",
+      phase: "set",
+      documentId: "wrapper-contract-document",
+      viewId: "main",
+      loci: [],
+      nativeEvent: {} as Event,
+      viewport: {
+        offsetStart: 1,
+        offsetEnd: 4,
+        totalColumns: 5,
+        segments: [{ segmentId: "axis", spaceId: "sequence-space", start: 1, end: 4 }],
+      },
+    });
+    expect(harness.messages).toContainEqual(
+      expect.objectContaining({
+        type: "interaction.native",
+        payload: expect.objectContaining({
+          interaction: "viewport",
+          viewport: {
+            offsetStart: 1,
+            offsetEnd: 4,
+            totalColumns: 5,
+            segments: [{ segmentId: "axis", spaceId: "sequence-space", start: 1, end: 4 }],
+          },
+        }),
+      }),
+    );
+    await wrapper.dispose();
+  });
 });

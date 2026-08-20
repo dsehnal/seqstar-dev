@@ -69,6 +69,34 @@ describe("harness contract golden examples", () => {
     ).toBe(false);
     expect(
       payloadSchema(InteractionEventSchema).check({
+        interactionId: "viewport-1",
+        interaction: "viewport",
+        phase: "set",
+        origin: { componentId: "sequence" },
+        viewport: {
+          offsetStart: 2,
+          offsetEnd: 6,
+          totalColumns: 10,
+          segments: [
+            { segmentId: "first", spaceId: "sequence-a", start: 2, end: 4 },
+            { segmentId: "second", spaceId: "sequence-b", start: 0, end: 2 },
+          ],
+        },
+        loci: [],
+      }),
+    ).toBe(true);
+    expect(
+      payloadSchema(InteractionEventSchema).check({
+        interactionId: "viewport-1",
+        interaction: "viewport",
+        phase: "set",
+        origin: { componentId: "sequence" },
+        viewport: { offsetStart: -1, offsetEnd: 1, totalColumns: 1, segments: [] },
+        loci: [],
+      }),
+    ).toBe(false);
+    expect(
+      payloadSchema(InteractionEventSchema).check({
         interactionId: "native-1",
         interaction: "hover",
         phase: "set",

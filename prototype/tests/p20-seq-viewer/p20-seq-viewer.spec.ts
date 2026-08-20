@@ -231,6 +231,169 @@ test("emits one attributed native hover clear when entering a display gap", asyn
   expect(events[3]).toMatchObject({ itemId: "edge", loci: expect.any(Array) });
 });
 
+test("navigates with bounded viewport descriptors and keeps gap hits empty", async ({ page }) => {
+  await page.goto("/");
+  const navigation = page.locator("[data-seq-viewer-navigation=root]");
+  await expect(navigation).toBeVisible();
+  await expect(page.locator("[data-seq-viewer-navigation-segment]")).toHaveCount(2);
+  const viewportEvents = async () =>
+    page.evaluate(() =>
+      (
+        window as typeof window & {
+          __p20: { events: Array<{ kind: string; viewport?: unknown }> };
+        }
+      ).__p20.events.filter((event) => event.kind === "viewport-change"),
+    );
+  await expect.poll(viewportEvents).toHaveLength(1);
+  expect((await viewportEvents())[0]).toMatchObject({
+    viewport: {
+      offsetStart: 0,
+      offsetEnd: 8,
+      totalColumns: 8,
+      segments: [
+        { segmentId: "sequence-axis", spaceId: "sequence-space", start: 0, end: 4 },
+        { segmentId: "alignment-axis", spaceId: "alignment-space", start: 0, end: 4 },
+      ],
+    },
+  });
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.getByRole("button", { name: "Pan right" }).click();
+  await page.getByRole("button", { name: "Pan right" }).click();
+  const window = page.locator("[data-seq-viewer-navigation=window]");
+  await window.focus();
+  await page.keyboard.press("ArrowRight");
+  const afterPan = (await viewportEvents()).at(-1) as {
+    viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
+  };
+  expect(afterPan.viewport).toMatchObject({ offsetStart: 2, offsetEnd: 8, totalColumns: 8 });
+  const hit = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: { viewer: () => { hitTest(x: number, y: number): unknown } };
+      }
+    ).__p20
+      .viewer()
+      .hitTest(260, 35),
+  );
+  const gap = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: { viewer: () => { hitTest(x: number, y: number): unknown } };
+      }
+    ).__p20
+      .viewer()
+      .hitTest(320, 35),
+  );
+  expect(hit).toMatchObject({ itemId: "edge", endpointRole: "to" });
+  expect(gap).toBeUndefined();
+  await page.getByRole("button", { name: "Reset navigation" }).click();
+  const reset = (await viewportEvents()).at(-1) as {
+    viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
+  };
+  expect(reset.viewport).toMatchObject({ offsetStart: 0, offsetEnd: 8, totalColumns: 8 });
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  const rightHandle = page.locator('[data-seq-viewer-navigation-handle="right"]');
+  const rightBox = await rightHandle.boundingBox();
+  if (!rightBox) throw new Error("right navigation handle missing");
+  await page.mouse.move(rightBox.x + rightBox.width / 2, rightBox.y + rightBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(rightBox.x - 90, rightBox.y + rightBox.height / 2);
+  await page.mouse.up();
+  const afterHandle = (await viewportEvents()).at(-1) as {
+    viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
+  };
+  expect(afterHandle.viewport.offsetEnd - afterHandle.viewport.offsetStart).toBeLessThan(6);
+  const windowBox = await window.boundingBox();
+  if (!windowBox) throw new Error("navigation window missing");
+  await page.mouse.move(windowBox.x + windowBox.width / 2, windowBox.y + windowBox.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(windowBox.x + 220, windowBox.y + windowBox.height / 2);
+  await page.mouse.up();
+  const afterDrag = (await viewportEvents()).at(-1) as {
+    viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
+  };
+  expect(afterDrag.viewport.offsetEnd).toBe(8);
+  await page.getByRole("button", { name: "Reset navigation" }).click();
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  await page.mouse.move(200, 35);
+  await page.keyboard.down("Shift");
+  await page.mouse.wheel(0, 100);
+  await page.keyboard.up("Shift");
+  const afterWheel = (await viewportEvents()).at(-1) as {
+    viewport: { offsetStart: number; offsetEnd: number };
+  };
+  expect(afterWheel.viewport).toMatchObject({ offsetStart: 2, offsetEnd: 8 });
+});
+
+test("cancels an old navigation drag before replacement installs its viewport", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "Zoom in" }).click();
+  const window = page.locator("[data-seq-viewer-navigation=window]");
+  const box = await window.boundingBox();
+  if (!box) throw new Error("navigation window missing");
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.evaluate(() =>
+    (window as typeof window & { __p20: { loadTall(): Promise<number> } }).__p20.loadTall(),
+  );
+  await page.mouse.move(box.x + 180, box.y + box.height / 2);
+  await page.mouse.up();
+  const viewportEvents = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: {
+          events: Array<{
+            kind: string;
+            documentId?: string;
+            viewport?: { offsetStart: number; offsetEnd: number; totalColumns: number };
+          }>;
+        };
+      }
+    ).__p20.events.filter((event) => event.kind === "viewport-change"),
+  );
+  expect(viewportEvents).toHaveLength(3);
+  expect(viewportEvents.at(-1)).toMatchObject({
+    documentId: "tall-document",
+    viewport: { offsetStart: 0, offsetEnd: 8, totalColumns: 8 },
+  });
+});
+
+test("retires native hover on scroll so row re-entry publishes a new set", async ({ page }) => {
+  await page.goto("/");
+  await page.evaluate(() =>
+    (window as typeof window & { __p20: { loadTall(): Promise<number> } }).__p20.loadTall(),
+  );
+  const root = page.locator('[data-seq-viewer="root"]');
+  await root.evaluate((element) => {
+    element.scrollTop = 0;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await page.mouse.move(184, 12);
+  await root.evaluate((element) => {
+    element.scrollTop = 500;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await root.evaluate((element) => {
+    element.scrollTop = 0;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await page.evaluate(() => new Promise<void>((resolve) => requestAnimationFrame(() => resolve())));
+  await page.mouse.move(184, 12);
+  const hover = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: { events: Array<{ kind: string; phase?: string; documentId?: string }> };
+      }
+    ).__p20.events.filter(
+      (event) => event.kind === "hover" && event.documentId === "tall-document",
+    ),
+  );
+  expect(hover.map((event) => event.phase)).toEqual(["set", "clear", "set"]);
+});
+
 test("renders and leases complete relationship state locally with replace semantics", async ({
   page,
 }) => {

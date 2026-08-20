@@ -10,6 +10,7 @@ import {
   type InteractionKind,
   interactionClearApplies,
   type LifecycleResult,
+  type ViewportDescriptor,
   type VisualizationRequest,
 } from "@seq-star/harness-core";
 import {
@@ -76,6 +77,19 @@ const equalLocus = (left: CoordinateLocus, right: CoordinateLocus): boolean =>
   stableLocus(left) === stableLocus(right);
 const id = (): string => globalThis.crypto.randomUUID();
 const timestamp = (): string => new Date().toISOString();
+const normalizeViewport = (
+  viewport: NonNullable<SeqViewerInteraction["viewport"]>,
+): ViewportDescriptor => ({
+  offsetStart: viewport.offsetStart,
+  offsetEnd: viewport.offsetEnd,
+  totalColumns: viewport.totalColumns,
+  segments: viewport.segments.map((segment) => ({
+    segmentId: segment.segmentId,
+    spaceId: segment.spaceId,
+    start: segment.start,
+    end: segment.end,
+  })),
+});
 const documentSpaces = (document: SeqViewSpec): readonly CoordinateSpace[] =>
   Object.freeze([
     ...document.sequences.map((sequence) =>
@@ -425,6 +439,7 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
             },
           }),
       loci: event.loci,
+      ...(event.viewport === undefined ? {} : { viewport: normalizeViewport(event.viewport) }),
     };
     context.fabric.publish({
       id: id(),

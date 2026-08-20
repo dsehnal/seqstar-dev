@@ -140,6 +140,18 @@ export interface SemanticTarget {
   readonly endpointRole?: string;
   readonly locusIndex?: number;
 }
+export interface ViewportSegment {
+  readonly segmentId: string;
+  readonly spaceId: string;
+  readonly start: number;
+  readonly end: number;
+}
+export interface ViewportDescriptor {
+  readonly offsetStart: number;
+  readonly offsetEnd: number;
+  readonly totalColumns: number;
+  readonly segments: readonly ViewportSegment[];
+}
 export interface InteractionEvent {
   readonly interactionId: string;
   readonly interaction: InteractionKind;
@@ -147,6 +159,7 @@ export interface InteractionEvent {
   readonly mode?: "replace" | "add" | "remove" | "toggle";
   readonly origin: InteractionOrigin;
   readonly semanticTarget?: SemanticTarget;
+  readonly viewport?: ViewportDescriptor;
   readonly loci: readonly CoordinateLocus[];
 }
 export interface InteractionOwner {
@@ -214,6 +227,24 @@ export const InteractionOwnerSchema = Type.Object(
   { correlationId: Type.String({ minLength: 1 }), sourceComponent: Type.String({ minLength: 1 }) },
   { additionalProperties: false },
 );
+export const ViewportSegmentSchema = Type.Object(
+  {
+    segmentId: Type.String({ minLength: 1 }),
+    spaceId: Type.String({ minLength: 1 }),
+    start: Type.Integer({ minimum: 0 }),
+    end: Type.Integer({ minimum: 0 }),
+  },
+  { additionalProperties: false },
+);
+export const ViewportDescriptorSchema = Type.Object(
+  {
+    offsetStart: Type.Integer({ minimum: 0 }),
+    offsetEnd: Type.Integer({ minimum: 0 }),
+    totalColumns: Type.Integer({ minimum: 0 }),
+    segments: Type.Array(ViewportSegmentSchema),
+  },
+  { additionalProperties: false },
+);
 export const InteractionEventSchema = Type.Object(
   {
     interactionId: Type.String({ minLength: 1 }),
@@ -235,6 +266,7 @@ export const InteractionEventSchema = Type.Object(
     ),
     origin: InteractionOriginSchema,
     semanticTarget: Type.Optional(SemanticTargetSchema),
+    viewport: Type.Optional(ViewportDescriptorSchema),
     loci: Type.Array(CoordinateLocusSchema),
   },
   { additionalProperties: false },

@@ -36,6 +36,18 @@ export interface SeqViewerCapabilities {
   readonly supportsExternalSelection: true;
   readonly supportsNativeInteractions: true;
 }
+export interface SeqViewerViewportSegment {
+  readonly segmentId: string;
+  readonly spaceId: string;
+  readonly start: number;
+  readonly end: number;
+}
+export interface SeqViewerViewport {
+  readonly offsetStart: number;
+  readonly offsetEnd: number;
+  readonly totalColumns: number;
+  readonly segments: readonly SeqViewerViewportSegment[];
+}
 export interface SeqViewerInteraction {
   readonly kind: "hover" | "select" | "track-activate" | "viewport-change";
   readonly phase?: "set" | "clear";
@@ -51,6 +63,7 @@ export interface SeqViewerInteraction {
   readonly itemId?: string;
   readonly endpointRole?: string;
   readonly locusIndex?: number;
+  readonly viewport?: SeqViewerViewport;
   readonly loci: readonly CoordinateLocus[];
   readonly nativeEvent?: Event;
 }
@@ -152,11 +165,21 @@ interface Hit {
   readonly locusIndex?: number;
   readonly loci: readonly CoordinateLocus[];
 }
+interface NavigationDrag {
+  readonly mode: "pan" | "left" | "right";
+  readonly pointerId: number;
+  readonly startX: number;
+  readonly offsetStart: number;
+  readonly offsetEnd: number;
+  changed: boolean;
+}
 
 const HEADER = 156,
   DEFAULT_ROW = 25,
   RULER = 20,
-  GAP = 12;
+  GAP = 12,
+  NAVIGATION_GAP = 8,
+  MIN_VISIBLE_COLUMNS = 2;
 const NONE: readonly CoordinateLocus[] = [];
 const names: readonly RepresentationName[] = [
   "sequence",
@@ -234,6 +257,11 @@ class CanvasSeqViewer implements SeqViewer {
   private readonly canvas = document.createElement("canvas");
   private readonly headers = document.createElement("div");
   private readonly spacer = document.createElement("div");
+  private readonly navigation = document.createElement("div");
+  private readonly navigationAxis = document.createElement("div");
+  private readonly navigationWindow = document.createElement("div");
+  private readonly navigationLeftHandle = document.createElement("div");
+  private readonly navigationRightHandle = document.createElement("div");
   private readonly abort = new AbortController();
   private readonly highlights = new Map<string, SequenceHighlight>();
   private readonly selections = new Map<string, SequenceSelection>();
@@ -251,6 +279,7 @@ class CanvasSeqViewer implements SeqViewer {
   private pan = 0;
   private nativeHover: SeqViewerInteraction | undefined;
   private nativeSelection: SeqViewerInteraction | undefined;
+  private navigationDrag: NavigationDrag | undefined;
 
   constructor(privateOptions: CreateSeqViewerOptions) {
     this.options = privateOptions;
@@ -289,13 +318,36 @@ class CanvasSeqViewer implements SeqViewer {
       pointerEvents: "none",
       zIndex: "1",
     });
-    this.root.append(this.spacer, this.canvas, this.headers);
+    this.configureNavigation();
+    this.root.append(this.spacer, this.canvas, this.headers, this.navigation);
     privateOptions.target.replaceChildren(this.root);
-    this.root.addEventListener("scroll", this.schedule, { signal: this.abort.signal });
+    this.root.addEventListener("scroll", this.scroll, { signal: this.abort.signal });
     this.canvas.addEventListener("pointermove", this.hover, { signal: this.abort.signal });
     this.canvas.addEventListener("pointerleave", this.leave, { signal: this.abort.signal });
     this.canvas.addEventListener("click", this.select, { signal: this.abort.signal });
     this.canvas.addEventListener("wheel", this.wheel, {
+      signal: this.abort.signal,
+      passive: false,
+    });
+    this.navigation.addEventListener("click", this.navigationControl, {
+      signal: this.abort.signal,
+    });
+    this.navigation.addEventListener("keydown", this.navigationKeydown, {
+      signal: this.abort.signal,
+    });
+    this.navigationAxis.addEventListener("pointerdown", this.navigationPointerDown, {
+      signal: this.abort.signal,
+    });
+    this.navigationAxis.addEventListener("pointermove", this.navigationPointerMove, {
+      signal: this.abort.signal,
+    });
+    this.navigationAxis.addEventListener("pointerup", this.navigationPointerUp, {
+      signal: this.abort.signal,
+    });
+    this.navigationAxis.addEventListener("pointercancel", this.navigationPointerUp, {
+      signal: this.abort.signal,
+    });
+    this.navigationAxis.addEventListener("wheel", this.wheel, {
       signal: this.abort.signal,
       passive: false,
     });
@@ -313,6 +365,112 @@ class CanvasSeqViewer implements SeqViewer {
     this.resize();
   }
   private readonly options: CreateSeqViewerOptions;
+
+  private configureNavigation(): void {
+    this.navigation.dataset.seqViewerNavigation = "root";
+    this.navigation.setAttribute("role", "group");
+    this.navigation.setAttribute("aria-label", "Sequence navigation");
+    Object.assign(this.navigation.style, {
+      position: "absolute",
+      left: `${HEADER}px`,
+      right: "4px",
+      bottom: "4px",
+      height: "30px",
+      display: "none",
+      zIndex: "2",
+      pointerEvents: "auto",
+      background: "rgb(255 255 255 / 94%)",
+      border: "1px solid #cbd5e1",
+      borderRadius: "4px",
+      boxShadow: "0 1px 2px rgb(15 23 42 / 16%)",
+    });
+    this.navigationAxis.dataset.seqViewerNavigation = "axis";
+    this.navigationAxis.title =
+      "Drag the window to pan. Drag handles to zoom. Shift-wheel pans; Ctrl-wheel zooms.";
+    Object.assign(this.navigationAxis.style, {
+      position: "absolute",
+      left: "4px",
+      right: "130px",
+      top: "5px",
+      height: "18px",
+      overflow: "hidden",
+      cursor: "grab",
+      background: "#e2e8f0",
+      borderRadius: "3px",
+      touchAction: "none",
+    });
+    this.navigationWindow.dataset.seqViewerNavigation = "window";
+    this.navigationWindow.tabIndex = 0;
+    this.navigationWindow.setAttribute("role", "slider");
+    this.navigationWindow.setAttribute("aria-label", "Viewport window; drag to pan");
+    Object.assign(this.navigationWindow.style, {
+      position: "absolute",
+      top: "1px",
+      bottom: "1px",
+      minWidth: "8px",
+      boxSizing: "border-box",
+      cursor: "grab",
+      background: "rgb(37 99 235 / 24%)",
+      border: "1px solid #2563eb",
+      borderRadius: "2px",
+      outlineOffset: "1px",
+    });
+    for (const [handle, side, label] of [
+      [this.navigationLeftHandle, "left", "Zoom in or out from the left"],
+      [this.navigationRightHandle, "right", "Zoom in or out from the right"],
+    ] as const) {
+      handle.dataset.seqViewerNavigationHandle = side;
+      handle.tabIndex = 0;
+      handle.setAttribute("role", "slider");
+      handle.setAttribute("aria-label", label);
+      Object.assign(handle.style, {
+        position: "absolute",
+        top: "-3px",
+        bottom: "-3px",
+        width: "6px",
+        cursor: "ew-resize",
+        background: "#1d4ed8",
+        borderRadius: "2px",
+      });
+      handle.style[side] = "-3px";
+    }
+    this.navigationWindow.append(this.navigationLeftHandle, this.navigationRightHandle);
+    const controls = document.createElement("div");
+    Object.assign(controls.style, {
+      position: "absolute",
+      right: "4px",
+      top: "3px",
+      display: "flex",
+      gap: "2px",
+    });
+    for (const [control, text, label] of [
+      ["pan-left", "◀", "Pan left"],
+      ["pan-right", "▶", "Pan right"],
+      ["zoom-out", "−", "Zoom out"],
+      ["zoom-in", "+", "Zoom in"],
+      ["reset", "Reset", "Reset navigation"],
+    ] as const) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.dataset.seqViewerNavigationControl = control;
+      button.textContent = text;
+      button.setAttribute("aria-label", label);
+      button.title = label;
+      Object.assign(button.style, {
+        height: "22px",
+        minWidth: control === "reset" ? "39px" : "17px",
+        padding: control === "reset" ? "0 3px" : "0",
+        border: "1px solid #94a3b8",
+        borderRadius: "2px",
+        background: "#fff",
+        color: "#0f172a",
+        font: "11px/1 ui-monospace, monospace",
+      });
+      controls.append(button);
+    }
+    this.navigationAxis.append(this.navigationWindow);
+    this.navigation.append(this.navigationAxis, controls);
+  }
 
   async load(document: SeqViewSpec, viewId: string, signal?: AbortSignal): Promise<LoadResult> {
     const generation = ++this.generation;
@@ -474,13 +632,16 @@ class CanvasSeqViewer implements SeqViewer {
     this.instances.push(...instances);
     this.clearNativeHover();
     this.clearNativeSelection();
+    this.cancelNavigationDrag();
     this.active = next;
     this.zoom = 1;
     this.pan = 0;
     this.root.scrollTop = 0;
     this.spacer.style.height = `${Math.max(this.height, next.totalHeight)}px`;
     this.renderHeaders();
+    this.renderNavigation();
     this.draw();
+    this.emitViewport();
     return {
       status: "rendered",
       generation,
@@ -525,6 +686,7 @@ class CanvasSeqViewer implements SeqViewer {
     this.canvas.style.width = `${this.width}px`;
     this.canvas.style.height = `${this.height}px`;
     this.spacer.style.height = `${Math.max(this.height, this.active?.totalHeight ?? 0)}px`;
+    this.renderNavigation();
     this.schedule();
   };
 
@@ -564,6 +726,7 @@ class CanvasSeqViewer implements SeqViewer {
     if (this.disposed) return;
     this.clearNativeHover();
     this.clearNativeSelection();
+    this.cancelNavigationDrag();
     this.disposed = true;
     ++this.generation;
     try {
@@ -882,6 +1045,185 @@ class CanvasSeqViewer implements SeqViewer {
     }
     return undefined;
   }
+  private minimumVisibleColumns(active: Active): number {
+    return Math.min(MIN_VISIBLE_COLUMNS, active.units);
+  }
+  private visibleColumnCount(active: Active): number {
+    return Math.min(
+      active.units,
+      Math.max(this.minimumVisibleColumns(active), Math.round(active.units / this.zoom)),
+    );
+  }
+  private setViewport(start: number, end: number): boolean {
+    const active = this.active;
+    if (!active) return false;
+    const visible = Math.min(
+      active.units,
+      Math.max(this.minimumVisibleColumns(active), Math.round(end - start)),
+    );
+    const nextStart = Math.min(active.units - visible, Math.max(0, Math.round(start)));
+    const nextZoom = active.units / visible;
+    if (this.pan === nextStart && this.zoom === nextZoom) return false;
+    this.pan = nextStart;
+    this.zoom = nextZoom;
+    this.renderNavigation();
+    this.schedule();
+    return true;
+  }
+  private panViewport(delta: number): boolean {
+    const active = this.active;
+    if (!active) return false;
+    const width = this.visibleColumnCount(active);
+    return this.setViewport(this.pan + delta, this.pan + delta + width);
+  }
+  private zoomViewport(direction: "in" | "out", center?: number): boolean {
+    const active = this.active;
+    if (!active) return false;
+    const current = this.visibleColumnCount(active);
+    const width =
+      direction === "in"
+        ? Math.max(this.minimumVisibleColumns(active), Math.floor(current / 1.25))
+        : Math.min(active.units, Math.ceil(current * 1.25));
+    const focal = center ?? this.pan + current / 2;
+    return this.setViewport(focal - width / 2, focal + width / 2);
+  }
+  private resetViewport(): boolean {
+    const active = this.active;
+    return active ? this.setViewport(0, active.units) : false;
+  }
+  private viewportDescriptor(): SeqViewerViewport | undefined {
+    const active = this.active;
+    if (!active) return undefined;
+    const offsetStart = this.pan,
+      offsetEnd = offsetStart + this.visibleColumnCount(active);
+    const segments = active.view.axis.segments.flatMap((segment, index) => {
+      const segmentOffset = active.offsets[index];
+      if (segmentOffset === undefined) return [];
+      const start = Math.max(offsetStart, segmentOffset),
+        end = Math.min(offsetEnd, segmentOffset + segment.end - segment.start);
+      return start < end
+        ? [
+            Object.freeze({
+              segmentId: segment.id,
+              spaceId: segment.space,
+              start: segment.start + start - segmentOffset,
+              end: segment.start + end - segmentOffset,
+            }),
+          ]
+        : [];
+    });
+    return Object.freeze({
+      offsetStart,
+      offsetEnd,
+      totalColumns: active.units,
+      segments: Object.freeze(segments),
+    });
+  }
+  private emitViewport(nativeEvent?: Event): void {
+    const active = this.active,
+      viewport = this.viewportDescriptor();
+    if (!active || !viewport) return;
+    this.subject.next({
+      kind: "viewport-change",
+      phase: "set",
+      documentId: active.document.id,
+      viewId: active.view.id,
+      viewport,
+      loci: NONE,
+      ...(nativeEvent ? { nativeEvent } : {}),
+    });
+  }
+  private navigationAxisWidth(): number {
+    return Math.max(1, this.navigationAxis.clientWidth || this.width - HEADER - 138);
+  }
+  private navigationCell(active: Active, width = this.navigationAxisWidth()): number {
+    const gaps = Math.max(0, active.view.axis.segments.length - 1) * NAVIGATION_GAP;
+    return Math.max(1, (width - gaps) / Math.max(1, active.units));
+  }
+  private navigationX(
+    active: Active,
+    offset: number,
+    edge: "start" | "end",
+    width = this.navigationAxisWidth(),
+  ): number {
+    const bounded = Math.max(0, Math.min(active.units, offset));
+    for (const [index, segment] of active.view.axis.segments.entries()) {
+      const start = active.offsets[index];
+      if (start === undefined) continue;
+      const end = start + segment.end - segment.start;
+      if (bounded < end || (edge === "end" && bounded <= end))
+        return index * NAVIGATION_GAP + bounded * this.navigationCell(active, width);
+    }
+    return width;
+  }
+  private renderNavigation(): void {
+    const active = this.active;
+    if (!active) {
+      this.navigation.style.display = "none";
+      return;
+    }
+    this.navigation.style.display = "block";
+    const viewport = this.viewportDescriptor();
+    if (!viewport) return;
+    const width = this.navigationAxisWidth();
+    this.navigationAxis.replaceChildren();
+    for (const [index, segment] of active.view.axis.segments.entries()) {
+      const offset = active.offsets[index];
+      if (offset === undefined) continue;
+      const element = document.createElement("span");
+      element.textContent = segment.id;
+      element.dataset.seqViewerNavigationSegment = segment.id;
+      const left = this.navigationX(active, offset, "start", width),
+        right = this.navigationX(active, offset + segment.end - segment.start, "end", width);
+      Object.assign(element.style, {
+        position: "absolute",
+        left: `${left}px`,
+        width: `${Math.max(1, right - left)}px`,
+        top: "0",
+        bottom: "0",
+        overflow: "hidden",
+        pointerEvents: "none",
+        background: index % 2 === 0 ? "#cbd5e1" : "#bfdbfe",
+        color: "#334155",
+        font: "9px/18px ui-monospace, monospace",
+        textAlign: "center",
+        whiteSpace: "nowrap",
+      });
+      this.navigationAxis.append(element);
+    }
+    const left = this.navigationX(active, viewport.offsetStart, "start", width),
+      right = this.navigationX(active, viewport.offsetEnd, "end", width);
+    this.navigationWindow.style.left = `${left}px`;
+    this.navigationWindow.style.width = `${Math.max(8, right - left)}px`;
+    this.navigationWindow.setAttribute("aria-valuemin", "0");
+    this.navigationWindow.setAttribute("aria-valuemax", String(active.units));
+    this.navigationWindow.setAttribute("aria-valuenow", String(viewport.offsetStart));
+    this.navigationWindow.setAttribute(
+      "aria-valuetext",
+      `Columns ${viewport.offsetStart + 1} to ${viewport.offsetEnd} of ${active.units}`,
+    );
+    for (const [handle, value] of [
+      [this.navigationLeftHandle, viewport.offsetStart],
+      [this.navigationRightHandle, viewport.offsetEnd],
+    ] as const) {
+      handle.setAttribute("aria-valuemin", "0");
+      handle.setAttribute("aria-valuemax", String(active.units));
+      handle.setAttribute("aria-valuenow", String(value));
+    }
+    this.navigationAxis.append(this.navigationWindow);
+  }
+  private offsetAtClientX(clientX: number): number | undefined {
+    const active = this.active,
+      box = this.canvas.getBoundingClientRect();
+    if (!active) return undefined;
+    const located = this.segmentAt(clientX - box.left);
+    if (!located) return undefined;
+    const index = active.view.axis.segments.indexOf(located.segment),
+      offset = active.offsets[index];
+    return offset === undefined
+      ? undefined
+      : offset + located.position - located.segment.start + 0.5;
+  }
   private xForBoundary(
     active: Active,
     locus: Extract<Locus, { kind: "boundary" }>,
@@ -943,6 +1285,7 @@ class CanvasSeqViewer implements SeqViewer {
     if (!context) return;
     this.canvas.style.transform = `translateY(${scroll}px)`;
     this.headers.style.transform = `translateY(${scroll}px)`;
+    this.navigation.style.transform = `translateY(${scroll}px)`;
     context.setTransform(this.dpr, 0, 0, this.dpr, 0, 0);
     context.clearRect(0, 0, this.width, this.height);
     context.fillStyle = "#fff";
@@ -1371,6 +1714,10 @@ class CanvasSeqViewer implements SeqViewer {
   private readonly leave = (event: PointerEvent): void => {
     this.clearNativeHover(event);
   };
+  private readonly scroll = (event: Event): void => {
+    this.clearNativeHover(event);
+    this.schedule();
+  };
   private setNativeHover(hit: SeqViewerInteraction, event: PointerEvent): void {
     const next = { ...hit, kind: "hover" as const, phase: "set" as const };
     if (this.sameNativeTarget(this.nativeHover, next)) return;
@@ -1436,20 +1783,114 @@ class CanvasSeqViewer implements SeqViewer {
       JSON.stringify(current.loci) === JSON.stringify(next.loci)
     );
   }
-  private readonly wheel = (event: WheelEvent): void => {
-    if (!this.active || (!event.ctrlKey && !event.shiftKey)) return;
+  private readonly navigationPointerDown = (event: PointerEvent): void => {
+    const active = this.active;
+    if (!active || !(event.target instanceof Element)) return;
+    const handle = event.target.closest<HTMLElement>("[data-seq-viewer-navigation-handle]");
+    const window = event.target.closest<HTMLElement>("[data-seq-viewer-navigation=window]");
+    const mode =
+      handle?.dataset.seqViewerNavigationHandle === "left"
+        ? "left"
+        : handle?.dataset.seqViewerNavigationHandle === "right"
+          ? "right"
+          : window
+            ? "pan"
+            : undefined;
+    const viewport = this.viewportDescriptor();
+    if (!mode || !viewport) return;
     event.preventDefault();
-    if (event.ctrlKey)
-      this.zoom = Math.min(32, Math.max(0.5, this.zoom * (event.deltaY < 0 ? 1.2 : 1 / 1.2)));
-    else this.pan = Math.max(0, this.pan + event.deltaY / Math.max(1, this.cell()));
-    this.schedule();
-    this.subject.next({
-      kind: "viewport-change",
-      documentId: this.active.document.id,
-      viewId: this.active.view.id,
-      loci: NONE,
-      nativeEvent: event,
-    });
+    this.navigationDrag = {
+      mode,
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      offsetStart: viewport.offsetStart,
+      offsetEnd: viewport.offsetEnd,
+      changed: false,
+    };
+    this.navigationAxis.setPointerCapture(event.pointerId);
+  };
+  private readonly navigationPointerMove = (event: PointerEvent): void => {
+    const active = this.active,
+      drag = this.navigationDrag;
+    if (!active || !drag || drag.pointerId !== event.pointerId) return;
+    const delta = Math.round((event.clientX - drag.startX) / this.navigationCell(active));
+    const changed =
+      drag.mode === "pan"
+        ? this.setViewport(drag.offsetStart + delta, drag.offsetEnd + delta)
+        : drag.mode === "left"
+          ? this.setViewport(drag.offsetStart + delta, drag.offsetEnd)
+          : this.setViewport(drag.offsetStart, drag.offsetEnd + delta);
+    drag.changed ||= changed;
+  };
+  private readonly navigationPointerUp = (event: PointerEvent): void => {
+    const drag = this.navigationDrag;
+    if (!drag || drag.pointerId !== event.pointerId) return;
+    this.navigationDrag = undefined;
+    try {
+      this.navigationAxis.releasePointerCapture(event.pointerId);
+    } catch {
+      /* pointer capture may already be released */
+    }
+    if (drag.changed) this.emitViewport(event);
+  };
+  private cancelNavigationDrag(): void {
+    const drag = this.navigationDrag;
+    this.navigationDrag = undefined;
+    if (!drag) return;
+    try {
+      this.navigationAxis.releasePointerCapture(drag.pointerId);
+    } catch {
+      /* replacement may already have released pointer capture */
+    }
+  }
+  private readonly navigationControl = (event: MouseEvent): void => {
+    if (!(event.target instanceof Element)) return;
+    const control = event.target.closest<HTMLElement>("[data-seq-viewer-navigation-control]")
+      ?.dataset.seqViewerNavigationControl;
+    const changed =
+      control === "pan-left"
+        ? this.panViewport(-1)
+        : control === "pan-right"
+          ? this.panViewport(1)
+          : control === "zoom-out"
+            ? this.zoomViewport("out")
+            : control === "zoom-in"
+              ? this.zoomViewport("in")
+              : control === "reset"
+                ? this.resetViewport()
+                : false;
+    if (changed) this.emitViewport(event);
+  };
+  private readonly navigationKeydown = (event: KeyboardEvent): void => {
+    const step = event.shiftKey ? 4 : 1;
+    const changed =
+      event.key === "ArrowLeft"
+        ? this.panViewport(-step)
+        : event.key === "ArrowRight"
+          ? this.panViewport(step)
+          : event.key === "ArrowUp" || event.key === "+" || event.key === "="
+            ? this.zoomViewport("in")
+            : event.key === "ArrowDown" || event.key === "-"
+              ? this.zoomViewport("out")
+              : event.key === "Home" || event.key.toLowerCase() === "r"
+                ? this.resetViewport()
+                : event.key === "End"
+                  ? this.panViewport(Number.MAX_SAFE_INTEGER)
+                  : false;
+    if (!changed) return;
+    event.preventDefault();
+    this.emitViewport(event);
+  };
+  private readonly wheel = (event: WheelEvent): void => {
+    if (!this.active || (!event.ctrlKey && !event.metaKey && !event.shiftKey && event.deltaX === 0))
+      return;
+    event.preventDefault();
+    const zoom = event.ctrlKey || event.metaKey;
+    const delta = event.deltaX || event.deltaY;
+    const changed = zoom
+      ? this.zoomViewport(delta < 0 ? "in" : "out", this.offsetAtClientX(event.clientX))
+      : this.panViewport(Math.sign(delta) * Math.max(1, Math.round(Math.abs(delta) / 80)));
+    if (changed) this.emitViewport(event);
   };
   private readonly schedule = (): void => {
     if (this.disposed || this.frame) return;
