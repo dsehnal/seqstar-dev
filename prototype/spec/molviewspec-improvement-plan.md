@@ -197,9 +197,10 @@ manifests, lockfile, and public contracts are read-only.
   selector colors, no atomic detail, no auto-focus.
 - Observed coverage: one chain cartoon, observed selectors colored, missing and
   unmapped residues neutral, no atomic detail.
-- Sites and variants: always color the cartoon. They may use one additional
-  union component and one ball-and-stick representation per activated layer,
-  never one component/representation per item or residue.
+- Sites and variants: always color the cartoon. Sites additionally use one
+  bounded union component and ball-and-stick representation per final color;
+  variants may opt in under the same limit. Never create one representation per
+  residue.
 - Mapping status, original loci, colors, request order, and lifecycle semantics
   stay unchanged.
 
@@ -254,7 +255,8 @@ public contracts are read-only.
 - Background: one cartoon for barnase and one for barstar, with stable role
   colors.
 - Interface activation: recolor all mapped interface endpoints on the two
-  cartoons; create no interface-wide ball-and-stick forest.
+  cartoons and add one selector-colored union ball-and-stick representation per
+  endpoint role.
 - Single-contact activation: retain cartoon context; add at most one union
   ball-and-stick detail representation per endpoint role and focus both roles.
 - Preserve relationship ID, both endpoint roles, every mapped endpoint,
@@ -263,8 +265,8 @@ public contracts are read-only.
 ### Acceptance
 
 - all 43 frozen contacts still cross-audit against exact selectors;
-- interface MVS has exactly two cartoon representations and zero atomic-detail
-  representations;
+- interface MVS has exactly two cartoon representations and two bounded
+  atomic-detail representations, independent of interface residue count;
 - contact MVS has exactly two cartoons and at most two bounded atomic-detail
   representations, independent of selector count;
 - endpoint role colors and focus union are deterministic;

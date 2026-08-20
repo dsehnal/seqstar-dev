@@ -531,6 +531,7 @@ const p53ChainSelector: MvsResidueSelector = Object.freeze({
   label_asym_id: "C",
   auth_asym_id: "A",
 });
+const SITE_ATOMIC_DETAIL_LIMIT = 16;
 
 /**
  * Stable semantic precedence follows the authored SeqViewSpec order. The active
@@ -683,17 +684,36 @@ export const generateUniProtAnnotationMvs = async (options: {
           },
         ],
   );
+  const siteDetailSelectorCount = new Set(
+    residueColors.flatMap((group) => group.selectors.map((item) => JSON.stringify(item))),
+  ).size;
+  if (track.id === "sites" && siteDetailSelectorCount > SITE_ATOMIC_DETAIL_LIMIT)
+    throw new Error(
+      `Site activation has ${String(siteDetailSelectorCount)} mapped selectors; atomic-detail limit is ${String(SITE_ATOMIC_DETAIL_LIMIT)}.`,
+    );
   appendMvsCartoonPresentation(structure, [
     {
       componentSelector: p53ChainSelector,
       baseColor: "#CBD5E1",
       residueColors,
+      ...(track.id === "sites"
+        ? {
+            atomicDetails: residueColors.map((group) => ({
+              semanticId: `${group.semanticId}-site-detail`,
+              color: group.color,
+              selectors: group.selectors,
+            })),
+          }
+        : {}),
     },
   ]);
   const document = fixedTimestamp(
     builder.getState({
       title: `${track.label ?? track.id} on 1TUP`,
-      description: `Generated from ${options.document.id}; unmapped annotations are intentionally omitted.`,
+      description:
+        track.id === "sites"
+          ? `Generated from ${options.document.id}; mapped site residues are colored on the cartoon and shown as bounded ball-and-stick detail; unmapped annotations are intentionally omitted.`
+          : `Generated from ${options.document.id}; unmapped annotations are intentionally omitted.`,
       description_format: "plaintext",
     }),
   );

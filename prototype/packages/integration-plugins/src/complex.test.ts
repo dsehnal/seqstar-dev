@@ -257,7 +257,7 @@ describe("P50 frozen 1BRS complex integration", () => {
     });
     expect(MVSData.validationIssues(interfaceMvs.document, { noExtra: true })).toBeUndefined();
     expect(interfaceMvs.document.metadata.description).toBe(
-      "Two role-colored cartoons with all mapped interface endpoints recolored and no atomic-detail representation.",
+      "Two role-colored cartoons with all mapped interface residues recolored and shown as bounded ball-and-stick overlays.",
     );
     expect(interfaceMvs.mappedContactIds).toEqual(contacts.map((contact) => contact.id));
     expect(
@@ -292,14 +292,22 @@ describe("P50 frozen 1BRS complex integration", () => {
         ),
       },
     ]);
-    expect(countMvsRepresentationTypes(interfaceMvs.document)).toEqual({ cartoon: 2 });
-    expect(countMvsTreeNodes(interfaceMvs.document)).toMatchObject({ component: 2 });
+    expect(countMvsRepresentationTypes(interfaceMvs.document)).toEqual({
+      ball_and_stick: 2,
+      cartoon: 2,
+    });
+    expect(countMvsTreeNodes(interfaceMvs.document)).toMatchObject({
+      component: 4,
+      representation: 4,
+    });
     expect(countMvsTreeNodes(interfaceMvs.document).focus ?? 0).toBe(0);
     expect(queryMvsTree(interfaceMvs.document, "color").map((node) => node.params)).toEqual([
       { color: "#BFDBFE" },
       { color: "#2563EB", selector: interfaceMvs.endpointRoles[0]?.selectors },
+      { color: "#2563EB" },
       { color: "#FDE68A" },
       { color: "#D97706", selector: interfaceMvs.endpointRoles[1]?.selectors },
+      { color: "#D97706" },
     ]);
     const selected = generateComplexMvs({
       contacts,

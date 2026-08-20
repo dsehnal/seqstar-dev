@@ -119,22 +119,36 @@ describe("MVS presentation helper", () => {
     expect((selectorColor.params as { selector: readonly unknown[] }).selector).toHaveLength(7);
   });
 
-  it("bounds sparse atomic detail to one union component and representation", () => {
+  it("bounds sparse atomic detail to one union component per final color", () => {
     const { document, summary } = createDocument([
       {
         ...p53Style,
-        atomicDetail: {
-          semanticId: "named-variants",
-          color: "#7C3AED",
-          selectors: [selector(9), selector(3), selector(3)],
-        },
+        atomicDetails: [
+          {
+            semanticId: "named-variants",
+            color: "#7C3AED",
+            selectors: [selector(9), selector(3), selector(3)],
+          },
+          {
+            semanticId: "named-site",
+            color: "#D97706",
+            selectors: [selector(5)],
+          },
+        ],
       },
     ]);
     expect(MVSData.validationIssues(document, { noExtra: true })).toBeUndefined();
-    expect(summary.atomicDetailComponents).toBe(1);
-    expect(summary.atomicDetailRepresentations).toBe(1);
-    expect(countMvsTreeNodes(document)).toMatchObject({ component: 2, representation: 2 });
-    expect(countMvsRepresentationTypes(document)).toEqual({ ball_and_stick: 1, cartoon: 1 });
+    expect(summary.atomicDetailComponents).toBe(2);
+    expect(summary.atomicDetailRepresentations).toBe(2);
+    expect(countMvsTreeNodes(document)).toMatchObject({ component: 3, representation: 3 });
+    expect(countMvsRepresentationTypes(document)).toEqual({ ball_and_stick: 2, cartoon: 1 });
+    expect(queryMvsTree(document, "color").map((node) => node.params)).toEqual([
+      { color: "#CBD5E1" },
+      { color: "#2563EB", selector: [selector(10)] },
+      { color: "#DC2626", selector: [selector(4), selector(7)] },
+      { color: "#7C3AED" },
+      { color: "#D97706" },
+    ]);
   });
 
   it("rejects ambiguous colors and duplicate cartoon styles instead of emitting arbitrary geometry", () => {
@@ -152,6 +166,17 @@ describe("MVS presentation helper", () => {
     expect(() => createDocument([p53Style, { ...p53Style, baseColor: "#FFFFFF" }])).toThrow(
       "Duplicate cartoon component selector",
     );
+    expect(() =>
+      createDocument([
+        {
+          ...p53Style,
+          atomicDetails: [
+            { semanticId: "red", color: "#DC2626", selectors: [selector(4)] },
+            { semanticId: "blue", color: "#2563EB", selectors: [selector(4)] },
+          ],
+        },
+      ]),
+    ).toThrow("Ambiguous atomic-detail colors");
   });
 
   it("omits empty groups and detaches immutable query snapshots", () => {
@@ -159,7 +184,7 @@ describe("MVS presentation helper", () => {
       {
         ...p53Style,
         residueColors: [{ semanticId: "empty", color: "#2563EB", precedence: 1, selectors: [] }],
-        atomicDetail: { semanticId: "empty-detail", color: "#7C3AED", selectors: [] },
+        atomicDetails: [{ semanticId: "empty-detail", color: "#7C3AED", selectors: [] }],
       },
     ]);
     expect(summary).toMatchObject({ selectorColorNodes: 0, atomicDetailComponents: 0 });

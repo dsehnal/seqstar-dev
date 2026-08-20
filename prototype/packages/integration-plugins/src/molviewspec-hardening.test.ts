@@ -54,7 +54,7 @@ const selectorCount = (document: Parameters<typeof queryMvsTree>[0]): number =>
   }, 0);
 
 describe("G40 cross-case MolViewSpec presentation hardening", () => {
-  it("keeps every P04637 activation as one validated cartoon-only document", async () => {
+  it("keeps one P04637 cartoon while limiting atomic detail to mapped sites", async () => {
     const generated = await Promise.all(
       p04637Profiles.map(async ([trackId, layerId]) => ({
         trackId,
@@ -64,14 +64,17 @@ describe("G40 cross-case MolViewSpec presentation hardening", () => {
 
     for (const { trackId, generation } of generated) {
       assertValid(generation.document);
+      const isSites = trackId === "sites";
       expect(countMvsTreeNodes(generation.document)).toMatchObject({
         download: 1,
         parse: 1,
         structure: 1,
-        component: 1,
-        representation: 1,
+        component: isSites ? 3 : 1,
+        representation: isSites ? 3 : 1,
       });
-      expect(countMvsRepresentationTypes(generation.document)).toEqual({ cartoon: 1 });
+      expect(countMvsRepresentationTypes(generation.document)).toEqual(
+        isSites ? { ball_and_stick: 2, cartoon: 1 } : { cartoon: 1 },
+      );
       expect(queryMvsTree(generation.document, "focus")).toHaveLength(0);
       expect(queryMvsTree(generation.document, "primitive")).toHaveLength(0);
       expect(selectorCount(generation.document)).toBeGreaterThan(0);
@@ -91,8 +94,14 @@ describe("G40 cross-case MolViewSpec presentation hardening", () => {
       activation: "interface",
     });
     assertValid(interfaceView.document);
-    expect(countMvsRepresentationTypes(interfaceView.document)).toEqual({ cartoon: 2 });
-    expect(countMvsTreeNodes(interfaceView.document)).toMatchObject({ component: 2 });
+    expect(countMvsRepresentationTypes(interfaceView.document)).toEqual({
+      ball_and_stick: 2,
+      cartoon: 2,
+    });
+    expect(countMvsTreeNodes(interfaceView.document)).toMatchObject({
+      component: 4,
+      representation: 4,
+    });
     expect(queryMvsTree(interfaceView.document, "focus")).toHaveLength(0);
 
     const contactView = generateComplexMvs({

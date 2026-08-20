@@ -774,15 +774,16 @@ export const generateComplexMvs = (options: ComplexMvsOptions): ComplexMvsGenera
           selectors: barnase,
         },
       ],
-      ...(options.activation === "contact"
-        ? {
-            atomicDetail: {
-              semanticId: "barnase-contact-endpoint",
-              color: "#2563EB",
-              selectors: barnase,
-            },
-          }
-        : {}),
+      atomicDetails: [
+        {
+          semanticId:
+            options.activation === "contact"
+              ? "barnase-contact-endpoint"
+              : "barnase-interface-residues",
+          color: "#2563EB",
+          selectors: barnase,
+        },
+      ],
     },
     {
       componentSelector: { label_entity_id: "2", label_asym_id: "D", auth_asym_id: "D" },
@@ -795,15 +796,16 @@ export const generateComplexMvs = (options: ComplexMvsOptions): ComplexMvsGenera
           selectors: barstar,
         },
       ],
-      ...(options.activation === "contact"
-        ? {
-            atomicDetail: {
-              semanticId: "barstar-contact-endpoint",
-              color: "#D97706",
-              selectors: barstar,
-            },
-          }
-        : {}),
+      atomicDetails: [
+        {
+          semanticId:
+            options.activation === "contact"
+              ? "barstar-contact-endpoint"
+              : "barstar-interface-residues",
+          color: "#D97706",
+          selectors: barstar,
+        },
+      ],
     },
   ];
   appendMvsCartoonPresentation(structure, styles);
@@ -818,7 +820,7 @@ export const generateComplexMvs = (options: ComplexMvsOptions): ComplexMvsGenera
       description:
         options.activation === "contact"
           ? `Two role-colored cartoons with bounded ball-and-stick atomic detail for both endpoints of contact ${relationshipId} and a union focus.`
-          : "Two role-colored cartoons with all mapped interface endpoints recolored and no atomic-detail representation.",
+          : "Two role-colored cartoons with all mapped interface residues recolored and shown as bounded ball-and-stick overlays.",
       description_format: "plaintext",
     }),
   );

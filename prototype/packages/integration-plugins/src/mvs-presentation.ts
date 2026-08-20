@@ -26,7 +26,7 @@ export interface MvsCartoonStyle {
   readonly componentSelector: MvsResidueSelector;
   readonly baseColor: `#${string}`;
   readonly residueColors: readonly MvsResidueColorGroup[];
-  readonly atomicDetail?: MvsAtomicDetailGroup;
+  readonly atomicDetails?: readonly MvsAtomicDetailGroup[];
 }
 
 export interface MvsPresentationSummary {
@@ -126,16 +126,44 @@ const colorGroups = (
   );
 };
 
+const atomicDetailGroups = (
+  groups: readonly MvsAtomicDetailGroup[] | undefined,
+): readonly Readonly<{ color: `#${string}`; selectors: readonly MvsResidueSelector[] }>[] => {
+  const selectors = new Map<
+    string,
+    Readonly<{ color: `#${string}`; selector: MvsResidueSelector }>
+  >();
+  for (const group of groups ?? []) {
+    for (const selector of group.selectors) {
+      const key = canonicalJson(selector);
+      const existing = selectors.get(key);
+      if (existing !== undefined && existing.color !== group.color)
+        throw new Error(`Ambiguous atomic-detail colors for mapped selector ${key}.`);
+      selectors.set(key, { color: group.color, selector });
+    }
+  }
+  const selectorsByColor = new Map<string, MvsResidueSelector[]>();
+  for (const { color, selector } of selectors.values()) {
+    const existing = selectorsByColor.get(color) ?? [];
+    existing.push(selector);
+    selectorsByColor.set(color, existing);
+  }
+  return Object.freeze(
+    [...selectorsByColor.entries()]
+      .sort(([left], [right]) => compareCanonical(left, right))
+      .map(([color, detailSelectors]) =>
+        Object.freeze({
+          color: color as `#${string}`,
+          selectors: uniqueSortedSelectors(detailSelectors),
+        }),
+      )
+      .filter((group) => group.selectors.length > 0),
+  );
+};
+
 const styleKey = (style: MvsCartoonStyle): string =>
   canonicalJson({
-    atomicDetail:
-      style.atomicDetail === undefined
-        ? undefined
-        : {
-            color: style.atomicDetail.color,
-            semanticId: style.atomicDetail.semanticId,
-            selectors: uniqueSortedSelectors(style.atomicDetail.selectors),
-          },
+    atomicDetails: atomicDetailGroups(style.atomicDetails),
     baseColor: style.baseColor,
     componentSelector: snapshot(style.componentSelector),
     residueColors: colorGroups(style.residueColors),
@@ -172,15 +200,13 @@ export const appendMvsCartoonPresentation = (
       });
       selectorColorNodes++;
     }
-    const detail = style.atomicDetail;
-    if (detail === undefined) continue;
-    const selectors = uniqueSortedSelectors(detail.selectors);
-    if (selectors.length === 0) continue;
-    structure
-      .component({ selector: selectors.map((selector) => snapshot(selector)) })
-      .representation({ type: "ball_and_stick" })
-      .color({ color: detail.color });
-    atomicDetailComponents++;
+    for (const detail of atomicDetailGroups(style.atomicDetails)) {
+      structure
+        .component({ selector: detail.selectors.map((selector) => snapshot(selector)) })
+        .representation({ type: "ball_and_stick" })
+        .color({ color: detail.color });
+      atomicDetailComponents++;
+    }
   }
   return Object.freeze({
     cartoonComponents: styles.length,

@@ -74,11 +74,41 @@ test("renders every revised P04637 and 1BRS MVS profile offline without accumula
     .toBe(1);
   const tracks = page.getByTestId("uniprot-tracks-host");
   for (const profile of [
-    { track: "missense-score", request: "P41-missense-score-", selectors: 196 },
-    { track: "structure-coverage", request: "P41-structure-coverage-", selectors: 196 },
-    { track: "regions", request: "P41-regions-", selectors: 196 },
-    { track: "sites", request: "P41-sites-", selectors: 2 },
-    { track: "variants", request: "P41-variants-", selectors: 2 },
+    {
+      track: "missense-score",
+      request: "P41-missense-score-",
+      selectors: 196,
+      components: 1,
+      representations: { cartoon: 1 },
+    },
+    {
+      track: "structure-coverage",
+      request: "P41-structure-coverage-",
+      selectors: 196,
+      components: 1,
+      representations: { cartoon: 1 },
+    },
+    {
+      track: "regions",
+      request: "P41-regions-",
+      selectors: 196,
+      components: 1,
+      representations: { cartoon: 1 },
+    },
+    {
+      track: "sites",
+      request: "P41-sites-",
+      selectors: 2,
+      components: 3,
+      representations: { ball_and_stick: 2, cartoon: 1 },
+    },
+    {
+      track: "variants",
+      request: "P41-variants-",
+      selectors: 2,
+      components: 1,
+      representations: { cartoon: 1 },
+    },
   ] as const) {
     await tracks.locator(`[data-seqstar-track-activate="${profile.track}"]`).click();
     await expect(page.getByTestId("p41-request-id")).toContainText(profile.request);
@@ -88,8 +118,8 @@ test("renders every revised P04637 and 1BRS MVS profile offline without accumula
     await expect
       .poll(() => inspectProfile(page, "p41-mvs-json"))
       .toEqual({
-        components: 1,
-        representations: { cartoon: 1 },
+        components: profile.components,
+        representations: profile.representations,
         selectors: profile.selectors,
       });
   }
@@ -111,8 +141,8 @@ test("renders every revised P04637 and 1BRS MVS profile offline without accumula
   await expect
     .poll(() => inspectProfile(page, "p50-mvs-json"))
     .toEqual({
-      components: 2,
-      representations: { cartoon: 2 },
+      components: 4,
+      representations: { ball_and_stick: 2, cartoon: 2 },
       selectors: 35,
     });
 

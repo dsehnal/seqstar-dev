@@ -83,7 +83,7 @@ test("runs the offline 1BRS multi-polymer interface flow through native referenc
       };
       return mvsProfile(document.root ?? document).representations;
     })
-    .toEqual({ cartoon: 2 });
+    .toEqual({ ball_and_stick: 2, cartoon: 2 });
   await expect(page.getByTestId("p50-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
@@ -189,7 +189,11 @@ test("renders, replaces, disposes, and remounts bounded contact detail offline",
       };
       return mvsProfile(document.root ?? document);
     })
-    .toEqual({ representations: { cartoon: 2 }, focusComponents: 0, focusSelectors: [] });
+    .toEqual({
+      representations: { ball_and_stick: 2, cartoon: 2 },
+      focusComponents: 0,
+      focusSelectors: [],
+    });
   await expect
     .poll(() => page.evaluate(() => document.documentElement.dataset.seqstarHarnessLastMessage))
     .toBe("lifecycle.visualization:complex-structure:broadcast");

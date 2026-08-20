@@ -145,8 +145,9 @@ manufacture coordinates for missing residues.
 ### 3.4 Sparse sites and variants
 
 Sparse sites and variants MUST always color their selected residues on the
-cartoon. They MAY also add a `ball_and_stick` detail representation when all of
-the following are true:
+cartoon. Site activation MUST also add selector-colored `ball_and_stick` detail
+for its mapped residues. Variants MAY add the same detail when all of the
+following are true:
 
 - atomic detail is useful for the activation's stated purpose;
 - the mapped selector count is below a named generator limit;
@@ -160,9 +161,9 @@ or tooltips MUST NOT be emitted.
 ### 3.5 Complex interfaces and relationships
 
 The 1BRS background SHOULD remain two cartoons with stable polymer-role colors.
-Interface activation SHOULD recolor endpoint residue sets on those cartoons.
-It SHOULD NOT add ball-and-stick geometry for every interface residue by
-default.
+Interface activation MUST recolor endpoint residue sets on those cartoons and
+MUST add one bounded, selector-colored `ball_and_stick` union per polymer role
+so the complete interface residue set is visible in atomic context.
 
 Activating one contact MAY add ball-and-stick representations for that
 contact's two endpoints and focus their union. The MVS generation summary and
@@ -224,7 +225,7 @@ interface MvsCartoonStyle {
   readonly componentSelector: MvsResidueSelector;
   readonly baseColor: `#${string}`;
   readonly residueColors: readonly MvsResidueColorGroup[];
-  readonly atomicDetail?: MvsAtomicDetailGroup;
+  readonly atomicDetails?: readonly MvsAtomicDetailGroup[];
 }
 ```
 

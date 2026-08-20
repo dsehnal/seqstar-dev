@@ -254,7 +254,7 @@ describe("P41 P04637 / 1TUP integration", () => {
     ]);
   });
 
-  it("uses one cartoon-only profile for regions and sites while retaining their mappings", async () => {
+  it("keeps regions cartoon-only and adds selector-colored atomic detail for mapped sites", async () => {
     const [forward] = createP04637MappingTranslators(rows);
     const build = (trackId: string, layerId: string) => {
       const controller = new AbortController();
@@ -310,12 +310,38 @@ describe("P41 P04637 / 1TUP integration", () => {
       label_seq_id: rows[index]?.labelSeqId,
       auth_seq_id: rows[index]?.authSeqId,
     }));
-    assertOneCartoonProfile(sites.document);
+    expect(MVSData.validationIssues(sites.document, { noExtra: true })).toBeUndefined();
+    expect(countMvsTreeNodes(sites.document)).toMatchObject({
+      component: 3,
+      representation: 3,
+    });
+    expect(countMvsRepresentationTypes(sites.document)).toEqual({
+      ball_and_stick: 2,
+      cartoon: 1,
+    });
     expect(sortedSelectors(selectorColors(sites.document))).toEqual(expectedSites);
     expect(colorNodes(sites.document).map((node) => node.color)).toEqual([
       "#CBD5E1",
       "#7C3AED",
       "#D97706",
+      "#7C3AED",
+      "#D97706",
+    ]);
+    const siteDetails = queryMvsTree(sites.document, "component")
+      .filter((component) =>
+        component.children?.some(
+          (child) =>
+            child.kind === "representation" &&
+            (child.params as { type?: unknown } | undefined)?.type === "ball_and_stick",
+        ),
+      )
+      .map((component) => ({
+        selector: (component.params as { selector?: unknown } | undefined)?.selector,
+        color: component.children?.[0]?.children?.[0]?.params,
+      }));
+    expect(siteDetails).toEqual([
+      { selector: [expectedSites[1]], color: { color: "#7C3AED" } },
+      { selector: [expectedSites[0]], color: { color: "#D97706" } },
     ]);
   });
 
