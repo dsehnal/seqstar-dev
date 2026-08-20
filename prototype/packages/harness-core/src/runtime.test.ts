@@ -517,7 +517,7 @@ describe("harness runtime", () => {
   });
 
   it("synchronizes selection in both directions without command echo", async () => {
-    const space: CoordinateSpace = { id: "shared", kind: "index", length: 4 };
+    const space: CoordinateSpace = { id: "shared", kind: "index", length: 6 };
     const commands: string[] = [];
     const harness = createApplicationHarness(
       {
@@ -868,6 +868,216 @@ describe("harness runtime", () => {
     await Promise.resolve();
     await Promise.resolve();
     expect(appliedPositions).toEqual([2]);
+    await harness.disposeAsync();
+  });
+
+  it("replaces one synchronized native hover lease without disturbing unrelated owners", async () => {
+    const space: CoordinateSpace = { id: "shared", kind: "index", length: 4 };
+    type OwnedState = {
+      readonly interactionId: string;
+      readonly positions: readonly number[];
+    };
+    const highlights = new Map<string, OwnedState>();
+    const selections = new Map<string, OwnedState>();
+    const received: HarnessMessage[] = [];
+    const ownerKey = (owner: { correlationId: string; sourceComponent: string }): string =>
+      `${owner.correlationId}\u0000${owner.sourceComponent}`;
+    const applyCommand = (entry: HarnessMessage): void => {
+      const command = entry.payload as unknown as {
+        interactionId: string;
+        owner: { correlationId: string; sourceComponent: string };
+        mode: "replace" | "add" | "remove" | "toggle";
+        loci: readonly { position: { value: number } }[];
+      };
+      const state = entry.type.startsWith("interaction.highlight") ? highlights : selections;
+      const key = ownerKey(command.owner);
+      const previous = state.get(key);
+      const incoming = command.loci.map((locus) => locus.position.value);
+      if (command.mode === "replace")
+        state.set(key, { interactionId: command.interactionId, positions: incoming });
+      else if (command.mode === "add")
+        state.set(key, {
+          interactionId: command.interactionId,
+          positions: [...new Set([...(previous?.positions ?? []), ...incoming])],
+        });
+      else if (command.mode === "remove") {
+        const positions = (previous?.positions ?? []).filter(
+          (position) => !incoming.includes(position),
+        );
+        if (positions.length === 0) state.delete(key);
+        else state.set(key, { interactionId: command.interactionId, positions });
+      }
+    };
+    const clearCommand = (entry: HarnessMessage): void => {
+      const command = entry.payload as unknown as {
+        interactionId?: string;
+        owner: { correlationId: string; sourceComponent: string };
+      };
+      const state = entry.type.startsWith("interaction.highlight") ? highlights : selections;
+      const key = ownerKey(command.owner);
+      const current = state.get(key);
+      if (
+        current !== undefined &&
+        (command.interactionId === undefined || command.interactionId === current.interactionId)
+      )
+        state.delete(key);
+    };
+    const harness = createApplicationHarness(
+      {
+        id: "app",
+        components: [
+          { id: "molstar", type: "mock" },
+          { id: "sequence", type: "mock" },
+        ],
+        synchronization: [
+          { id: "hover", interaction: "hover", between: ["molstar", "sequence"] },
+          { id: "select", interaction: "select", between: ["molstar", "sequence"] },
+        ],
+      },
+      {
+        componentFactories: [
+          {
+            type: "mock",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                context.reportCoordinateSpaces([space]);
+                if (id !== "sequence") return;
+                context.fabric.observe({ targetComponent: id }).subscribe((entry) => {
+                  if (!entry.type.startsWith("interaction.")) return;
+                  received.push(entry);
+                  if (entry.type.endsWith(".apply")) applyCommand(entry);
+                  else if (entry.type.endsWith(".clear")) clearCommand(entry);
+                });
+              },
+              dispose() {},
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    const point = (position: number) => ({
+      kind: "point" as const,
+      space,
+      position: { kind: "index" as const, value: position },
+    });
+    const unrelatedOwner = {
+      correlationId: crypto.randomUUID(),
+      sourceComponent: "external",
+    };
+    harness.fabric.publish(
+      message(
+        "interaction.highlight.apply",
+        {
+          interactionId: "external-highlight",
+          owner: unrelatedOwner,
+          mode: "replace",
+          loci: [point(5)],
+        },
+        { component: "sequence" },
+      ),
+    );
+    const native = (
+      interaction: "hover" | "select",
+      phase: "set" | "clear",
+      positions: readonly number[],
+      options: {
+        readonly correlationId: string;
+        readonly interactionId: string;
+        readonly mode?: "replace" | "add" | "remove";
+      },
+    ): void => {
+      const id = crypto.randomUUID();
+      harness.fabric.publish({
+        id,
+        type: "interaction.native",
+        version: "0.1.0",
+        source: { component: "molstar" },
+        correlationId: options.correlationId,
+        timestamp: "2026-08-20T00:00:00.000Z",
+        payload: {
+          interactionId: options.interactionId,
+          interaction,
+          phase,
+          ...(options.mode === undefined ? {} : { mode: options.mode }),
+          origin: { componentId: "molstar" },
+          loci: positions.map(point),
+        },
+      });
+    };
+    const hoverLease = {
+      correlationId: crypto.randomUUID(),
+      interactionId: crypto.randomUUID(),
+    };
+    native("hover", "set", [0], hoverLease);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect([...highlights.values()].map((state) => state.positions)).toEqual([[5], [0]]);
+
+    native("hover", "set", [2], hoverLease);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect([...highlights.values()].map((state) => state.positions)).toEqual([[5], [2]]);
+
+    native("hover", "set", [1], {
+      correlationId: crypto.randomUUID(),
+      interactionId: crypto.randomUUID(),
+    });
+    native("hover", "set", [4], {
+      correlationId: crypto.randomUUID(),
+      interactionId: crypto.randomUUID(),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect([...highlights.values()].map((state) => state.positions)).toEqual([[5], [4]]);
+    const reflectedHighlights = received.filter(
+      (entry) =>
+        entry.type === "interaction.highlight.apply" &&
+        (entry.payload as unknown as { owner: { sourceComponent: string } }).owner
+          .sourceComponent === "molstar",
+    );
+    expect(reflectedHighlights).toHaveLength(3);
+    expect(
+      new Set(
+        reflectedHighlights.map(
+          (entry) =>
+            (entry.payload as unknown as { owner: { correlationId: string } }).owner.correlationId,
+        ),
+      ).size,
+    ).toBe(1);
+    expect(
+      new Set(
+        reflectedHighlights.map(
+          (entry) => (entry.payload as unknown as { interactionId: string }).interactionId,
+        ),
+      ).size,
+    ).toBe(1);
+
+    native("hover", "clear", [], {
+      correlationId: crypto.randomUUID(),
+      interactionId: crypto.randomUUID(),
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect([...highlights.values()].map((state) => state.positions)).toEqual([[5]]);
+
+    const selectionLease = {
+      correlationId: crypto.randomUUID(),
+      interactionId: crypto.randomUUID(),
+    };
+    native("select", "set", [0], { ...selectionLease, mode: "replace" });
+    native("select", "set", [1], { ...selectionLease, mode: "add" });
+    native("select", "set", [0], { ...selectionLease, mode: "remove" });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect([...selections.values()].map((state) => state.positions)).toEqual([[1]]);
+    expect(
+      received
+        .filter((entry) => entry.type === "interaction.selection.apply")
+        .map((entry) => (entry.payload as unknown as { mode: string }).mode),
+    ).toEqual(["replace", "add", "remove"]);
+
+    native("select", "clear", [], selectionLease);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(selections.size).toBe(0);
     await harness.disposeAsync();
   });
 

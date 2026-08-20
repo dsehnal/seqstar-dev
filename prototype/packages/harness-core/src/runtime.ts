@@ -560,6 +560,13 @@ export const createApplicationHarness = (
   const cleanups: Disposable[] = [];
   const processors = new Map<string, { processor: MessageProcessor; abort: AbortController }>();
   const synchronizationControllers = new Map<string, AbortController>();
+  const hoverSynchronizationLeases = new Map<
+    string,
+    {
+      readonly interactionId: string;
+      readonly owner: { readonly correlationId: string; readonly sourceComponent: string };
+    }
+  >();
   const reflections = new Set<string>();
   const policies = {
     partialRendering: spec.policies?.partialRendering ?? "reject",
@@ -727,7 +734,10 @@ export const createApplicationHarness = (
               ? rule.between.slice(1)
               : rule.between.filter((id) => id !== event.origin.componentId);
           for (const destination of candidates) {
-            const reflection = `${message.correlationId}\u0000${rule.id}\u0000${destination}`;
+            // Correlation IDs intentionally remain stable for the lifetime of a native hover
+            // lease. Individual moves still need to supersede one another, so reflection
+            // retirement is scoped to the concrete native message rather than its correlation.
+            const reflection = `${message.id}\u0000${rule.id}\u0000${destination}`;
             if (reflections.has(reflection)) continue;
             reflections.add(reflection);
             const component = registry.get(destination);
@@ -735,24 +745,34 @@ export const createApplicationHarness = (
               reflections.delete(reflection);
               continue;
             }
-            const owner = {
+            const incomingOwner = {
               correlationId: message.correlationId,
               sourceComponent: event.origin.componentId,
             };
             const key = `${rule.id}\u0000${event.origin.componentId}\u0000${destination}`;
+            const existingHoverLease = hoverSynchronizationLeases.get(key);
+            const hoverLease = existingHoverLease ?? {
+              interactionId: event.interactionId,
+              owner: incomingOwner,
+            };
+            const owner = event.interaction === "hover" ? hoverLease.owner : incomingOwner;
+            const interactionId =
+              event.interaction === "hover" ? hoverLease.interactionId : event.interactionId;
             if (event.interaction === "hover") {
               synchronizationControllers.get(key)?.abort();
               synchronizationControllers.set(key, new AbortController());
+              if (event.phase === "set") hoverSynchronizationLeases.set(key, hoverLease);
             }
             const signal = synchronizationControllers.get(key)?.signal;
             if (event.phase === "clear") {
+              if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
               fabric.publish({
                 ...message,
                 id: newId(),
                 causationId: message.id,
                 target: { component: destination },
                 type: `interaction.${commandFamily(event.interaction)}.clear`,
-                payload: { interactionId: event.interactionId, owner },
+                payload: { interactionId, owner },
               });
               reflections.delete(reflection);
               continue;
@@ -784,15 +804,17 @@ export const createApplicationHarness = (
               if (
                 (rule.unmapped ?? (event.interaction === "hover" ? "clear" : "preserve")) ===
                 "clear"
-              )
+              ) {
+                if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
                 fabric.publish({
                   ...message,
                   id: newId(),
                   causationId: message.id,
                   target: { component: destination },
                   type: `interaction.${commandFamily(event.interaction)}.clear`,
-                  payload: { interactionId: event.interactionId, owner },
+                  payload: { interactionId, owner },
                 });
+              }
               reflections.delete(reflection);
               continue;
             }
@@ -812,13 +834,14 @@ export const createApplicationHarness = (
                   (rule.unmapped ?? (event.interaction === "hover" ? "clear" : "preserve")) ===
                     "clear"
                 ) {
+                  if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
                   fabric.publish({
                     ...message,
                     id: newId(),
                     causationId: message.id,
                     target: { component: destination },
                     type: `interaction.${commandFamily(event.interaction)}.clear`,
-                    payload: { interactionId: event.interactionId, owner },
+                    payload: { interactionId, owner },
                   });
                   return;
                 }
@@ -836,7 +859,7 @@ export const createApplicationHarness = (
                     target: { component: destination },
                     type: `interaction.${commandFamily(event.interaction)}.apply`,
                     payload: {
-                      interactionId: event.interactionId,
+                      interactionId,
                       owner,
                       mode: event.mode ?? "replace",
                       loci,
@@ -846,7 +869,21 @@ export const createApplicationHarness = (
                     } as unknown as JsonObject,
                   });
               })
-              .catch(() => diagnosis(`Synchronization '${rule.id}' failed.`, message))
+              .catch(() => {
+                if (signal?.aborted || disposed) return;
+                diagnosis(`Synchronization '${rule.id}' failed.`, message);
+                if (event.interaction === "hover" && (rule.unmapped ?? "clear") === "clear") {
+                  hoverSynchronizationLeases.delete(key);
+                  fabric.publish({
+                    ...message,
+                    id: newId(),
+                    causationId: message.id,
+                    target: { component: destination },
+                    type: "interaction.highlight.clear",
+                    payload: { interactionId, owner },
+                  });
+                }
+              })
               .finally(() => reflections.delete(reflection));
           }
         },
@@ -860,6 +897,7 @@ export const createApplicationHarness = (
       const failures: unknown[] = [];
       for (const entry of processors.values()) entry.abort.abort();
       for (const controller of synchronizationControllers.values()) controller.abort();
+      hoverSynchronizationLeases.clear();
       for (const cleanup of cleanups.splice(0).reverse()) {
         try {
           cleanup.dispose();
