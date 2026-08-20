@@ -7,11 +7,12 @@
     <style>
       html, body, #viewer { width: 100%; height: 100%; margin: 0; }
       #viewer { width: 640px; height: 280px; }
+      #alignment-actions { width: 720px; height: 140px; margin-top: 16px; }
       #status { position: fixed; bottom: 0; background: #111827; color: white; padding: 4px; }
     </style>
   </head>
   <body>
-    <div id="viewer"></div><output id="status" data-status="loading"></output>
+    <div id="viewer"></div><div id="alignment-actions"></div><output id="status" data-status="loading"></output>
     <script type="module" src="/main.ts"></script>
   </body>
 </html>

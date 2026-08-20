@@ -381,8 +381,14 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
         view.sections.flatMap((section) => section.tracks.map((track) => track.id)),
       ),
     );
-    return Object.freeze(
-      (this.presentation.tracks ?? [])
+    const configuredMembers = this.presentation.alignmentMemberActions ?? [];
+    const members = new Set(
+      (document.alignments ?? []).flatMap((alignment) =>
+        alignment.members.map((member) => `${alignment.id}\u0000${member.id}`),
+      ),
+    );
+    return Object.freeze([
+      ...(this.presentation.tracks ?? [])
         .filter((item) => !tracks.has(item.trackId))
         .map((item) => ({
           code: "wrapper.seq-viewer.presentation.track-action.absent",
@@ -390,7 +396,15 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
           message: `Configured reference track action '${item.trackId}' is absent from the loaded document.`,
           path: "/views",
         })),
-    );
+      ...configuredMembers
+        .filter((item) => !members.has(`${item.alignmentId}\u0000${item.memberId}`))
+        .map((item) => ({
+          code: "wrapper.seq-viewer.presentation.member-action.absent",
+          severity: "warning" as const,
+          message: `Configured reference alignment member action '${item.alignmentId}/${item.memberId}' is absent from the loaded document.`,
+          path: "/alignments",
+        })),
+    ]);
   }
 
   private lifecycle(
@@ -463,6 +477,13 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
       this.nativeLeases.set(leaseKey, lease);
       this.activeNativeLeaseKeys.set(interaction, leaseKey);
     }
+    const itemlessTrackActivation =
+      interaction === "track-activate" &&
+      event.loci.length === 0 &&
+      event.annotationId === undefined &&
+      event.itemId === undefined &&
+      event.endpointRole === undefined &&
+      event.locusIndex === undefined;
     const payload: InteractionEvent = {
       interactionId: lease.interactionId,
       interaction,
@@ -480,11 +501,12 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
           ? {}
           : { alignmentMemberId: event.alignmentMemberId }),
       },
-      ...(event.annotationId === undefined &&
-      event.itemId === undefined &&
-      event.trackId === undefined &&
-      event.endpointRole === undefined &&
-      event.locusIndex === undefined
+      ...(itemlessTrackActivation ||
+      (event.annotationId === undefined &&
+        event.itemId === undefined &&
+        event.trackId === undefined &&
+        event.endpointRole === undefined &&
+        event.locusIndex === undefined)
         ? {}
         : {
             semanticTarget: {

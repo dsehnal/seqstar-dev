@@ -110,6 +110,60 @@ test("keeps a truncated label separate from its square presentation action", asy
     .toMatchObject({ kind: "track-activate", trackId: "track" });
 });
 
+test("keeps member actions exact, unavailable members disabled, and actions stable after scrolling", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: { mountAlignmentActions(): Promise<void> };
+      }
+    ).__p20.mountAlignmentActions(),
+  );
+  const host = page.locator("#alignment-actions");
+  const root = host.locator('[data-seq-viewer="root"]');
+  await expect(root.locator("[data-seq-viewer-track]")).toHaveCount(32);
+  const available = host.locator(
+    '[data-seq-viewer-track-action][data-seq-viewer-alignment="PF00042.29"][data-seq-viewer-alignment-member="member-5"]',
+  );
+  const unavailable = host.locator(
+    '[data-seq-viewer-track-action][data-seq-viewer-alignment-member="member-4"]',
+  );
+  await expect(available).toHaveAttribute("aria-label", "Show member 5 in 3D");
+  await expect(available.locator("svg")).toHaveCount(1);
+  await expect(unavailable).toBeDisabled();
+  await expect(unavailable).toHaveAttribute("data-seq-viewer-track-action-unavailable", "true");
+  await root.evaluate((element) => {
+    element.scrollTop = 88;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await expect(available).toBeVisible();
+  await available.click();
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        (
+          window as typeof window & {
+            __p20: { readonly alignmentActionEvents: readonly unknown[] };
+          }
+        ).__p20.alignmentActionEvents.at(-1),
+      ),
+    )
+    .toMatchObject({
+      kind: "track-activate",
+      documentId: "alignment-action-document",
+      viewId: "alignment-actions",
+      sectionId: "alignment-section",
+      trackId: "alignment-track",
+      layerId: "alignment-layer-last",
+      alignmentId: "PF00042.29",
+      alignmentMemberId: "member-5",
+      sequenceId: "alignment-sequence",
+      loci: [],
+    });
+});
+
 test("preserves relationship endpoint and locus identity for boundary links", async ({ page }) => {
   await page.goto("/");
   const hits = await page.evaluate(() => {

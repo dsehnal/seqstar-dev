@@ -15,17 +15,40 @@ const wrapperDocument = {
   sequences: [
     { id: "sequence", coordinateSpace: "sequence-space", alphabet: "protein", residues: "MKTAY" },
   ],
+  alignments: [
+    {
+      id: "PF00042.29",
+      coordinateSpace: "alignment-space",
+      length: 5,
+      members: [
+        { id: "HBA_HUMAN-27-137:member", sequence: "sequence", positions: [0, 1, 2, 3, 4] },
+      ],
+    },
+  ],
   views: [
     {
       id: "main",
-      axis: { segments: [{ id: "axis", space: "sequence-space", start: 0, end: 5 }] },
+      axis: {
+        segments: [
+          { id: "axis", space: "sequence-space", start: 0, end: 5 },
+          { id: "alignment-axis", space: "alignment-space", start: 0, end: 5 },
+        ],
+      },
       sections: [
         {
           id: "section",
           tracks: [
             {
               id: "track",
-              layers: [{ id: "letters", representation: "sequence", sequence: "sequence" }],
+              layers: [
+                { id: "letters", representation: "sequence", sequence: "sequence" },
+                { id: "alignment", representation: "alignment", alignment: "PF00042.29" },
+                {
+                  id: "alignment-last",
+                  representation: "alignment",
+                  alignment: "PF00042.29",
+                },
+              ],
             },
           ],
         },
@@ -162,10 +185,18 @@ describe("reference viewer wrapper common contract", () => {
           },
         },
       ],
+      alignmentMemberActions: [
+        {
+          alignmentId: "PF00042.29",
+          memberId: "HBA_HUMAN-27-137:member",
+          label: "Show HBA in 3D",
+          kind: "structure",
+        },
+      ],
     };
     const snapshot = snapshotReferenceViewerPresentation(presentation);
     presentation.tracks[0].action.tooltip = "mutated";
-    expect(snapshot).toEqual({
+    expect(snapshot).toMatchObject({
       tracks: [
         expect.objectContaining({
           trackId: "track",
@@ -175,6 +206,7 @@ describe("reference viewer wrapper common contract", () => {
     });
     expect(Object.isFrozen(snapshot)).toBe(true);
     expect(Object.isFrozen(snapshot.tracks ?? [])).toBe(true);
+    expect(Object.isFrozen(snapshot.alignmentMemberActions ?? [])).toBe(true);
     const cyclic: Record<string, unknown> = {};
     cyclic.self = cyclic;
     const accessor = {} as { readonly tracks: unknown };
@@ -186,6 +218,17 @@ describe("reference viewer wrapper common contract", () => {
       { tracks: [{ trackId: "track", action: () => undefined }] },
       { tracks: [{ trackId: "track", action: { kind: "bad" } }] },
       { tracks: [{ trackId: "track" }, { trackId: "track" }] },
+      {
+        alignmentMemberActions: [
+          { alignmentId: "alignment", memberId: "member", label: "One" },
+          { alignmentId: "alignment", memberId: "member", label: "Two" },
+        ],
+      },
+      {
+        alignmentMemberActions: [
+          { alignmentId: "alignment", memberId: "member", label: "x", kind: "bad" },
+        ],
+      },
       { tracks: Infinity },
     ])
       expect(() => snapshotReferenceViewerPresentation(invalid)).toThrow(
@@ -199,7 +242,14 @@ describe("reference viewer wrapper common contract", () => {
     const wrapper = new ReferenceViewerWrapper({
       id: "reference",
       target: {} as HTMLElement,
-      config: { presentation: { tracks: [{ trackId: "absent" }] } },
+      config: {
+        presentation: {
+          tracks: [{ trackId: "absent" }],
+          alignmentMemberActions: [
+            { alignmentId: "PF00042.29", memberId: "missing", label: "Unavailable member" },
+          ],
+        },
+      },
       viewerFactory: () => viewer as unknown as SeqViewer,
     });
     await wrapper.start(harness.context);
@@ -218,10 +268,80 @@ describe("reference viewer wrapper common contract", () => {
             expect.objectContaining({
               code: "wrapper.seq-viewer.presentation.track-action.absent",
             }),
+            expect.objectContaining({
+              code: "wrapper.seq-viewer.presentation.member-action.absent",
+            }),
           ]),
         }),
       }),
     );
+    await wrapper.dispose();
+  });
+
+  it("publishes an available alignment member action as a native track activation", async () => {
+    const harness = createHarnessContext();
+    const viewer = new ControlledNativeMock();
+    const wrapper = new ReferenceViewerWrapper({
+      id: "reference",
+      target: {} as HTMLElement,
+      config: {
+        presentation: {
+          alignmentMemberActions: [
+            {
+              alignmentId: "PF00042.29",
+              memberId: "HBA_HUMAN-27-137:member",
+              label: "Show HBA in 3D",
+              kind: "structure",
+            },
+          ],
+        },
+      },
+      viewerFactory: () => viewer as unknown as SeqViewer,
+    });
+    await wrapper.start(harness.context);
+    harness.fabric.publish(
+      message("visualization.seqviewspec.request", request("member-action"), {
+        component: "reference",
+      }),
+    );
+    viewer.loads[0]?.resolve(rendered(1));
+    await tick();
+    viewer.emit({
+      kind: "track-activate",
+      documentId: "wrapper-contract-document",
+      viewId: "main",
+      sectionId: "section",
+      trackId: "track",
+      layerId: "alignment-last",
+      alignmentId: "PF00042.29",
+      alignmentMemberId: "HBA_HUMAN-27-137:member",
+      sequenceId: "sequence",
+      loci: [],
+    });
+    const native = harness.messages.find((item) => item.type === "interaction.native");
+    expect(native).toMatchObject({
+      type: "interaction.native",
+      source: { component: "reference" },
+      payload: {
+        interaction: "track-activate",
+        phase: "set",
+        origin: {
+          componentId: "reference",
+          documentId: "wrapper-contract-document",
+          viewId: "main",
+          sectionId: "section",
+          trackId: "track",
+          layerId: "alignment-last",
+          alignmentId: "PF00042.29",
+          alignmentMemberId: "HBA_HUMAN-27-137:member",
+          sequenceId: "sequence",
+        },
+        loci: [],
+      },
+    });
+    expect(
+      (native?.payload as { semanticTarget?: unknown } | undefined)?.semanticTarget,
+    ).toBeUndefined();
     await wrapper.dispose();
   });
 

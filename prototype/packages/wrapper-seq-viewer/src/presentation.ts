@@ -95,56 +95,99 @@ export const snapshotReferenceViewerPresentation = (
   if (value === undefined) return Object.freeze({});
   assertJson(value);
   const presentation = record(value, "presentation");
-  keys(presentation, ["tracks"], "presentation");
-  if (presentation.tracks === undefined) return Object.freeze({});
-  const trackValues = presentation.tracks;
-  if (!Array.isArray(trackValues))
-    fail("wrapper.seq-viewer.presentation.shape", "presentation.tracks must be an array.");
-  const actionValues = trackValues as unknown[];
-  const ids = new Set<string>();
-  const tracks = Object.freeze(
-    actionValues.map((candidate, index) => {
-      const track = record(candidate, `presentation.tracks[${index}]`);
-      keys(track, ["trackId", "action"], `presentation.tracks[${index}]`);
-      const trackId = text(track.trackId, `presentation.tracks[${index}].trackId`);
-      if (ids.has(trackId))
-        fail(
-          "wrapper.seq-viewer.presentation.duplicate-track",
-          `presentation.tracks contains duplicate track '${trackId}'.`,
+  keys(presentation, ["tracks", "alignmentMemberActions"], "presentation");
+  let tracks: SequenceWrapperPresentationConfig["tracks"];
+  if (presentation.tracks !== undefined) {
+    const trackValues = presentation.tracks;
+    if (!Array.isArray(trackValues))
+      fail("wrapper.seq-viewer.presentation.shape", "presentation.tracks must be an array.");
+    const actionValues = trackValues as unknown[];
+    const ids = new Set<string>();
+    tracks = Object.freeze(
+      actionValues.map((candidate, index) => {
+        const track = record(candidate, `presentation.tracks[${index}]`);
+        keys(track, ["trackId", "action"], `presentation.tracks[${index}]`);
+        const trackId = text(track.trackId, `presentation.tracks[${index}].trackId`);
+        if (ids.has(trackId))
+          fail(
+            "wrapper.seq-viewer.presentation.duplicate-track",
+            `presentation.tracks contains duplicate track '${trackId}'.`,
+          );
+        ids.add(trackId);
+        if (track.action === undefined) return Object.freeze({ trackId });
+        const action = record(track.action, `presentation.tracks[${index}].action`);
+        keys(
+          action,
+          ["kind", "accessibleName", "tooltip", "icon"],
+          `presentation.tracks[${index}].action`,
         );
-      ids.add(trackId);
-      if (track.action === undefined) return Object.freeze({ trackId });
-      const action = record(track.action, `presentation.tracks[${index}].action`);
-      keys(
-        action,
-        ["kind", "accessibleName", "tooltip", "icon"],
-        `presentation.tracks[${index}].action`,
+        const kind = action.kind;
+        const icon = action.icon;
+        if (kind !== "structure-profile" && kind !== "layer-inspection")
+          fail(
+            "wrapper.seq-viewer.presentation.shape",
+            `presentation.tracks[${index}].action.kind is invalid.`,
+          );
+        if (icon !== "box" && icon !== "layers")
+          fail(
+            "wrapper.seq-viewer.presentation.shape",
+            `presentation.tracks[${index}].action.icon is invalid.`,
+          );
+        return Object.freeze({
+          trackId,
+          action: Object.freeze({
+            kind,
+            icon,
+            accessibleName: text(
+              action.accessibleName,
+              `presentation.tracks[${index}].action.accessibleName`,
+            ),
+            tooltip: text(action.tooltip, `presentation.tracks[${index}].action.tooltip`),
+          }),
+        });
+      }),
+    );
+  }
+  let alignmentMemberActions: SequenceWrapperPresentationConfig["alignmentMemberActions"];
+  if (presentation.alignmentMemberActions !== undefined) {
+    if (!Array.isArray(presentation.alignmentMemberActions))
+      fail(
+        "wrapper.seq-viewer.presentation.shape",
+        "presentation.alignmentMemberActions must be an array.",
       );
-      const kind = action.kind;
-      const icon = action.icon;
-      if (kind !== "structure-profile" && kind !== "layer-inspection")
-        fail(
-          "wrapper.seq-viewer.presentation.shape",
-          `presentation.tracks[${index}].action.kind is invalid.`,
-        );
-      if (icon !== "box" && icon !== "layers")
-        fail(
-          "wrapper.seq-viewer.presentation.shape",
-          `presentation.tracks[${index}].action.icon is invalid.`,
-        );
-      return Object.freeze({
-        trackId,
-        action: Object.freeze({
-          kind,
-          icon,
-          accessibleName: text(
-            action.accessibleName,
-            `presentation.tracks[${index}].action.accessibleName`,
-          ),
-          tooltip: text(action.tooltip, `presentation.tracks[${index}].action.tooltip`),
-        }),
-      });
-    }),
-  );
-  return Object.freeze({ tracks });
+    const ids = new Set<string>();
+    alignmentMemberActions = Object.freeze(
+      (presentation.alignmentMemberActions as unknown[]).map((candidate, index) => {
+        const action = record(candidate, `presentation.alignmentMemberActions[${index}]`);
+        const path = `presentation.alignmentMemberActions[${index}]`;
+        keys(action, ["alignmentId", "memberId", "label", "kind"], path);
+        const alignmentId = text(action.alignmentId, `${path}.alignmentId`);
+        const memberId = text(action.memberId, `${path}.memberId`);
+        const label = text(action.label, `${path}.label`);
+        const kind =
+          action.kind === undefined
+            ? undefined
+            : action.kind === "structure" || action.kind === "layers"
+              ? action.kind
+              : fail("wrapper.seq-viewer.presentation.shape", `${path}.kind is invalid.`);
+        const memberKey = `${alignmentId}\u0000${memberId}`;
+        if (ids.has(memberKey))
+          fail(
+            "wrapper.seq-viewer.presentation.duplicate-member",
+            `presentation.alignmentMemberActions contains duplicate member '${alignmentId}/${memberId}'.`,
+          );
+        ids.add(memberKey);
+        return Object.freeze({
+          alignmentId,
+          memberId,
+          label,
+          ...(kind === undefined ? {} : { kind }),
+        });
+      }),
+    );
+  }
+  return Object.freeze({
+    ...(tracks === undefined ? {} : { tracks }),
+    ...(alignmentMemberActions === undefined ? {} : { alignmentMemberActions }),
+  });
 };

@@ -239,6 +239,88 @@ const mount = async (): Promise<void> => {
   status.textContent = JSON.stringify({ result, events });
 };
 await mount();
+
+const alignmentActionHost = document.querySelector<HTMLElement>("#alignment-actions");
+if (!alignmentActionHost) throw new Error("P20 fixture is missing its alignment action host");
+const alignmentActionDocument: SeqViewSpec = {
+  kind: "seq-view-spec",
+  version: "0.1.0",
+  id: "alignment-action-document",
+  sequences: [
+    {
+      id: "alignment-sequence",
+      coordinateSpace: "alignment-sequence-space",
+      alphabet: "protein",
+      residues: "A".repeat(118),
+    },
+  ],
+  alignments: [
+    {
+      id: "PF00042.29",
+      coordinateSpace: "alignment-action-space",
+      length: 118,
+      members: Array.from({ length: 32 }, (_, index) => ({
+        id: `member-${index}`,
+        sequence: "alignment-sequence",
+        positions: Array.from({ length: 118 }, (_unused, position) => position),
+      })),
+    },
+  ],
+  views: [
+    {
+      id: "alignment-actions",
+      axis: {
+        segments: [{ id: "alignment-axis", space: "alignment-action-space", start: 0, end: 118 }],
+      },
+      sections: [
+        {
+          id: "alignment-section",
+          tracks: [
+            {
+              id: "alignment-track",
+              label: "Alignment member",
+              layers: [
+                {
+                  id: "alignment-layer",
+                  representation: "alignment",
+                  alignment: "PF00042.29",
+                },
+                {
+                  id: "alignment-layer-last",
+                  representation: "alignment",
+                  alignment: "PF00042.29",
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  ],
+};
+let alignmentActionViewer: SeqViewer | undefined;
+const alignmentActionEvents: unknown[] = [];
+const mountAlignmentActions = async (): Promise<void> => {
+  alignmentActionViewer?.dispose();
+  alignmentActionEvents.length = 0;
+  alignmentActionViewer = createSeqViewer({
+    target: alignmentActionHost,
+    presentation: {
+      alignmentMemberActions: [
+        {
+          alignmentId: "PF00042.29",
+          memberId: "member-5",
+          label: "Show member 5 in 3D",
+          kind: "structure",
+        },
+      ],
+    },
+  });
+  alignmentActionViewer.interactions.subscribe((event) =>
+    alignmentActionEvents.push({ ...event, nativeEvent: undefined }),
+  );
+  await alignmentActionViewer.load(alignmentActionDocument, "alignment-actions");
+};
 const testProvider = (representation: RepresentationName): RepresentationProvider => ({
   id: `test.${representation}`,
   representation,
@@ -588,6 +670,10 @@ Object.assign(window, {
     },
     dispose: () => viewer.dispose(),
     customProviderEvidence,
+    mountAlignmentActions,
+    get alignmentActionEvents() {
+      return alignmentActionEvents;
+    },
     throwingProviderEvidence,
     loadTall,
     delayedSizeEvidence,

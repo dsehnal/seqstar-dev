@@ -78,8 +78,21 @@ export type TrackPresentation = Readonly<{
   readonly trackId: string;
   readonly action?: TrackPresentationAction;
 }>;
+/**
+ * A presentation-only action for one concrete alignment member.  The action
+ * intentionally carries no structure or mapping data: consumers publish the
+ * member identity and let the harness decide what, if anything, can be shown.
+ */
+export type AlignmentMemberPresentationAction = Readonly<{
+  readonly alignmentId: string;
+  readonly memberId: string;
+  readonly label: string;
+  readonly kind?: "structure" | "layers";
+}>;
 export type SequenceWrapperPresentationConfig = Readonly<{
   readonly tracks?: readonly TrackPresentation[];
+  /** When present, this is the authoritative availability list for alignment members. */
+  readonly alignmentMemberActions?: readonly AlignmentMemberPresentationAction[];
 }>;
 type View = SeqViewSpec["views"][number];
 type Track = View["sections"][number]["tracks"][number];
@@ -1735,9 +1748,30 @@ class CanvasSeqViewer implements SeqViewer {
     const active = this.active;
     if (!active) return;
     for (const row of active.rows) {
-      const presentation = this.options.presentation?.tracks?.find(
+      const trackPresentation = this.options.presentation?.tracks?.find(
         (item) => item.trackId === row.track.id,
       );
+      const configuredMemberActions = this.options.presentation?.alignmentMemberActions;
+      const memberPresentation =
+        row.alignmentId === undefined || row.alignmentMemberId === undefined
+          ? undefined
+          : configuredMemberActions?.find(
+              (item) =>
+                item.alignmentId === row.alignmentId && item.memberId === row.alignmentMemberId,
+            );
+      // A configured member-action list is an availability declaration.  Keep
+      // the same affordance for unlisted members, but make the lack of a
+      // structure honest and non-interactive rather than silently activating a
+      // generic track action.
+      const memberAvailabilityKnown =
+        row.alignmentId !== undefined &&
+        row.alignmentMemberId !== undefined &&
+        configuredMemberActions !== undefined;
+      const action =
+        row.alignmentMemberId === undefined || configuredMemberActions === undefined
+          ? trackPresentation?.action
+          : memberPresentation;
+      const actionVisible = action !== undefined || memberAvailabilityKnown;
       const header = document.createElement("div");
       Object.assign(header.style, {
         position: "absolute",
@@ -1746,8 +1780,8 @@ class CanvasSeqViewer implements SeqViewer {
         width: "100%",
         height: `${row.height - 1}px`,
         display: "grid",
-        gridTemplateColumns: presentation?.action ? "minmax(0, 1fr) 20px" : "minmax(0, 1fr)",
-        gap: presentation?.action ? "2px" : "0",
+        gridTemplateColumns: actionVisible ? "minmax(0, 1fr) 20px" : "minmax(0, 1fr)",
+        gap: actionVisible ? "2px" : "0",
         boxSizing: "border-box",
         borderBottom: "1px solid #dbeafe",
         background: "#f8fafc",
@@ -1772,37 +1806,46 @@ class CanvasSeqViewer implements SeqViewer {
         textAlign: "left",
         pointerEvents: "auto",
       });
-      button.addEventListener(
-        "click",
-        (event) =>
-          this.subject.next({
-            kind: "track-activate",
-            documentId: active.document.id,
-            viewId: active.view.id,
-            sectionId: row.sectionId,
-            trackId: row.track.id,
-            loci: NONE,
-            nativeEvent: event,
-          }),
-        { signal: this.abort.signal },
-      );
+      button.addEventListener("click", (event) => this.activateHeader(active, row, event), {
+        signal: this.abort.signal,
+      });
       header.append(button);
-      if (presentation?.action) {
-        const action = document.createElement("button");
-        action.type = "button";
-        action.dataset.seqViewerTrackAction = row.track.id;
-        action.dataset.seqViewerTrackActionKind = presentation.action.kind;
-        action.append(
-          createLucideElement(presentation.action.icon === "box" ? Box : Layers, {
-            width: 13,
-            height: 13,
-            "aria-hidden": "true",
-            focusable: "false",
-          }),
+      if (actionVisible) {
+        const actionButton = document.createElement("button");
+        actionButton.type = "button";
+        actionButton.dataset.seqViewerTrackAction = row.track.id;
+        if (row.alignmentId !== undefined)
+          actionButton.dataset.seqViewerAlignment = row.alignmentId;
+        if (row.alignmentMemberId !== undefined)
+          actionButton.dataset.seqViewerAlignmentMember = row.alignmentMemberId;
+        if (action !== undefined)
+          actionButton.dataset.seqViewerTrackActionKind =
+            "icon" in action ? action.kind : (action.kind ?? "structure");
+        if (action === undefined) actionButton.dataset.seqViewerTrackActionUnavailable = "true";
+        actionButton.append(
+          createLucideElement(
+            action !== undefined &&
+              ("icon" in action ? action.icon === "box" : action.kind !== "layers")
+              ? Box
+              : Layers,
+            {
+              width: 13,
+              height: 13,
+              "aria-hidden": "true",
+              focusable: "false",
+            },
+          ),
         );
-        action.setAttribute("aria-label", presentation.action.accessibleName);
-        action.title = presentation.action.tooltip;
-        Object.assign(action.style, {
+        const availableLabel =
+          action === undefined
+            ? `Structure unavailable for ${row.label}`
+            : "accessibleName" in action
+              ? action.accessibleName
+              : action.label;
+        actionButton.setAttribute("aria-label", availableLabel);
+        actionButton.title = availableLabel;
+        if (action === undefined) actionButton.disabled = true;
+        Object.assign(actionButton.style, {
           width: "20px",
           height: "20px",
           padding: "0",
@@ -1814,26 +1857,44 @@ class CanvasSeqViewer implements SeqViewer {
           display: "grid",
           placeItems: "center",
         });
-        action.addEventListener(
+        actionButton.addEventListener(
           "click",
           (event) => {
             event.stopPropagation();
-            this.subject.next({
-              kind: "track-activate",
-              documentId: active.document.id,
-              viewId: active.view.id,
-              sectionId: row.sectionId,
-              trackId: row.track.id,
-              loci: NONE,
-              nativeEvent: event,
-            });
+            this.activateHeader(active, row, event);
           },
           { signal: this.abort.signal },
         );
-        header.append(action);
+        header.append(actionButton);
       }
       this.headers.append(header);
     }
+  }
+  private activateHeader(active: Active, row: Row, event: Event): void {
+    let alignmentLayerId: string | undefined;
+    if (row.alignmentId !== undefined && row.alignmentMemberId !== undefined)
+      for (const { layer } of row.layers)
+        if (
+          layer.representation === "alignment" &&
+          layer.alignment === row.alignmentId &&
+          (layer.members === undefined || layer.members.includes(row.alignmentMemberId))
+        )
+          // Match Nightingale's stable layer-order resolution when a track
+          // deliberately contains multiple layers for the same alignment.
+          alignmentLayerId = layer.id;
+    this.subject.next({
+      kind: "track-activate",
+      documentId: active.document.id,
+      viewId: active.view.id,
+      sectionId: row.sectionId,
+      trackId: row.track.id,
+      ...(alignmentLayerId === undefined ? {} : { layerId: alignmentLayerId }),
+      ...(row.sequenceId === undefined ? {} : { sequenceId: row.sequenceId }),
+      ...(row.alignmentId === undefined ? {} : { alignmentId: row.alignmentId }),
+      ...(row.alignmentMemberId === undefined ? {} : { alignmentMemberId: row.alignmentMemberId }),
+      loci: NONE,
+      nativeEvent: event,
+    });
   }
   private readonly hover = (event: PointerEvent): void => {
     const hit = this.hitTest(event.clientX, event.clientY);
