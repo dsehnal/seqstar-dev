@@ -8,6 +8,8 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
 
   await expect(page).toHaveURL(/#\/renderer-portability$/u);
   await expect(page.getByTestId("case-renderer-portability")).toBeVisible();
+  await expect(page.getByText("Case study", { exact: true })).toBeVisible();
+  await expect(page.getByText(/Case study \d/u)).toHaveCount(0);
   await page.locator(".app-nav__more > summary").click();
   await expect(page.getByRole("link", { name: "Renderer comparison" })).toHaveAttribute(
     "aria-current",

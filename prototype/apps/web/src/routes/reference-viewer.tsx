@@ -225,7 +225,7 @@ function ReferenceViewerContent() {
           data-testid="reference-viewer-host"
           ref={hostRef}
         />
-        <p className="mt-3 text-slate-600 text-sm" data-testid="reference-viewer-harness-status">
+        <p data-testid="reference-viewer-harness-status" hidden>
           Harness: {status}
         </p>
       </VisualizationCard>

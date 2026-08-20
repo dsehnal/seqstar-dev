@@ -141,7 +141,7 @@ function UniProtStructureContent({
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-uniprot-structure">
       <section>
-        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study 2</p>
+        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study</p>
         <h1 className="mt-2 font-bold text-3xl text-slate-950">
           Switchable protein annotations and structure
         </h1>
@@ -149,41 +149,44 @@ function UniProtStructureContent({
           Three checked offline datasets exercise different sequence tracks and structures. The
           integration plugin owns every document, mapping, and MolViewSpec generation step.
         </p>
-        <p className="mt-2 text-slate-500 text-sm" data-testid="inspect-harness-status">
+        <p data-testid="inspect-harness-status" hidden>
           Harness: {status} · no runtime network required
         </p>
       </section>
-      <CaseRendererChooser
-        descriptor={{ caseId: "uniprot-structure", modes: rendererModes, initialMode }}
-        modeComponents={rendererComponents}
-        onModeChange={onModeChange}
-      >
-        {() => null}
-      </CaseRendererChooser>
-      <section className="flex flex-wrap items-end gap-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
-        <label className="grid gap-1 font-medium text-slate-800 text-sm" htmlFor="dataset-select">
-          Protein and structure dataset
-          <select
-            className="min-w-80 rounded border border-slate-400 bg-white px-3 py-2 text-slate-950 disabled:opacity-60"
-            data-testid="dataset-selector"
-            disabled={switching || inspect.catalog === undefined}
-            id="dataset-select"
-            onChange={(event) => selectDataset(event.currentTarget.value)}
-            value={requestedDatasetId}
-          >
-            {inspect.catalog?.datasets.map((dataset) => (
-              <option key={dataset.id} value={dataset.id}>
-                {dataset.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <p aria-live="polite" className="text-slate-600 text-sm" data-testid="dataset-status">
-          {requestedDataset?.label ?? "Loading dataset catalog"} · {transition?.status ?? "pending"}
-          {transition?.status === "switching" && displayedDataset !== undefined
-            ? ` · previous ${displayedDataset.label} remains until both viewers confirm the switch`
-            : ""}
-        </p>
+      <section className="case-control-panel">
+        <CaseRendererChooser
+          descriptor={{ caseId: "uniprot-structure", modes: rendererModes, initialMode }}
+          modeComponents={rendererComponents}
+          onModeChange={onModeChange}
+        >
+          {() => null}
+        </CaseRendererChooser>
+        <div className="case-control-panel__dataset">
+          <label className="grid gap-1 font-medium text-slate-800 text-sm" htmlFor="dataset-select">
+            Protein and structure dataset
+            <select
+              className="min-w-80 rounded border border-slate-400 bg-white px-3 py-2 text-slate-950 disabled:opacity-60"
+              data-testid="dataset-selector"
+              disabled={switching || inspect.catalog === undefined}
+              id="dataset-select"
+              onChange={(event) => selectDataset(event.currentTarget.value)}
+              value={requestedDatasetId}
+            >
+              {inspect.catalog?.datasets.map((dataset) => (
+                <option key={dataset.id} value={dataset.id}>
+                  {dataset.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <p aria-live="polite" className="text-slate-600 text-sm" data-testid="dataset-status">
+            {requestedDataset?.label ?? "Loading dataset catalog"} ·{" "}
+            {transition?.status ?? "pending"}
+            {transition?.status === "switching" && displayedDataset !== undefined
+              ? ` · previous ${displayedDataset.label} remains until both viewers confirm the switch`
+              : ""}
+          </p>
+        </div>
       </section>
       <p className="rounded border border-sky-200 bg-sky-50 p-3 text-slate-700 text-sm">
         Activate any sequence track label to replace the neutral structure with its mapped view.

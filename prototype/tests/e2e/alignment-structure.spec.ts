@@ -16,6 +16,24 @@ test("loads the offline PF00042.29 alignment / 1A3N structure case", async ({ pa
   await expect(page.getByTestId("p69905-structure-host").locator("canvas").first()).toBeVisible({
     timeout: 20_000,
   });
+  const alignmentHost = page.getByTestId("pf00042-alignment-host");
+  const root = alignmentHost.locator('[data-seq-viewer="root"]');
+  await root.evaluate((element) => {
+    element.scrollTop = element.scrollHeight;
+    element.dispatchEvent(new Event("scroll"));
+  });
+  await expect
+    .poll(async () => {
+      const lastTrack = await alignmentHost
+        .getByRole("button", { name: "Activate track Subgroup annotations" })
+        .boundingBox();
+      const navigation = await alignmentHost
+        .locator('[data-seq-viewer-navigation="root"]')
+        .boundingBox();
+      if (lastTrack === null || navigation === null) return Number.POSITIVE_INFINITY;
+      return lastTrack.y + lastTrack.height - navigation.y;
+    })
+    .toBeLessThanOrEqual(0);
   await expect(page.getByTestId("p60-mapping-summary")).toContainText("118 columns");
   expect(external).toEqual([]);
 });

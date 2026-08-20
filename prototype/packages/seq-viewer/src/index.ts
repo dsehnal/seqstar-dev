@@ -208,6 +208,7 @@ const HEADER = 156,
   RULER = 20,
   GAP = 12,
   NAVIGATION_GAP = 8,
+  NAVIGATION_CLEARANCE = 38,
   MIN_VISIBLE_COLUMNS = 2;
 const NONE: readonly CoordinateLocus[] = [];
 const names: readonly RepresentationName[] = [
@@ -745,7 +746,10 @@ class CanvasSeqViewer implements SeqViewer {
     // The spacer is scrollable document content, never a measurement source for
     // the host. In particular it must not mirror the viewer height: doing so
     // turns a min-height host plus a 100%-sized child into a resize feedback loop.
-    this.spacer.style.height = `${Math.max(1, this.active?.totalHeight ?? 0)}px`;
+    this.spacer.style.height = `${Math.max(
+      1,
+      (this.active?.totalHeight ?? 0) + (this.active === undefined ? 0 : NAVIGATION_CLEARANCE),
+    )}px`;
   }
 
   hitTest(clientX: number, clientY: number): SeqViewerInteraction | undefined {

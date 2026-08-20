@@ -154,6 +154,7 @@ test("keeps sequence viewers inset while Mol* stays flush and borderless", async
         "msp-snapshot-description-wrapper",
         "msp-state-snapshot-viewport-controls",
         "msp-animation-viewport-controls",
+        "msp-viewport-controls-buttons",
       ];
       return classes.map((className) => {
         const probe = document.createElement("div");
@@ -164,7 +165,7 @@ test("keeps sequence viewers inset while Mol* stays flush and borderless", async
         return display;
       });
     }),
-  ).toEqual(["none", "none", "none"]);
+  ).toEqual(["none", "none", "none", "none"]);
 });
 
 test("retains the accessible glass shell under reduced motion, forced colors, narrow width, and zoom", async ({

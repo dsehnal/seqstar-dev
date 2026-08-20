@@ -278,7 +278,7 @@ function AlignmentStructureContent({
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-alignment-structure">
       <section>
-        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study 4</p>
+        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study</p>
         <h1 className="mt-2 font-bold text-3xl text-slate-950">
           Alignment to sequence to structure
         </h1>
@@ -287,7 +287,7 @@ function AlignmentStructureContent({
           labeled AlphaFold DB v6 predictions. This is a comparative display, not a biological
           ensemble; all models and transforms are local checked fixtures.
         </p>
-        <p className="mt-2 text-slate-500 text-sm" data-testid="p60-harness-status">
+        <p data-testid="p60-harness-status" hidden>
           Harness: {status} · local checked fixture only
         </p>
       </section>

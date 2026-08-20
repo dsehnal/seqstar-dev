@@ -2,7 +2,6 @@ import { createApplicationHarness, type HarnessMessage } from "@seq-star/harness
 import {
   type ComponentInstanceSpec,
   HarnessProvider,
-  useHarness,
   useHarnessHost,
   useHarnessMessages,
 } from "@seq-star/harness-react";
@@ -109,7 +108,6 @@ function RendererPortabilityContent({
   readonly initialMode: RendererMode;
   readonly onModeChange: (mode: RendererMode) => void;
 }) {
-  const { status } = useHarness();
   const referenceHost = useHarnessHost(referenceId);
   const nightingaleHost = useHarnessHost(nightingaleId);
   const inspect = useInspectPanelState({
@@ -146,7 +144,7 @@ function RendererPortabilityContent({
       data-testid="case-renderer-portability"
     >
       <section className="max-w-4xl">
-        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study 1</p>
+        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study</p>
         <h1 className="mt-2 font-bold text-3xl text-slate-950">Renderer portability</h1>
         <p className="mt-3 text-lg text-slate-600">
           One checked-in UniProt TP53 P04637 SeqViewSpec request drives the independent Seq* and
@@ -164,10 +162,6 @@ function RendererPortabilityContent({
         </p>
         <p className="mt-1 break-all">
           <strong>Digest:</strong> <span data-testid="renderer-document-digest">{digest}</span>
-        </p>
-        <p className="mt-1">
-          <strong>Harness:</strong> {status}. The same immutable payload is independently targeted
-          to both components.
         </p>
       </section>
       <CaseRendererChooser

@@ -148,7 +148,7 @@ function VisualizerPanel({ panel }: { readonly panel: PendingCase["panels"][numb
         </span>
       </div>
       <p className="mt-3 text-slate-600">{panel.detail}</p>
-      <p className="mt-5 text-slate-500 text-sm" data-testid={`panel-status-${panel.id}`}>
+      <p data-testid={`panel-status-${panel.id}`} hidden>
         Harness: {status}. The visualizer wrapper is not installed in this packet.
       </p>
     </section>

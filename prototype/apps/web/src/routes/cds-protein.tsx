@@ -110,13 +110,13 @@ function Content({
   return (
     <main className="mx-auto grid max-w-7xl gap-5 px-3 py-6 sm:px-6" data-testid="case-cds-protein">
       <section>
-        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study 5</p>
+        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study</p>
         <h1 className="mt-2 font-bold text-3xl text-slate-950">Nucleotide to protein CDS</h1>
         <p className="mt-3 max-w-4xl text-lg text-slate-600">
           Two independent Seq* viewers exchange named coordinate loci only through the harness. A
           protein residue maps to its complete zero-based, half-open codon interval.
         </p>
-        <p className="mt-2 text-slate-500 text-sm" data-testid="p70-harness-status">
+        <p data-testid="p70-harness-status" hidden>
           Harness: {status} · local synthetic fixture · no runtime network required
         </p>
       </section>
@@ -139,7 +139,7 @@ function Content({
         className="rounded-lg bg-slate-950 p-5 text-slate-100"
         data-testid="p70-mapping-status"
       >
-        <h2 className="font-semibold text-lg">Harness mapping status</h2>
+        <h2 className="font-semibold text-lg">Mapping status</h2>
         <p className="mt-2 text-slate-300 text-sm">
           {mapping === undefined
             ? "Hover or select either local viewer."

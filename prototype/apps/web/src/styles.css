@@ -312,7 +312,8 @@ select {
 }
 .viewer-host--structure .msp-snapshot-description-wrapper,
 .viewer-host--structure .msp-state-snapshot-viewport-controls,
-.viewer-host--structure .msp-animation-viewport-controls {
+.viewer-host--structure .msp-animation-viewport-controls,
+.viewer-host--structure .msp-viewport-controls-buttons {
   display: none;
 }
 .cds-viewer-host {
@@ -413,6 +414,30 @@ select {
   color: var(--shell-muted);
   font-size: 0.76rem;
 }
+.case-control-panel {
+  display: grid;
+  grid-template-columns: minmax(22rem, 0.75fr) minmax(28rem, 1.25fr);
+  align-items: stretch;
+  overflow: hidden;
+  border: 1px solid var(--shell-line);
+  border-radius: 12px;
+  background: var(--shell-surface);
+  box-shadow: var(--shell-shadow);
+  backdrop-filter: blur(12px) saturate(1.08);
+}
+.case-control-panel .case-renderer-controls {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.case-control-panel__dataset {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px 24px;
+  padding: 12px;
+  border-left: 1px solid var(--shell-line);
+}
 .renderer-chooser__label {
   white-space: nowrap;
 }
@@ -457,6 +482,13 @@ select {
 }
 
 @media (max-width: 820px) {
+  .case-control-panel {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .case-control-panel__dataset {
+    border-top: 1px solid var(--shell-line);
+    border-left: 0;
+  }
   .app-shell-header__inner {
     align-items: flex-start;
     flex-direction: column;

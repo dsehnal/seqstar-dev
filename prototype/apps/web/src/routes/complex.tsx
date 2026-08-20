@@ -97,7 +97,7 @@ function ComplexContent({
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-complex">
       <section>
-        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study 3</p>
+        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study</p>
         <h1 className="mt-2 font-bold text-3xl text-slate-950">Barnase–barstar complex</h1>
         <p className="mt-3 max-w-4xl text-lg text-slate-600">
           An explicit two-polymer assembly: barnase P00648 / chain A and barstar P11540 / chain D.
@@ -105,7 +105,7 @@ function ComplexContent({
           position. Hover residues to reflect an exact chain locus; select a contact to focus both
           named endpoints.
         </p>
-        <p className="mt-2 text-slate-500 text-sm" data-testid="p50-harness-status">
+        <p data-testid="p50-harness-status" hidden>
           Harness: {status} · local 1BRS fixture only
         </p>
       </section>
@@ -123,7 +123,7 @@ function ComplexContent({
         Synthetic confidence — deterministic prototype values, not a biological prediction.
       </p>
       <div className="grid gap-5 xl:grid-cols-2">
-        <ViewerPanel hostRef={sequenceHost} id={sequenceComponent} title="Named complex assembly" />
+        <ViewerPanel hostRef={sequenceHost} id={sequenceComponent} title="Complex" />
         <ViewerPanel
           hostRef={structureHost}
           id={structureComponent}
@@ -131,18 +131,6 @@ function ComplexContent({
           title="Mol* / generated MVS"
         />
       </div>
-      <section className="grid gap-3 rounded-lg border border-sky-200 bg-sky-50 p-4 text-slate-700">
-        <h2 className="font-semibold text-slate-950 text-lg">Track profiles and navigation</h2>
-        <p className="text-sm">
-          Track headers replace the lifecycle-bound MVS profile: named polymers → neutral, regions →
-          regions, synthetic confidence → confidence, interface → interface, contacts → contacts.
-          The sequence navigation band supports wheel/drag and keyboard pan, zoom, and reset.
-        </p>
-        <p className="text-xs">
-          Frozen source transforms: 19 barnase interface residues, 16 barstar interface residues,
-          and 43 contacts; barstar C41A/C83A remain explicit construct conflicts.
-        </p>
-      </section>
       <section data-testid="inspect-panel-container">
         <InspectPanel state={inspect} />
       </section>
