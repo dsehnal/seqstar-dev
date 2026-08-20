@@ -238,9 +238,56 @@ test("switches three audited datasets and inspects the latest validated document
     '"id": "P04637-1TUP-uniprot-structure"',
   );
 
+  await page.evaluate(() => {
+    const states: Array<{ status: string; disabled: boolean; headings: string[] }> = [];
+    const capture = () =>
+      states.push({
+        status:
+          document.querySelector<HTMLElement>('[data-testid="dataset-status"]')?.innerText ?? "",
+        disabled:
+          document.querySelector<HTMLSelectElement>('[data-testid="dataset-selector"]')?.disabled ??
+          false,
+        headings: [
+          ...document.querySelectorAll<HTMLElement>('[data-testid="case-uniprot-structure"] h2'),
+        ].map((element) => element.innerText),
+      });
+    capture();
+    new MutationObserver(capture).observe(
+      document.querySelector('[data-testid="case-uniprot-structure"]') ?? document.body,
+      { attributes: true, childList: true, subtree: true },
+    );
+    (
+      window as unknown as { h40DatasetTransitionStates: typeof states }
+    ).h40DatasetTransitionStates = states;
+  });
   await selector.selectOption("P69905-1A3N");
   await expect(page.getByTestId("dataset-status")).toContainText("P69905");
   await expect(page.getByTestId("dataset-status")).toContainText("active");
+  expect(
+    await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            h40DatasetTransitionStates: Array<{
+              status: string;
+              disabled: boolean;
+              headings: string[];
+            }>;
+          }
+        ).h40DatasetTransitionStates,
+    ),
+  ).toContainEqual({
+    status:
+      "Hemoglobin alpha (P69905) / 1A3N · switching · previous Human p53 (P04637) / 1TUP remains until both viewers confirm the switch",
+    disabled: true,
+    headings: expect.arrayContaining([
+      "Sequence tracks — transition pending",
+      "Mol* / MolViewSpec — transition pending",
+    ]),
+  });
+  await expect(selector).toBeEnabled();
+  await expect(page.getByRole("heading", { name: /Hemoglobin alpha.*tracks/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "1A3N / MolViewSpec" })).toBeVisible();
   await expect(page.getByTestId("uniprot-tracks-host")).toContainText("PF00042.29 conservation");
   await expect(
     page.getByTestId("uniprot-tracks-host").locator("[data-seqstar-track-activate]"),
@@ -263,6 +310,9 @@ test("switches three audited datasets and inspects the latest validated document
   await selector.selectOption("P00648-1BRS-A");
   await expect(page.getByTestId("dataset-status")).toContainText("P00648");
   await expect(page.getByTestId("dataset-status")).toContainText("active");
+  await expect(selector).toBeEnabled();
+  await expect(page.getByRole("heading", { name: /Barnase.*tracks/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "1BRS / MolViewSpec" })).toBeVisible();
   await expect(page.getByTestId("uniprot-tracks-host")).toContainText("Signal peptide");
   await expect(
     page.getByTestId("uniprot-tracks-host").locator("[data-seqstar-track-activate]"),
@@ -293,6 +343,32 @@ test("switches three audited datasets and inspects the latest validated document
   await expect(page.getByTestId("dataset-status")).toContainText("active");
   await expect(page.getByTestId("inspect-seqviewspec-json")).toContainText(
     '"id": "P00648-1BRS-chain-A-sequence-structure"',
+  );
+  await expect(page.getByTestId("inspect-seq-request-id")).toContainText(
+    "dataset-5-P00648-1BRS-A-sequence",
+  );
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "dataset-5-P00648-1BRS-A-neutral",
+  );
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
+    timeout: 20_000,
+  });
+  await page.getByTestId("inspect-tab-mvs").click();
+  await expect(page.getByTestId("inspect-mvs-json")).toContainText("1BRS barnase chain A");
+  await page.getByTestId("inspect-tab-summary").click();
+  await page
+    .getByTestId("uniprot-tracks-host")
+    .locator('[data-seqstar-track-activate="interface-residues"]')
+    .click();
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "P00648-1BRS-A-interface-residues",
+  );
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
+    timeout: 20_000,
+  });
+  await expect(page.getByTestId("inspect-mapping-counts")).toContainText("mapped 19");
+  await expect(page.getByTestId("inspect-seq-request-id")).toContainText(
+    "dataset-5-P00648-1BRS-A-sequence",
   );
 
   const inspector = page.getByTestId("inspect-panel");
@@ -328,6 +404,11 @@ test("switches three audited datasets and inspects the latest validated document
     root: { kind: "root" },
     metadata: { version: "1" },
   });
+  await page.getByTestId("inspect-copy-mvs").click();
+  await expect(page.getByTestId("inspect-copy-status-mvs")).toHaveText("Copied");
+  await page.getByTestId("inspect-tab-messages").click();
+  const visibleMessages = page.getByTestId("inspect-message-list").getByRole("listitem");
+  expect(await visibleMessages.count()).toBeLessThanOrEqual(100);
   await page.goto("/#/");
   await page.goto("/#/uniprot-structure");
   await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");

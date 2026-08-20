@@ -2,6 +2,7 @@ import {
   type HarnessMessage,
   type HarnessPluginSpec,
   type InteractionEvent,
+  type LifecycleResult,
   type PayloadSchema,
   payloadSchema,
 } from "@seq-star/harness-core";
@@ -1145,10 +1146,97 @@ export const createUniProtDatasetsPlugin = (
       "0.1.0",
       ShowAnnotationIntentPayloadSchema,
     );
-    let active: RuntimeDataset | undefined;
+    let committed: RuntimeDataset | undefined;
+    let requested: RuntimeDataset | undefined;
     let switchGeneration = 0;
     let annotationGeneration = 0;
     let annotationAbort: AbortController | undefined;
+    type PendingSwitch = {
+      readonly selected: RuntimeDataset;
+      readonly previousDatasetId?: UniProtDatasetId;
+      readonly generation: number;
+      readonly sequenceRequestId: string;
+      readonly structureRequestId: string;
+      readonly sequenceRequestEnvelopeId: string;
+      readonly structureRequestEnvelopeId: string;
+      readonly requestCorrelationId: string;
+      readonly correlationId: string;
+      readonly causationId: string;
+      readonly ready: Set<"sequence" | "structure">;
+      terminal: boolean;
+    };
+    let pendingSwitch: PendingSwitch | undefined;
+
+    const switchStatus = (
+      pending: PendingSwitch,
+      status: DatasetStatus["status"],
+    ): DatasetStatus => ({
+      datasetId: pending.selected.definition.id,
+      ...(pending.previousDatasetId === undefined
+        ? {}
+        : { previousDatasetId: pending.previousDatasetId }),
+      generation: pending.generation,
+      status,
+      sequenceRequestId: pending.sequenceRequestId,
+      structureRequestId: pending.structureRequestId,
+    });
+    const publishSwitchStatus = (pending: PendingSwitch, status: DatasetStatus["status"]): void => {
+      context.fabric.publish(
+        message(
+          "dataset.status",
+          switchStatus(pending, status),
+          pending.correlationId,
+          pending.causationId,
+        ),
+      );
+    };
+    const supersede = (pending: PendingSwitch): void => {
+      if (pending.terminal) return;
+      pending.terminal = true;
+      if (pendingSwitch === pending) {
+        pendingSwitch = undefined;
+        requested = committed;
+      }
+      publishSwitchStatus(pending, "superseded");
+    };
+
+    const observeLifecycle = (incoming: HarnessMessage): void => {
+      const pending = pendingSwitch;
+      if (pending === undefined || pending.terminal) return;
+      const lifecycle = incoming.payload as unknown as LifecycleResult;
+      const family =
+        lifecycle.componentId === options.sequenceComponent &&
+        lifecycle.requestId === pending.sequenceRequestId &&
+        incoming.source.component === options.sequenceComponent &&
+        incoming.correlationId === pending.requestCorrelationId &&
+        incoming.causationId === pending.sequenceRequestEnvelopeId
+          ? "sequence"
+          : lifecycle.componentId === options.structureComponent &&
+              lifecycle.requestId === pending.structureRequestId &&
+              incoming.source.component === options.structureComponent &&
+              incoming.correlationId === pending.requestCorrelationId &&
+              incoming.causationId === pending.structureRequestEnvelopeId
+            ? "structure"
+            : undefined;
+      if (family === undefined) return;
+      if (lifecycle.status === "failed" || lifecycle.status === "superseded") {
+        supersede(pending);
+        return;
+      }
+      if (lifecycle.status !== "rendered" && lifecycle.status !== "degraded") return;
+      if (
+        lifecycle.visibleRequestId !== undefined &&
+        lifecycle.visibleRequestId !== lifecycle.requestId
+      )
+        return;
+      pending.ready.add(family);
+      if (pending.ready.size !== 2 || pendingSwitch !== pending) return;
+      pending.terminal = true;
+      pendingSwitch = undefined;
+      committed = pending.selected;
+      requested = pending.selected;
+      publishSwitchStatus(pending, "active");
+    };
 
     const publishSelection = async (
       datasetId: UniProtDatasetId,
@@ -1161,73 +1249,79 @@ export const createUniProtDatasetsPlugin = (
       annotationAbort = undefined;
       annotationGeneration++;
       const current = ++switchGeneration;
-      const previousDatasetId = active?.definition.id;
-      active = selected;
+      if (pendingSwitch !== undefined) supersede(pendingSwitch);
+      const previousDatasetId = committed?.definition.id;
+      requested = selected;
       const sequenceRequestId = `dataset-${current}-${datasetId}-sequence`;
       const structureRequestId = `dataset-${current}-${datasetId}-neutral`;
-      const status = (state: DatasetStatus["status"]): DatasetStatus => ({
-        datasetId,
+      const sequenceRequest = message(
+        "visualization.seqviewspec.request",
+        {
+          format: "seqviewspec",
+          requestId: sequenceRequestId,
+          mode: "replace",
+          document: selected.definition.seqViewSpec,
+          viewId: selected.definition.viewId,
+        },
+        incoming.correlationId,
+        incoming.id,
+        { component: options.sequenceComponent },
+      );
+      const structureRequest = message(
+        "visualization.mvs.request",
+        {
+          format: "mvs",
+          requestId: structureRequestId,
+          mode: "replace",
+          document: selected.definition.neutralMvs,
+        },
+        incoming.correlationId,
+        incoming.id,
+        { component: options.structureComponent },
+      );
+      const pending: PendingSwitch = {
+        selected,
         ...(previousDatasetId === undefined ? {} : { previousDatasetId }),
         generation: current,
-        status: state,
         sequenceRequestId,
         structureRequestId,
-      });
-      context.fabric.publish(
-        message("dataset.status", status("switching"), incoming.correlationId, incoming.id),
-      );
+        sequenceRequestEnvelopeId: sequenceRequest.id,
+        structureRequestEnvelopeId: structureRequest.id,
+        requestCorrelationId: incoming.correlationId,
+        correlationId: incoming.correlationId,
+        causationId: incoming.id,
+        ready: new Set(),
+        terminal: false,
+      };
+      pendingSwitch = pending;
+      publishSwitchStatus(pending, "switching");
       await Promise.resolve();
       if (signal.aborted || current !== switchGeneration) {
-        context.fabric.publish(
-          message("dataset.status", status("superseded"), incoming.correlationId, incoming.id),
-        );
+        supersede(pending);
         return;
       }
-      context.fabric.publish(
-        message(
-          "visualization.seqviewspec.request",
-          {
-            format: "seqviewspec",
-            requestId: sequenceRequestId,
-            mode: "replace",
-            document: selected.definition.seqViewSpec,
-            viewId: selected.definition.viewId,
-          },
-          incoming.correlationId,
-          incoming.id,
-          { component: options.sequenceComponent },
-        ),
-      );
+      context.fabric.publish(sequenceRequest);
       await Promise.resolve();
       if (signal.aborted || current !== switchGeneration) {
-        context.fabric.publish(
-          message("dataset.status", status("superseded"), incoming.correlationId, incoming.id),
-        );
+        supersede(pending);
         return;
       }
-      context.fabric.publish(
-        message(
-          "visualization.mvs.request",
-          {
-            format: "mvs",
-            requestId: structureRequestId,
-            mode: "replace",
-            document: selected.definition.neutralMvs,
-          },
-          incoming.correlationId,
-          incoming.id,
-          { component: options.structureComponent },
-        ),
-      );
-      context.fabric.publish(
-        message("dataset.status", status("active"), incoming.correlationId, incoming.id),
-      );
+      context.fabric.publish(structureRequest);
     };
 
     context.addProcessor({
       id: "h20.uniprot-datasets",
-      types: ["intent.dataset.select", "interaction.native", "intent.annotation.show-in-structure"],
+      types: [
+        "intent.dataset.select",
+        "interaction.native",
+        "intent.annotation.show-in-structure",
+        "lifecycle.visualization",
+      ],
       async process(incoming, processorContext, signal) {
+        if (incoming.type === "lifecycle.visualization") {
+          observeLifecycle(incoming);
+          return;
+        }
         if (incoming.type === "intent.dataset.select") {
           await publishSelection(
             (incoming.payload as unknown as DatasetSelectIntent).datasetId,
@@ -1245,9 +1339,11 @@ export const createUniProtDatasetsPlugin = (
             event.origin.documentId === undefined ||
             event.origin.viewId === undefined ||
             event.origin.trackId === undefined ||
-            active?.definition.seqViewSpec.id !== event.origin.documentId ||
-            active.definition.viewId !== event.origin.viewId ||
-            !active.definition.trackIds.includes(event.origin.trackId)
+            committed === undefined ||
+            pendingSwitch !== undefined ||
+            committed.definition.seqViewSpec.id !== event.origin.documentId ||
+            committed.definition.viewId !== event.origin.viewId ||
+            !committed.definition.trackIds.includes(event.origin.trackId)
           )
             return;
           processorContext.fabric.publish(
@@ -1266,7 +1362,7 @@ export const createUniProtDatasetsPlugin = (
           );
           return;
         }
-        const selected = active;
+        const selected = committed;
         const intent = incoming.payload as {
           readonly documentId?: string;
           readonly viewId?: string;
@@ -1318,7 +1414,9 @@ export const createUniProtDatasetsPlugin = (
           controller.signal.aborted ||
           current !== annotationGeneration ||
           selectedSwitch !== switchGeneration ||
-          active !== selected
+          committed !== selected ||
+          requested !== selected ||
+          pendingSwitch !== undefined
         )
           return;
         const published = detached(generated);
@@ -1348,7 +1446,9 @@ export const createUniProtDatasetsPlugin = (
     return {
       dispose() {
         annotationAbort?.abort();
-        active = undefined;
+        committed = undefined;
+        requested = undefined;
+        pendingSwitch = undefined;
         switchGeneration++;
         annotationGeneration++;
       },

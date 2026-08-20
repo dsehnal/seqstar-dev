@@ -26,6 +26,7 @@ import {
   createUniProtDatasetsPlugin,
   createUniProtDatasetTranslators,
   DatasetSelectIntentPayloadSchema,
+  type DatasetStatus,
   DatasetStatusPayloadSchema,
   generateDatasetAnnotationMvs,
   ShowAnnotationIntentPayloadSchema,
@@ -337,14 +338,56 @@ describe("H20 offline UniProt/structure dataset catalog", () => {
 });
 
 const wait = (milliseconds = 40) => new Promise((resolve) => setTimeout(resolve, milliseconds));
-const component = (type: string, capability: string): ComponentFactory => ({
+const component = (
+  type: string,
+  capability: string,
+  options: {
+    readonly autoRender?: boolean;
+    readonly onRequest?: (request: HarnessMessage) => void;
+  } = {},
+): ComponentFactory => ({
   type,
   create({ id }) {
+    let unsubscribe: (() => void) | undefined;
     return {
       id,
       capabilities: [capability],
-      async start() {},
-      dispose() {},
+      async start(context) {
+        const subscription = context.fabric
+          .observe({ targetComponent: id })
+          .subscribe((request) => {
+            if (!request.type.startsWith("visualization.")) return;
+            options.onRequest?.(request);
+            if (options.autoRender === false) return;
+            for (const status of ["accepted", "rendered"] as const)
+              context.fabric.publish({
+                id: crypto.randomUUID(),
+                type: "lifecycle.visualization",
+                version: "0.1.0",
+                source: { component: id },
+                correlationId: request.correlationId,
+                causationId: request.id,
+                timestamp: new Date().toISOString(),
+                payload: {
+                  requestId: (request.payload as { requestId: string }).requestId,
+                  generation: 1,
+                  componentId: id,
+                  status,
+                  ...(status === "rendered"
+                    ? {
+                        visibleRequestId: (request.payload as { requestId: string }).requestId,
+                      }
+                    : {}),
+                  capabilities: [capability],
+                  diagnostics: [],
+                },
+              });
+          });
+        unsubscribe = () => subscription.unsubscribe();
+      },
+      dispose() {
+        unsubscribe?.();
+      },
     };
   },
 });
@@ -361,6 +404,236 @@ const envelope = (type: string, payload: unknown): HarnessMessage => {
     payload: payload as never,
   };
 };
+
+const controlledSwitchHarness = async () => {
+  const requests: HarnessMessage[] = [];
+  const harness = createApplicationHarness(
+    {
+      id: "h20-controlled-switching",
+      components: [
+        { id: "sequence", type: "test.sequence" },
+        { id: "structure", type: "test.structure" },
+      ],
+      plugins: [{ id: "datasets", plugin: "test.datasets" }],
+    },
+    {
+      componentFactories: [
+        component("test.sequence", "seqstar:format/seqviewspec", {
+          autoRender: false,
+          onRequest: (request) => requests.push(request),
+        }),
+        component("test.structure", "seqstar:format/mvs", {
+          autoRender: false,
+          onRequest: (request) => requests.push(request),
+        }),
+      ],
+      pluginFactories: [
+        {
+          plugin: "test.datasets",
+          create: () =>
+            createUniProtDatasetsPlugin({
+              sequenceComponent: "sequence",
+              structureComponent: "structure",
+              assets,
+            }),
+        },
+      ],
+    },
+  );
+  const observed: HarnessMessage[] = [];
+  harness.fabric.observe().subscribe((item) => observed.push(item));
+  await harness.start();
+  await wait();
+  let lifecycleGeneration = 0;
+  const publishLifecycle = async (
+    request: HarnessMessage,
+    status: "accepted" | "rendered" | "degraded" | "superseded" | "failed",
+    extra: Readonly<Record<string, unknown>> = {},
+    envelope: {
+      readonly sourceComponent?: string;
+      readonly correlationId?: string;
+      readonly causationId?: string;
+    } = {},
+  ): Promise<void> => {
+    const componentId =
+      request.target !== undefined && "component" in request.target
+        ? request.target.component
+        : undefined;
+    if (componentId === undefined) throw new Error("Expected a targeted visualization request.");
+    const requestId = (request.payload as { requestId: string }).requestId;
+    harness.fabric.publish({
+      id: crypto.randomUUID(),
+      type: "lifecycle.visualization",
+      version: "0.1.0",
+      source: { component: envelope.sourceComponent ?? componentId },
+      correlationId: envelope.correlationId ?? request.correlationId,
+      causationId: envelope.causationId ?? request.id,
+      timestamp: new Date().toISOString(),
+      payload: {
+        requestId,
+        generation: ++lifecycleGeneration,
+        componentId,
+        status,
+        ...((status === "rendered" || status === "degraded") && extra.visibleRequestId === undefined
+          ? { visibleRequestId: requestId }
+          : {}),
+        capabilities: [],
+        diagnostics: [],
+        ...extra,
+      } as never,
+    });
+    await wait();
+  };
+  const requestsFor = (datasetId: UniProtDatasetId): readonly HarnessMessage[] =>
+    requests.filter((request) =>
+      (request.payload as { requestId?: string }).requestId?.includes(`-${datasetId}-`),
+    );
+  const latestStatus = () =>
+    observed.filter((item) => item.type === "dataset.status").at(-1)?.payload as
+      | DatasetStatus
+      | undefined;
+  return { harness, observed, publishLifecycle, requestsFor, latestStatus };
+};
+
+describe("H20 lifecycle-confirmed dataset commitment", () => {
+  it("stays switching after partial readiness and commits only after both viewers are ready", async () => {
+    const controlled = await controlledSwitchHarness();
+    const [sequence, structure] = controlled.requestsFor("P04637-1TUP");
+    if (sequence === undefined || structure === undefined)
+      throw new Error("Expected initial sequence and structure requests.");
+    await controlled.publishLifecycle(sequence, "rendered", {}, { sourceComponent: "structure" });
+    await controlled.publishLifecycle(structure, "degraded");
+    expect(controlled.latestStatus()).toMatchObject({
+      datasetId: "P04637-1TUP",
+      status: "switching",
+    });
+    await controlled.publishLifecycle(
+      sequence,
+      "rendered",
+      {},
+      {
+        correlationId: crypto.randomUUID(),
+      },
+    );
+    expect(controlled.latestStatus()).toMatchObject({
+      datasetId: "P04637-1TUP",
+      status: "switching",
+    });
+    await controlled.publishLifecycle(
+      sequence,
+      "rendered",
+      {},
+      {
+        causationId: crypto.randomUUID(),
+      },
+    );
+    expect(controlled.latestStatus()).toMatchObject({
+      datasetId: "P04637-1TUP",
+      status: "switching",
+    });
+    await controlled.publishLifecycle(sequence, "rendered");
+    expect(controlled.latestStatus()).toMatchObject({
+      datasetId: "P04637-1TUP",
+      status: "active",
+    });
+    await controlled.harness.disposeAsync();
+  });
+
+  it("ignores stale B lifecycle after rapid B to C routing and commits only C", async () => {
+    const controlled = await controlledSwitchHarness();
+    const initial = controlled.requestsFor("P04637-1TUP");
+    if (initial[0] === undefined || initial[1] === undefined)
+      throw new Error("Expected initial requests.");
+    await controlled.publishLifecycle(initial[0], "rendered");
+    await controlled.publishLifecycle(initial[1], "rendered");
+
+    controlled.harness.fabric.publish(
+      envelope("intent.dataset.select", { datasetId: "P69905-1A3N" }),
+    );
+    await wait();
+    const b = controlled.requestsFor("P69905-1A3N");
+    expect(b).toHaveLength(2);
+    controlled.harness.fabric.publish(
+      envelope("intent.dataset.select", { datasetId: "P00648-1BRS-A" }),
+    );
+    await wait();
+    const c = controlled.requestsFor("P00648-1BRS-A");
+    expect(c).toHaveLength(2);
+    expect(controlled.latestStatus()).toMatchObject({
+      datasetId: "P00648-1BRS-A",
+      previousDatasetId: "P04637-1TUP",
+      status: "switching",
+    });
+
+    if (b[0] === undefined || b[1] === undefined || c[0] === undefined || c[1] === undefined)
+      throw new Error("Expected complete B and C requests.");
+    await controlled.publishLifecycle(b[0], "rendered");
+    await controlled.publishLifecycle(b[1], "rendered");
+    expect(controlled.latestStatus()?.datasetId).toBe("P00648-1BRS-A");
+    expect(controlled.latestStatus()?.status).toBe("switching");
+    await controlled.publishLifecycle(c[1], "rendered");
+    expect(controlled.latestStatus()?.status).toBe("switching");
+    await controlled.publishLifecycle(c[0], "rendered");
+    expect(controlled.latestStatus()).toMatchObject({
+      datasetId: "P00648-1BRS-A",
+      previousDatasetId: "P04637-1TUP",
+      status: "active",
+    });
+    expect(
+      controlled.observed.filter(
+        (item) =>
+          item.type === "dataset.status" &&
+          (item.payload as unknown as DatasetStatus).datasetId === "P69905-1A3N" &&
+          (item.payload as unknown as DatasetStatus).status === "active",
+      ),
+    ).toHaveLength(0);
+    await controlled.harness.disposeAsync();
+  });
+
+  it("does not commit failed, cleared, or wrapper-superseded switches", async () => {
+    const controlled = await controlledSwitchHarness();
+    const initial = controlled.requestsFor("P04637-1TUP");
+    if (initial[0] === undefined || initial[1] === undefined)
+      throw new Error("Expected initial requests.");
+    await controlled.publishLifecycle(initial[0], "rendered");
+    await controlled.publishLifecycle(initial[1], "rendered");
+
+    controlled.harness.fabric.publish(
+      envelope("intent.dataset.select", { datasetId: "P69905-1A3N" }),
+    );
+    await wait();
+    const b = controlled.requestsFor("P69905-1A3N");
+    if (b[0] === undefined || b[1] === undefined) throw new Error("Expected B requests.");
+    await controlled.publishLifecycle(b[0], "rendered");
+    await controlled.publishLifecycle(b[1], "failed", { previousView: "cleared" });
+    expect(controlled.latestStatus()).toMatchObject({
+      datasetId: "P69905-1A3N",
+      previousDatasetId: "P04637-1TUP",
+      status: "superseded",
+    });
+
+    controlled.harness.fabric.publish(
+      envelope("intent.dataset.select", { datasetId: "P00648-1BRS-A" }),
+    );
+    await wait();
+    const c = controlled.requestsFor("P00648-1BRS-A");
+    if (c[0] === undefined) throw new Error("Expected C requests.");
+    await controlled.publishLifecycle(c[0], "superseded");
+    expect(controlled.latestStatus()).toMatchObject({
+      datasetId: "P00648-1BRS-A",
+      previousDatasetId: "P04637-1TUP",
+      status: "superseded",
+    });
+    expect(
+      controlled.observed.filter(
+        (item) =>
+          item.type === "dataset.status" &&
+          (item.payload as unknown as DatasetStatus).status === "active",
+      ),
+    ).toHaveLength(1);
+    await controlled.harness.disposeAsync();
+  });
+});
 
 describe("H20 harness-owned dataset switching", () => {
   it("orders replacements, keeps rapid latest selection, retires old activations, and disposes cleanly", async () => {

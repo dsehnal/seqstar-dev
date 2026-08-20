@@ -101,10 +101,20 @@ function ViewerPanel({ id, title }: { readonly id: string; readonly title: strin
 function UniProtStructureContent() {
   const { harness, status } = useHarness();
   const inspect = useInspectPanelState({ sequenceComponent, structureComponent });
-  const currentDatasetId =
-    inspect.datasetStatus?.datasetId ?? inspect.catalog?.initialDatasetId ?? "";
-  const currentDataset = inspect.catalog?.datasets.find((item) => item.id === currentDatasetId);
-  const switching = inspect.datasetStatus?.status === "switching";
+  const transition = inspect.datasetStatus;
+  const requestedDatasetId =
+    transition?.status === "superseded"
+      ? (transition.previousDatasetId ?? transition.datasetId)
+      : (transition?.datasetId ?? inspect.catalog?.initialDatasetId ?? "");
+  const requestedDataset = inspect.catalog?.datasets.find(
+    (item) => item.id === transition?.datasetId,
+  );
+  const displayedDatasetId =
+    transition?.status === "active" ? transition.datasetId : transition?.previousDatasetId;
+  const displayedDataset = inspect.catalog?.datasets.find((item) => item.id === displayedDatasetId);
+  const switching = transition?.status === "switching";
+  const transitionLabel =
+    transition?.status === "superseded" ? "transition incomplete" : "transition pending";
   const selectDataset = (datasetId: string) => {
     if (inspect.catalog?.datasets.some((dataset) => dataset.id === datasetId) !== true) return;
     const messageId = crypto.randomUUID();
@@ -143,7 +153,7 @@ function UniProtStructureContent() {
             disabled={switching || inspect.catalog === undefined}
             id="dataset-select"
             onChange={(event) => selectDataset(event.currentTarget.value)}
-            value={currentDatasetId}
+            value={requestedDatasetId}
           >
             {inspect.catalog?.datasets.map((dataset) => (
               <option key={dataset.id} value={dataset.id}>
@@ -153,8 +163,10 @@ function UniProtStructureContent() {
           </select>
         </label>
         <p aria-live="polite" className="text-slate-600 text-sm" data-testid="dataset-status">
-          {currentDataset?.label ?? "Loading dataset catalog"} ·{" "}
-          {inspect.datasetStatus?.status ?? "pending"}
+          {requestedDataset?.label ?? "Loading dataset catalog"} · {transition?.status ?? "pending"}
+          {transition?.status === "switching" && displayedDataset !== undefined
+            ? ` · previous ${displayedDataset.label} remains until both viewers confirm the switch`
+            : ""}
         </p>
       </section>
       <p className="rounded border border-sky-200 bg-sky-50 p-3 text-slate-700 text-sm">
@@ -164,15 +176,17 @@ function UniProtStructureContent() {
         <ViewerPanel
           id={sequenceComponent}
           title={
-            currentDataset === undefined ? "Sequence tracks" : `${currentDataset.label} tracks`
+            transition?.status === "active" && displayedDataset !== undefined
+              ? `${displayedDataset.label} tracks`
+              : `Sequence tracks — ${transitionLabel}`
           }
         />
         <ViewerPanel
           id={structureComponent}
           title={
-            currentDataset?.structureId === undefined
-              ? "Mol* / MolViewSpec"
-              : `${currentDataset.structureId} / MolViewSpec`
+            transition?.status === "active" && displayedDataset?.structureId !== undefined
+              ? `${displayedDataset.structureId} / MolViewSpec`
+              : `Mol* / MolViewSpec — ${transitionLabel}`
           }
         />
       </div>
