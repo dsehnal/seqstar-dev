@@ -61,7 +61,7 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   await expect(controls).toBeVisible();
   await expect(controls.locator(".case-renderer-controls")).toHaveCount(1);
   await expect(controls.getByTestId("dataset-selector")).toHaveCount(1);
-  await expect(page.locator('p:visible').filter({ hasText: /^Harness:/u })).toHaveCount(0);
+  await expect(page.locator("p:visible").filter({ hasText: /^Harness:/u })).toHaveCount(0);
   await expect(
     page.getByTestId("uniprot-tracks-host").locator('[data-seqstar-nightingale="root"]'),
   ).toBeVisible();

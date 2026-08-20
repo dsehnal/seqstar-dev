@@ -233,6 +233,7 @@ class RecordingSequenceComponent implements HarnessComponent {
   readonly highlights = new Map<string, readonly CoordinateLocus[]>();
   readonly selections = new Map<string, readonly CoordinateLocus[]>();
   private subscription: { unsubscribe(): void } | undefined;
+  private context: ComponentContext | undefined;
 
   constructor(
     readonly id: string,
@@ -240,6 +241,7 @@ class RecordingSequenceComponent implements HarnessComponent {
   ) {}
 
   async start(context: ComponentContext): Promise<void> {
+    this.context = context;
     context.reportCoordinateSpaces(this.spaces);
     this.subscription = context.fabric
       .observe({ targetComponent: this.id })
@@ -260,9 +262,30 @@ class RecordingSequenceComponent implements HarnessComponent {
       });
   }
 
+  publishNativeHover(locus: CoordinateLocus): void {
+    const context = this.context;
+    if (context === undefined) throw new Error("Sequence component is not ready.");
+    context.fabric.publish({
+      id: uuid(),
+      type: "interaction.native",
+      version: "0.1.0",
+      source: { component: this.id },
+      correlationId: uuid(),
+      timestamp: "2026-08-20T00:00:00.000Z",
+      payload: {
+        interactionId: uuid(),
+        interaction: "hover",
+        phase: "set",
+        origin: { componentId: this.id },
+        loci: [locus],
+      },
+    });
+  }
+
   dispose(): void {
     this.subscription?.unsubscribe();
     this.subscription = undefined;
+    this.context = undefined;
   }
 }
 
@@ -463,6 +486,33 @@ describe("Mol* wrapper production boundary", () => {
     expect(
       sequence.received.filter((event) => event.type === "interaction.selection.apply"),
     ).toHaveLength(2);
+
+    // Reproduce the renderer ownership transition that previously left Mol*'s
+    // native A resident and rendered A + reflected B together.
+    const callsBeforeTransfer = driver.calls.length;
+    const nativeBeforeTransfer = native.length;
+    driver.emit({ kind: "hover", residues: [complexBarnaseResidue] });
+    await flush();
+    sequence.publishNativeHover(barstarColumn);
+    await flush();
+    expect(
+      driver.calls.slice(callsBeforeTransfer).map((call) => [call.action, call.schemas] as const),
+    ).toEqual([
+      ["highlight", 1],
+      ["highlight", 0],
+      ["highlight", 1],
+    ]);
+    expect(native.slice(nativeBeforeTransfer).map((event) => event.source.component)).toEqual([
+      "complex-structure",
+      "complex-sequence",
+    ]);
+    driver.emit({ kind: "hover", residues: [] });
+    await flush();
+    expect(driver.calls.slice(callsBeforeTransfer).map((call) => call.schemas)).toEqual([1, 0, 1]);
+    expect(native.slice(nativeBeforeTransfer).map((event) => event.source.component)).toEqual([
+      "complex-structure",
+      "complex-sequence",
+    ]);
     await harness.disposeAsync();
     subscription.unsubscribe();
   });

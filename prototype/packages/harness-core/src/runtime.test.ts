@@ -1867,6 +1867,7 @@ describe("harness runtime", () => {
     expect(commands).toEqual([
       "sequence:interaction.highlight.apply",
       "sequence:interaction.highlight.clear",
+      "molstar:interaction.highlight.clear",
       "molstar:interaction.highlight.apply",
     ]);
     await harness.disposeAsync();

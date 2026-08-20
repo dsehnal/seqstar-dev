@@ -809,12 +809,16 @@ export const createApplicationHarness = (
     ruleId: string,
     lease: HoverSynchronizationLease,
     message: HarnessMessage<string, InteractionEvent>,
+    clearSource = false,
   ): void => {
-    for (const destination of lease.destinations)
+    const targets = new Set(lease.destinations);
+    if (clearSource) targets.add(lease.sourceComponent);
+    for (const destination of targets)
       fabric.publish({
         ...message,
         id: newId(),
         causationId: message.id,
+        correlationId: lease.owner.correlationId,
         target: { component: destination },
         type: "interaction.highlight.clear",
         payload: { interactionId: lease.interactionId, owner: lease.owner },
@@ -925,7 +929,10 @@ export const createApplicationHarness = (
             }
             abortHoverSynchronization(rule.id);
             if (prior !== undefined && prior.sourceComponent !== event.origin.componentId)
-              retireHoverLease(rule.id, prior, message);
+              // The outgoing renderer still owns its native hover. Retire both
+              // its reflected destinations and that native source before the
+              // incoming renderer's replacement is applied.
+              retireHoverLease(rule.id, prior, message, true);
             const retained = hoverSynchronizationLeases.get(rule.id);
             const lease = retained ?? {
               interactionId: event.interactionId,

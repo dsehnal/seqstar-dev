@@ -92,9 +92,7 @@ test("composes the offline 1BRS sequence, neutral MVS, profiles, navigation, and
   );
   const sequence = page.getByTestId("complex-sequence-host");
   await expect(page.getByRole("heading", { name: "Complex", exact: true })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Track profiles and navigation" })).toHaveCount(
-    0,
-  );
+  await expect(page.getByRole("heading", { name: "Track profiles and navigation" })).toHaveCount(0);
   await expect(sequence.locator("[data-seq-viewer-track]")).toHaveCount(5);
   await expect(page.getByTestId("complex-structure-host").locator("canvas").first()).toBeVisible();
   await expect(page.getByTestId("inspect-seq-request-id")).toContainText("P50-sequence-initial");

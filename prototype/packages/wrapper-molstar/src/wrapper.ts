@@ -820,9 +820,14 @@ export class MolstarWrapper implements VisualizerWrapper {
       this.publishNativeSelection(event, loci);
       return;
     }
+    const currentLease = this.nativeLeases.get("hover");
+    // An owner-transfer clear can be followed by Mol*'s ordinary pointer-leave
+    // notification. The native lease is already retired, so do not mint an
+    // orphan clear or disturb the incoming renderer's applied hover.
+    if (loci.length === 0 && currentLease === undefined) return;
     this.nativeState.set("highlight", [...loci]);
     this.renderApplied("highlight");
-    const lease = this.nativeLeases.get("hover") ?? {
+    const lease = currentLease ?? {
       interactionId: uuid(),
       correlationId: uuid(),
     };
@@ -990,6 +995,18 @@ export class MolstarWrapper implements VisualizerWrapper {
   }
 
   private clear(family: AppliedFamily, command: InteractionClearCommand): void {
+    const nativeHoverLease = this.nativeLeases.get("hover");
+    if (
+      family === "highlight" &&
+      command.owner.sourceComponent === this.id &&
+      nativeHoverLease !== undefined &&
+      nativeHoverLease.interactionId === command.interactionId &&
+      nativeHoverLease.correlationId === command.owner.correlationId
+    ) {
+      this.nativeState.set("highlight", []);
+      this.nativeLeases.delete("hover");
+      this.renderApplied("highlight");
+    }
     const nativeSelectionLease = this.nativeSelectionLease;
     if (
       family === "selection" &&
