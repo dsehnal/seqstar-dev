@@ -44,9 +44,11 @@ const withResizable = <T extends Constructor<NightingaleBaseElement>>(
       this.height ??= this["min-height"];
       if (this.getAttribute("width") === null) this.style.width = "100%";
       if (this.getAttribute("height") === null) this.style.height = "100%";
+      observedElements.add(this);
       SingletonResizeObserver.observe(this);
     }
     override disconnectedCallback() {
+      observedElements.delete(this);
       SingletonResizeObserver.unobserve(this);
       super.disconnectedCallback();
     }
@@ -56,9 +58,11 @@ const withResizable = <T extends Constructor<NightingaleBaseElement>>(
 
 export default withResizable;
 
+const observedElements = new WeakSet<Element>();
 const SingletonResizeObserver = new ResizeObserver((entries) => {
   window.requestAnimationFrame(() => {
     for (const entry of entries) {
+      if (!observedElements.has(entry.target)) continue;
       const width = entry.contentBoxSize?.[0].inlineSize;
       const height = entry.contentBoxSize?.[0].blockSize;
       if (typeof width !== "undefined" && typeof height !== "undefined") {

@@ -8,6 +8,7 @@ type EventType = "click" | "mouseover" | "mouseout" | "reset";
 
 type FeatureData = {
   accession: string;
+  externalId?: string;
   feature?: FeatureData | null;
   fragments?: Array<{
     start: number;
@@ -71,7 +72,8 @@ export function createEvent(
     }
   }
   if (withId) {
-    detail.selectedId = (feature as FeatureData)?.accession;
+    detail.selectedId =
+      (feature as FeatureData)?.externalId ?? (feature as FeatureData)?.accession;
   }
   return new CustomEvent("change", {
     detail,

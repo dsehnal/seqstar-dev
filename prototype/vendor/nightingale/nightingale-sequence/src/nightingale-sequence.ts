@@ -69,6 +69,9 @@ class NightingaleSequence extends withManager(
   numberOfTicks?: number;
   chWidth?: number;
   chHeight?: number;
+  #loadHandler = (event: Event) => {
+    this.data = (event as CustomEvent).detail.payload;
+  };
 
   override connectedCallback() {
     super.connectedCallback();
@@ -76,9 +79,12 @@ class NightingaleSequence extends withManager(
     this.numberOfTicks = Number.isInteger(ticks)
       ? ticks
       : DEFAULT_NUMBER_OF_TICKS;
-    this.addEventListener("load", (e: Event) => {
-      this.data = (e as CustomEvent).detail.payload;
-    });
+    this.addEventListener("load", this.#loadHandler);
+  }
+
+  override disconnectedCallback() {
+    this.removeEventListener("load", this.#loadHandler);
+    super.disconnectedCallback();
   }
 
   get data() {
@@ -241,6 +247,8 @@ class NightingaleSequence extends withManager(
             .enter()
             .append("rect")
             .attr("class", "base_bg feature")
+            .attr("id", (d) => this.seqstarDomId(`${this.seqstarLayerId}:residue:${d.position}`))
+            .attr("data-seqstar-feature-id", (d) => `${this.seqstarLayerId}:residue:${d.position}`)
             .attr("height", this.getHeightWithMargins())
             .attr("width", ftWidth)
             .attr("fill", (d) => (Math.round(d.position) % 2 ? "#ccc" : "#eee"))
@@ -265,6 +273,7 @@ class NightingaleSequence extends withManager(
 
       this.updateHighlight();
       this.renderMarginOnGroup(this.margins);
+      this.notifySeqstarFirstRender();
     }
   }
 

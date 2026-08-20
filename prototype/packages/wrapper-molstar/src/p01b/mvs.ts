@@ -1,5 +1,9 @@
 import { MVSData } from "molstar/lib/extensions/mvs/index.js";
 import type { MVSData as MVSDataDocument } from "molstar/lib/extensions/mvs/mvs-data.js";
+import { parsePDB } from "molstar/lib/mol-io/reader/pdb/parser.js";
+import { Structure } from "molstar/lib/mol-model/structure.js";
+import { trajectoryFromPDB } from "molstar/lib/mol-model-formats/structure/pdb.js";
+import { RuntimeContext } from "molstar/lib/mol-task/index.js";
 
 /**
  * A deliberately synthetic two-residue structure used only by the P01b
@@ -47,4 +51,24 @@ export function createSyntheticPeptideMvs(
 /** Use the validator exported by the same Mol* package as the builder/loader. */
 export function validateMvs(document: MVSDataDocument): readonly string[] {
   return MVSData.validationIssues(document, { noExtra: true }) ?? [];
+}
+
+/** Build one Mol* root containing two models with identical residue labels. */
+export async function createSyntheticMultiModelStructure(): Promise<Structure> {
+  const atoms = SYNTHETIC_PEPTIDE_PDB.split("\n")
+    .filter((line) => line.startsWith("ATOM") || line.startsWith("TER"))
+    .join("\n");
+  const pdb = `HEADER    SYNTHETIC TWO MODEL PEPTIDE
+MODEL        1
+${atoms}
+ENDMDL
+MODEL        2
+${atoms}
+ENDMDL
+END
+`;
+  const parsed = await parsePDB(pdb, "duplicate-root").run();
+  if (parsed.isError) throw new Error(parsed.message);
+  const trajectory = await trajectoryFromPDB(parsed.result).run();
+  return Structure.ofTrajectory(trajectory, RuntimeContext.Synchronous);
 }

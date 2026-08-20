@@ -55,6 +55,18 @@ const withZoom = <T extends Constructor<NightingaleBaseElement>>(
     private _svg?: SVGSelection;
     private dontDispatch = false;
     private wheelHelper?: WheelHelper;
+    private zoomFrame?: number;
+
+    override disconnectedCallback(): void {
+      if (this.zoomFrame !== undefined) cancelAnimationFrame(this.zoomFrame);
+      this.zoomFrame = undefined;
+      this._zoomRefreshedRequested = false;
+      this.zoomBehavior?.on("zoom", null);
+      this._svg?.on(".zoom", null);
+      this.wheelHelper?.dispose();
+      this.wheelHelper = undefined;
+      super.disconnectedCallback();
+    }
 
     @property({ type: Boolean })
     "use-ctrl-to-zoom" = false;
@@ -187,7 +199,8 @@ const withZoom = <T extends Constructor<NightingaleBaseElement>>(
     private requestZoomRefreshed = () => {
       if (this._zoomRefreshedRequested) return;
       this._zoomRefreshedRequested = true;
-      requestAnimationFrame(() => {
+      this.zoomFrame = requestAnimationFrame(() => {
+        this.zoomFrame = undefined;
         this._zoomRefreshedRequested = false;
         this.zoomRefreshed();
       });

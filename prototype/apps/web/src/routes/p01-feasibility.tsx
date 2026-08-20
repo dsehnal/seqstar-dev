@@ -17,7 +17,7 @@ import {
 import {
   mountNightingaleFeasibilitySpike,
   type NightingaleFeasibilitySpike,
-} from "@seq-star/wrapper-nightingale";
+} from "@seq-star/wrapper-nightingale/p01a-feasibility-spike";
 
 export const Route = createFileRoute("/p01-feasibility")({ component: P01FeasibilityPage });
 

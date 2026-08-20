@@ -4,8 +4,15 @@ import { PluginStateObject } from "molstar/lib/mol-plugin-state/objects.js";
 import type { Representation } from "molstar/lib/mol-repr/representation.js";
 
 export interface ResidueIdentity {
+  /** Active Mol* structure-state identity, scoped to the rendered generation. */
+  readonly structureId: string;
   readonly modelEntryId: string;
+  readonly modelId: string;
+  readonly modelIndex: number;
   readonly modelNumber: number;
+  readonly unitId: number;
+  readonly operatorName: string;
+  readonly instanceId: string;
   readonly entityId: string;
   readonly labelAsymId: string;
   readonly authAsymId: string;
@@ -18,12 +25,33 @@ export interface ResidueIdentity {
 export interface NativeResidueEvent {
   readonly kind: "hover" | "selection-add" | "selection-remove" | "selection-clear";
   readonly residues: readonly ResidueIdentity[];
+  /** True when Mol* supplied a non-atomic/coarse/foreign locus, not a clear. */
+  readonly unsupported?: boolean;
 }
+
+const normalizeNativeLoci = (
+  loci: unknown,
+): Pick<NativeResidueEvent, "residues" | "unsupported"> => {
+  const residues = extractResidues(loci);
+  return {
+    residues,
+    ...(!StructureElement.Loci.is(loci) ||
+    (!StructureElement.Loci.isEmpty(loci) && residues.length === 0)
+      ? { unsupported: true }
+      : {}),
+  };
+};
 
 function residueKey(residue: ResidueIdentity): string {
   return [
+    residue.structureId,
     residue.modelEntryId,
+    residue.modelId,
+    residue.modelIndex,
     residue.modelNumber,
+    residue.unitId,
+    residue.operatorName,
+    residue.instanceId,
     residue.entityId,
     residue.labelAsymId,
     residue.authAsymId,
@@ -34,15 +62,23 @@ function residueKey(residue: ResidueIdentity): string {
 }
 
 /** Convert native atomic StructureElement loci into JSON-safe residue identities. */
-export function extractResidues(loci: unknown): readonly ResidueIdentity[] {
+export function extractResidues(loci: unknown, structureId?: string): readonly ResidueIdentity[] {
   if (!StructureElement.Loci.is(loci)) return [];
 
   const residues = new Map<string, ResidueIdentity>();
   StructureElement.Loci.forEachLocation(loci, (location) => {
     if (!Unit.isAtomic(location.unit)) return;
     const residue: ResidueIdentity = {
+      structureId:
+        structureId ??
+        `structure-${loci.structure.hashCode}-${loci.structure.transformHash}-${loci.structure.label}`,
       modelEntryId: location.unit.model.entryId,
+      modelId: location.unit.model.id,
+      modelIndex: loci.structure.getModelIndex(location.unit.model),
       modelNumber: location.unit.model.modelNum,
+      unitId: location.unit.id,
+      operatorName: location.unit.conformation.operator.name,
+      instanceId: location.unit.conformation.operator.instanceId,
       entityId: StructureProperties.chain.label_entity_id(location),
       labelAsymId: StructureProperties.chain.label_asym_id(location),
       authAsymId: StructureProperties.chain.auth_asym_id(location),
@@ -78,7 +114,7 @@ export function subscribeNativeResidueHover(
   receive: (event: NativeResidueEvent) => void,
 ): { unsubscribe(): void } {
   return viewer.subscribe(viewer.plugin.behaviors.interaction.hover, (event) => {
-    receive({ kind: "hover", residues: extractResidues(event.current.loci) });
+    receive({ kind: "hover", ...normalizeNativeLoci(event.current.loci) });
   });
 }
 
@@ -89,10 +125,10 @@ export function subscribeNativeResidueSelection(
 ): { unsubscribe(): void } {
   const subscriptions = [
     viewer.subscribe(viewer.plugin.managers.structure.selection.events.loci.add, (loci) => {
-      receive({ kind: "selection-add", residues: extractResidues(loci) });
+      receive({ kind: "selection-add", ...normalizeNativeLoci(loci) });
     }),
     viewer.subscribe(viewer.plugin.managers.structure.selection.events.loci.remove, (loci) => {
-      receive({ kind: "selection-remove", residues: extractResidues(loci) });
+      receive({ kind: "selection-remove", ...normalizeNativeLoci(loci) });
     }),
     viewer.subscribe(viewer.plugin.managers.structure.selection.events.loci.clear, () => {
       receive({ kind: "selection-clear", residues: [] });

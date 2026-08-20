@@ -38,6 +38,7 @@ type Residue = {
 
 export type Feature = {
   accession: string;
+  externalId?: string;
   color?: string;
   fill?: string;
   shape?: Shapes;
@@ -271,6 +272,7 @@ class NightingaleTrack extends withManager(
     this.createFeatures();
     this.highlighted = this.svg.append("g").attr("class", "highlighted");
     this.margins = this.svg.append("g").attr("class", "margin");
+    this.notifySeqstarFirstRender();
   }
 
   protected createFeatures() {
@@ -281,7 +283,12 @@ class NightingaleTrack extends withManager(
       .enter()
       .append("g")
       .attr("class", "feature-group")
-      .attr("id", (d) => `g_${d.accession}`)
+      .attr("id", (d, index) =>
+        d.externalId === undefined
+          ? `g_${d.accession}`
+          : this.seqstarDomId(`${d.externalId}\u0000feature:${index}`)
+      )
+      .attr("data-seqstar-feature-id", (d) => d.externalId ?? d.accession)
       .selectAll("g.location-group")
       .data((d) =>
         (d.locations || []).map((loc) =>

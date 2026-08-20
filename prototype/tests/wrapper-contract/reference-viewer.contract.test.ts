@@ -365,4 +365,42 @@ describe("reference viewer wrapper common contract", () => {
     );
     harness.fabric.dispose();
   });
+
+  it("pairs a native set and clear with one interaction lease", async () => {
+    const harness = createHarnessContext();
+    const viewer = new ControlledNativeMock();
+    const wrapper = new ReferenceViewerWrapper({
+      id: "reference",
+      target: {} as HTMLElement,
+      viewerFactory: () => viewer as unknown as SeqViewer,
+    });
+    await wrapper.start(harness.context);
+    harness.fabric.publish(
+      message("visualization.seqviewspec.request", request("active"), { component: "reference" }),
+    );
+    viewer.loads[0]?.resolve(rendered(1));
+    await tick();
+    const native = (phase: "set" | "clear") => ({
+      kind: "hover",
+      phase,
+      documentId: "wrapper-contract-document",
+      viewId: "main",
+      trackId: "track",
+      layerId: "letters",
+      loci: phase === "set" ? [locus] : [],
+    });
+    viewer.emit(native("set"));
+    viewer.emit(native("clear"));
+    const messages = harness.messages.filter((entry) => entry.type === "interaction.native");
+    expect(messages).toHaveLength(2);
+    const first = messages[0];
+    const second = messages[1];
+    if (first === undefined || second === undefined)
+      throw new Error("Missing native lease events.");
+    expect(first.correlationId).toBe(second.correlationId);
+    expect((first.payload as { interactionId: string }).interactionId).toBe(
+      (second.payload as { interactionId: string }).interactionId,
+    );
+    await wrapper.dispose();
+  });
 });

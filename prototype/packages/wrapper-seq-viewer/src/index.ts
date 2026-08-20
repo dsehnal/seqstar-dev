@@ -136,6 +136,10 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
   private currentCapabilities: readonly Capability[] = baseCapabilities;
   private disposed = false;
   private readonly applied = new Map<AppliedFamily, Map<string, Map<string, AppliedEntry>>>();
+  private readonly nativeLeases = new Map<
+    string,
+    { readonly correlationId: string; readonly interactionId: string }
+  >();
 
   constructor(options: ReferenceViewerWrapperOptions) {
     this.id = options.id;
@@ -235,6 +239,7 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
       return;
     }
     this.requestAbort?.abort();
+    this.nativeLeases.clear();
     const generation = ++this.nextGeneration;
     this.activeAcceptedGeneration = generation;
     const controller = new AbortController();
@@ -370,8 +375,25 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     const context = this.context;
     if (context === undefined || this.disposed) return;
     const interaction: InteractionKind = event.kind === "viewport-change" ? "viewport" : event.kind;
-    const payload: InteractionEvent = {
+    const leaseKey = [
+      interaction,
+      event.documentId,
+      event.viewId,
+      event.sectionId ?? "",
+      event.trackId ?? "",
+      event.layerId ?? "",
+      event.annotationId ?? "",
+      event.itemId ?? "",
+      event.endpointRole ?? "",
+      event.locusIndex ?? -1,
+    ].join("\u0000");
+    const lease = this.nativeLeases.get(leaseKey) ?? {
+      correlationId: id(),
       interactionId: id(),
+    };
+    if ((event.phase ?? "set") === "set") this.nativeLeases.set(leaseKey, lease);
+    const payload: InteractionEvent = {
+      interactionId: lease.interactionId,
       interaction,
       phase: event.phase ?? "set",
       origin: {
@@ -409,10 +431,11 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
       type: "interaction.native",
       version: "0.1.0",
       source: { component: this.id },
-      correlationId: id(),
+      correlationId: lease.correlationId,
       timestamp: timestamp(),
       payload: payload as unknown as JsonObject,
     });
+    if (event.phase === "clear") this.nativeLeases.delete(leaseKey);
   }
 
   private apply(family: AppliedFamily, command: InteractionCommand, message: HarnessMessage): void {
@@ -516,6 +539,7 @@ export class ReferenceViewerWrapper implements VisualizerWrapper {
     this.nativeSubscription?.unsubscribe();
     this.nativeSubscription = undefined;
     this.applied.clear();
+    this.nativeLeases.clear();
     this.activeSpaces = [];
     this.context?.reportCoordinateSpaces([]);
     this.context = undefined;

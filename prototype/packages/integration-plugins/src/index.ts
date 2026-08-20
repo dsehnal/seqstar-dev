@@ -222,3 +222,11 @@ export const referenceViewerDiagnosticFixture: CheckedFixture = {
 export interface IntegrationPluginsPackageBoundary {
   readonly packageName: "@seq-star/integration-plugins";
 }
+
+export {
+  createRendererPortabilityPlugin,
+  type RendererPortabilityPluginOptions,
+  rendererPortabilityDocument,
+  rendererPortabilityDocumentDigest,
+  rendererPortabilitySequenceSpace,
+} from "./renderer-portability.js";

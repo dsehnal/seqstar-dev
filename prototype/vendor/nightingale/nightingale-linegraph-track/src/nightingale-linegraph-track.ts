@@ -55,6 +55,7 @@ export type LineValue = {
 };
 export type LineData = {
   name: string;
+  externalId?: string;
   range: number[];
   color?: string; // (color will be assigned if not provided. Use "none" for no line color)
   fill?: string; //Create area plot using given fill color (default "none"),
@@ -69,6 +70,7 @@ interface ChangeEventDetail {
   target: NightingaleLinegraphTrack,
   parentEvent: MouseEvent,
   highlight?: string,
+  position?: number,
 }
 
 
@@ -184,7 +186,8 @@ class NightingaleLinegraphTrack extends withManager(
     this.#chart
       .append("path")
       .attr("class", "graph")
-      .attr("id", (d) => d.name)
+      .attr("id", (d) => this.seqstarDomId(d.externalId ?? d.name))
+      .attr("data-seqstar-feature-id", (d) => d.externalId ?? d.name)
       .attr("d", (d) => {
         d.color = d.color || interpolateRainbow(Math.random());
         // eslint-disable-next-line no-param-reassign
@@ -331,12 +334,17 @@ class NightingaleLinegraphTrack extends withManager(
     const handleClick = (event: MouseEvent) => {
       const mouse = d3Mouse(event);
 
-      const seqPosition = Math.floor(
-        this.xScale?.invert(mouse[0] - this["margin-left"]) || 0,
+      const seqPosition = Math.max(
+        1,
+        Math.min(
+          this.length ?? 1,
+          Math.floor(this.xScale?.invert(mouse[0] - this["margin-left"]) || 1),
+        ),
       );
       const detail: ChangeEventDetail = {
         eventtype: "click",
         feature: undefined,
+        position: seqPosition,
         type: this.type,
         target: this,
         parentEvent: event,
@@ -361,6 +369,7 @@ class NightingaleLinegraphTrack extends withManager(
       .on("mouseout", handleMouseout)
       .on("mousemove", handleMousemove)
       .on('click', handleClick);
+    this.notifySeqstarFirstRender();
   }
 
   refresh() {

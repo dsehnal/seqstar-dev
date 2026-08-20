@@ -43,27 +43,40 @@ Affected file:
   it allows TypeScript 6 `moduleResolution: "Bundler"` to honor Lit's exports
   map instead of relying on legacy directory resolution.
 
-## Feasibility findings reserved for P30
+## P30 generic embedding surface
 
-These are not patches yet. They are concrete seams that require a reviewed
-generic solution before production wrapper behavior is implemented:
+Affected files:
+`nightingale-new-core/src/nightingale-base-element.ts`,
+`nightingale-new-core/src/utils/bindEvents.ts`,
+`nightingale-new-core/src/mixins/withResizable/index.ts`,
+`nightingale-new-core/src/mixins/withZoom/index.ts`,
+`nightingale-sequence/src/nightingale-sequence.ts`,
+`nightingale-track/src/nightingale-track.ts`,
+`nightingale-linegraph-track/src/nightingale-linegraph-track.ts`, and the three
+leaf packages' narrow public declarations under `types/`.
 
-- **Stable identities:** feature data retain `accession`, but the track creates
-  unscoped DOM IDs as `g_${accession}`. A stable externally supplied track ID
-  and collision-safe feature/item identity surface are needed.
-- **External hover and selection:** the `fixedHighlight` setter immediately
-  renders and clears an imperative interval, while click events expose
-  `selectedId`. Directly changing `highlight` decodes the region but does not
-  call `updateHighlight` until a later refresh. There is no separate owner-aware
-  imperative selection API or clear operation.
-- **Readiness:** Lit's `updateComplete` reports template completion, not a
-  generation-tagged usable D3 frame. The wrapper needs a generic post-render
-  signal carrying the request generation.
-- **Lifecycle:** resize observation and manager registration are cleaned up,
-  but the sequence component adds an anonymous `load` listener on every
-  connection and the zoom mixin does not dispose its wheel helper/D3 bindings
-  or cancel a queued animation frame on disconnect.
-- **Native events:** feature/sequence tracks publish bubbling `change` events;
-  the line graph uses a similar but differently cased `eventtype` detail. A
-  generic normalized vendored notification is preferable to library-specific
-  branching in the wrapper.
+- Added stable embedding-supplied track, layer, generation, and feature IDs.
+  DOM IDs use a collision-free Unicode code-point encoding and include the
+  feature occurrence, so repeated item IDs cannot collide while the normalized
+  event retains the stable external item identity.
+- Added one bubbling `nightingale-interaction` event that normalizes native
+  hover, selection, clear, and track activation across the selected renderers.
+  Feature/sequence clicks derive regions from the actual D3 datum even when
+  click highlighting is disabled; linegraph clicks now expose their computed
+  sequence position independently of hover/highlight configuration. An
+  unresolved click is not emitted as an empty selection.
+  A public emitter provides the same event path for deterministic embedding
+  tests and keyboard or host-driven integrations.
+- Added owner-keyed imperative `highlight` and `selection` state. Both families
+  retain every region independently, clear only the requested owner, and render
+  with distinct overlays without mutating Nightingale's existing highlight
+  state.
+- Added generation-tagged `waitForSeqstarFirstRender`. Leaf renderers signal it
+  only after their actual D3 sequence/feature/chart frame has been constructed;
+  superseded waits are abortable.
+- Made disconnect cleanup complete for the sequence load listener, resize
+  observation, wheel/D3 zoom bindings, and queued animation frames. Reconnect
+  installs one native event bridge and disposal remains idempotent.
+
+These APIs are generic visualizer embedding seams. They contain no SeqViewSpec,
+harness, application, or TP53-specific behavior.

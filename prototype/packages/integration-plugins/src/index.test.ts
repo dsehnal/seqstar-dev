@@ -10,7 +10,11 @@ import {
   createCheckedFixtureProvider,
   createCheckedFixtureProviderPlugin,
   createIdentityTranslatorPlugin,
+  createRendererPortabilityPlugin,
   referenceViewerDiagnosticFixture,
+  rendererPortabilityDocument,
+  rendererPortabilityDocumentDigest,
+  rendererPortabilitySequenceSpace,
 } from "./index.js";
 
 const context = (): {
@@ -43,6 +47,42 @@ const context = (): {
 };
 
 describe("checked fixture and translator plugins", () => {
+  it("publishes byte-equivalent P04637 documents to both renderer instances", async () => {
+    expect(rendererPortabilityDocument.sequences[0]?.residues).toHaveLength(393);
+    expect(rendererPortabilityDocument.id).toBe("uniprot-P04637-renderer-portability");
+    expect(rendererPortabilityDocumentDigest()).resolves.toMatch(/^sha256-[a-f0-9]{64}$/u);
+    const harness = context();
+    const plugin = createRendererPortabilityPlugin({
+      referenceComponent: "base-sequence",
+      nightingaleComponent: "nightingale-sequence",
+    });
+    const cleanup = plugin.setup(harness.context, {});
+    const requests = harness.messages.filter(
+      (
+        entry,
+      ): entry is {
+        readonly payload: { readonly document: unknown };
+        readonly target: { readonly component: string };
+      } =>
+        typeof entry === "object" &&
+        entry !== null &&
+        "type" in entry &&
+        entry.type === "visualization.seqviewspec.request",
+    );
+    expect(requests.map((entry) => entry.target.component)).toEqual([
+      "base-sequence",
+      "nightingale-sequence",
+    ]);
+    expect(requests[0]?.payload.document).toEqual(requests[1]?.payload.document);
+    expect(
+      harness.translators.findPaths(
+        rendererPortabilitySequenceSpace,
+        rendererPortabilitySequenceSpace,
+      ),
+    ).toEqual([{ translatorIds: [], cost: 0 }]);
+    cleanup && "dispose" in cleanup && cleanup.dispose();
+  });
+
   it("returns sorted detached immutable fixture values", () => {
     const provider = createCheckedFixtureProvider([
       { ...referenceViewerDiagnosticFixture, id: "z-fixture" },

@@ -7,6 +7,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./p01a-feasibility-spike": {
+      "types": "./dist/p01a-feasibility-spike.d.ts",
+      "default": "./dist/p01a-feasibility-spike.js"
     }
   },
   "files": [
@@ -19,6 +23,9 @@
     "@nightingale-elements/nightingale-linegraph-track": "workspace:*",
     "@nightingale-elements/nightingale-sequence": "workspace:*",
     "@nightingale-elements/nightingale-track": "workspace:*",
-    "@seq-star/harness-core": "workspace:*"
+    "@seq-star/harness-core": "workspace:*",
+    "@seq-star/seq-coords": "workspace:*",
+    "@seq-star/seq-core": "workspace:*",
+    "@seq-star/seq-view-spec": "workspace:*"
   }
 }
