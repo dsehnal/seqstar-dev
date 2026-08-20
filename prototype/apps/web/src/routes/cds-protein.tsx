@@ -52,11 +52,11 @@ const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElemen
 function Panel({ id, title }: { readonly id: string; readonly title: string }) {
   const host = useHarnessHost(id);
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+    <section className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm sm:p-4">
       <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
       <section
         aria-label={title}
-        className="mt-3 min-h-72 overflow-auto rounded border border-slate-200"
+        className="mt-3 h-[22rem] min-h-0 w-full overflow-hidden rounded border border-slate-200"
         data-testid={`${id}-host`}
         ref={host}
       />
@@ -84,7 +84,7 @@ function Content() {
     }, []),
   );
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-cds-protein">
+    <main className="mx-auto grid max-w-7xl gap-6 px-3 py-8 sm:px-6" data-testid="case-cds-protein">
       <section>
         <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">
           Case study 5 · optional stretch

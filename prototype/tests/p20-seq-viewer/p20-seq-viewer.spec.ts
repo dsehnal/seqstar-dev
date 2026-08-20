@@ -591,3 +591,45 @@ test("is DPR-aware and repeated disposal leaves no duplicate DOM", async ({ page
   expect(evidence.dpr).toBeGreaterThanOrEqual(1);
   expect(evidence.roots).toBe(0);
 });
+
+test("defers zero-sized hosts and preserves the last valid canvas through hidden observations", async ({
+  page,
+}) => {
+  await page.goto("/");
+  const evidence = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: {
+          delayedSizeEvidence(): Promise<{
+            hidden: Record<string, string | number>;
+            initialized: Record<string, string | number>;
+            preserved: Record<string, string | number>;
+            resized: Record<string, string | number>;
+          }>;
+        };
+      }
+    ).__p20.delayedSizeEvidence(),
+  );
+  expect(evidence.hidden).toMatchObject({
+    canvasWidth: "100%",
+    canvasHeight: "100%",
+    rootHeight: "",
+  });
+  expect(evidence.hidden.width).not.toBe(1);
+  expect(evidence.hidden.height).not.toBe(1);
+  expect(evidence.initialized).toMatchObject({
+    width: 640,
+    height: 280,
+    canvasWidth: "640px",
+    canvasHeight: "280px",
+    rootHeight: "280px",
+  });
+  expect(evidence.preserved).toEqual(evidence.initialized);
+  expect(evidence.resized).toMatchObject({
+    width: 480,
+    height: 240,
+    canvasWidth: "480px",
+    canvasHeight: "240px",
+    rootHeight: "240px",
+  });
+});

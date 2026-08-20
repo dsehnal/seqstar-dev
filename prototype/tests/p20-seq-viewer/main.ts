@@ -498,6 +498,44 @@ const loadTall = async () => {
   await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
   return root.scrollTop;
 };
+const delayedSizeEvidence = async () => {
+  const host = document.createElement("div");
+  host.style.width = "0";
+  host.style.height = "0";
+  document.body.append(host);
+  const delayed = createSeqViewer({ target: host });
+  await delayed.load(fixtureDocument, "view");
+  const canvas = host.querySelector<HTMLCanvasElement>("canvas");
+  const root = host.querySelector<HTMLElement>("[data-seq-viewer=root]");
+  if (!canvas || !root) throw new Error("delayed viewer missing");
+  const snapshot = () => ({
+    width: canvas.width,
+    height: canvas.height,
+    canvasWidth: canvas.style.width,
+    canvasHeight: canvas.style.height,
+    rootHeight: root.style.height,
+  });
+  const frame = () =>
+    new Promise<void>((resolve) =>
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+    );
+  const hidden = snapshot();
+  host.style.width = "640px";
+  host.style.height = "280px";
+  await frame();
+  const initialized = snapshot();
+  host.style.width = "0";
+  host.style.height = "0";
+  await frame();
+  const preserved = snapshot();
+  host.style.width = "480px";
+  host.style.height = "240px";
+  await frame();
+  const resized = snapshot();
+  delayed.dispose();
+  host.remove();
+  return { hidden, initialized, preserved, resized };
+};
 Object.assign(window, {
   __p20: {
     events,
@@ -531,5 +569,6 @@ Object.assign(window, {
     customProviderEvidence,
     throwingProviderEvidence,
     loadTall,
+    delayedSizeEvidence,
   },
 });

@@ -272,8 +272,8 @@ class CanvasSeqViewer implements SeqViewer {
   private generation = 0;
   private disposed = false;
   private frame = 0;
-  private width = 1;
-  private height = 1;
+  private width = 0;
+  private height = 0;
   private dpr = 1;
   private zoom = 1;
   private pan = 0;
@@ -295,8 +295,9 @@ class CanvasSeqViewer implements SeqViewer {
       position: "relative",
       overflow: "auto",
       width: "100%",
-      height: "100%",
-      minHeight: "120px",
+      minWidth: "0",
+      minHeight: "0",
+      boxSizing: "border-box",
       background: "#fff",
       color: "#102a43",
       font: "12px/1.2 ui-monospace, monospace",
@@ -352,7 +353,7 @@ class CanvasSeqViewer implements SeqViewer {
       passive: false,
     });
     if (typeof ResizeObserver !== "undefined") {
-      this.observer = new ResizeObserver(() => this.resize());
+      this.observer = new ResizeObserver(this.resizeObserved);
       this.observer.observe(privateOptions.target);
     } else window.addEventListener("resize", this.resize, { signal: this.abort.signal });
     for (const behavior of privateOptions.spec?.behaviors ?? [])
@@ -637,7 +638,7 @@ class CanvasSeqViewer implements SeqViewer {
     this.zoom = 1;
     this.pan = 0;
     this.root.scrollTop = 0;
-    this.spacer.style.height = `${Math.max(this.height, next.totalHeight)}px`;
+    this.syncSpacer();
     this.renderHeaders();
     this.renderNavigation();
     this.draw();
@@ -676,19 +677,44 @@ class CanvasSeqViewer implements SeqViewer {
     this.schedule();
   }
   resize = (): void => {
+    this.resizeTo(this.options.target.clientWidth, this.options.target.clientHeight);
+  };
+
+  private readonly resizeObserved = (entries: ResizeObserverEntry[]): void => {
+    const entry = entries.find((item) => item.target === this.options.target) ?? entries[0];
+    if (entry) this.resizeTo(entry.contentRect.width, entry.contentRect.height);
+    else this.resize();
+  };
+
+  private resizeTo(width: number, height: number): void {
     if (this.disposed) return;
-    const box = this.options.target.getBoundingClientRect();
-    this.width = Math.max(1, Math.floor(box.width || this.options.target.clientWidth || 800));
-    this.height = Math.max(1, Math.floor(box.height || this.options.target.clientHeight || 300));
-    this.dpr = Math.max(1, window.devicePixelRatio || 1);
+    // ResizeObserver reports 0 × 0 while a target is detached or hidden. That
+    // is not a viewer size: retain the last real canvas until the host is
+    // visible again, and let the first non-zero observation initialize it.
+    if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) return;
+    const nextWidth = Math.round(width);
+    const nextHeight = Math.round(height);
+    const nextDpr = Math.max(1, window.devicePixelRatio || 1);
+    if (nextWidth === this.width && nextHeight === this.height && nextDpr === this.dpr) return;
+    this.width = nextWidth;
+    this.height = nextHeight;
+    this.dpr = nextDpr;
+    this.root.style.height = `${this.height}px`;
     this.canvas.width = Math.round(this.width * this.dpr);
     this.canvas.height = Math.round(this.height * this.dpr);
     this.canvas.style.width = `${this.width}px`;
     this.canvas.style.height = `${this.height}px`;
-    this.spacer.style.height = `${Math.max(this.height, this.active?.totalHeight ?? 0)}px`;
+    this.syncSpacer();
     this.renderNavigation();
     this.schedule();
-  };
+  }
+
+  private syncSpacer(): void {
+    // The spacer is scrollable document content, never a measurement source for
+    // the host. In particular it must not mirror the viewer height: doing so
+    // turns a min-height host plus a 100%-sized child into a resize feedback loop.
+    this.spacer.style.height = `${Math.max(1, this.active?.totalHeight ?? 0)}px`;
+  }
 
   hitTest(clientX: number, clientY: number): SeqViewerInteraction | undefined {
     const active = this.active;
@@ -1744,7 +1770,10 @@ class CanvasSeqViewer implements SeqViewer {
   };
   private setNativeSelection(hit: SeqViewerInteraction, event: MouseEvent): void {
     const next = { ...hit, kind: "select" as const, phase: "set" as const };
-    if (this.sameNativeTarget(this.nativeSelection, next)) return;
+    if (this.sameNativeTarget(this.nativeSelection, next)) {
+      this.clearNativeSelection(event);
+      return;
+    }
     this.clearNativeSelection(event);
     this.nativeSelection = next;
     this.draw();
