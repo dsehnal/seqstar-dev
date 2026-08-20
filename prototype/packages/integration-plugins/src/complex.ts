@@ -36,16 +36,28 @@ export const barstarSequenceSpace: CoordinateSpace = Object.freeze({
   length: 90,
 });
 export const barnaseStructureSpace: CoordinateSpace = Object.freeze({
-  id: "1BRS-barnase-chain-A",
+  id: "structure-residue",
   kind: "structure-residue",
   authority: "molstar",
-  context: Object.freeze({ entry: "1BRS", entity: "1", "label-asym": "A", "auth-asym": "A" }),
+  context: Object.freeze({
+    entry: "1BRS",
+    entity: "1",
+    "label-asym": "A",
+    "auth-asym": "A",
+    numbering: "label-and-auth",
+  }),
 });
 export const barstarStructureSpace: CoordinateSpace = Object.freeze({
-  id: "1BRS-barstar-chain-D",
+  id: "structure-residue",
   kind: "structure-residue",
   authority: "molstar",
-  context: Object.freeze({ entry: "1BRS", entity: "2", "label-asym": "D", "auth-asym": "D" }),
+  context: Object.freeze({
+    entry: "1BRS",
+    entity: "2",
+    "label-asym": "D",
+    "auth-asym": "D",
+    numbering: "label-and-auth",
+  }),
 });
 
 type MappingStatus = "exact" | "exact_conflict" | "missing_coordinate" | "outside_construct";
@@ -195,9 +207,15 @@ export const parseSyntheticConfidenceTsv = (text: string): readonly SyntheticCon
 };
 
 const structurePattern = (entry: "A" | "D"): CoordinateSpacePattern => ({
+  id: "structure-residue",
   kind: "structure-residue",
   authority: "molstar",
-  context: { entry: "1BRS", "label-asym": entry, "auth-asym": entry },
+  context: {
+    entry: "1BRS",
+    entity: entry === "A" ? "1" : "2",
+    "label-asym": entry,
+    "auth-asym": entry,
+  },
 });
 const sequencePoint = (space: CoordinateSpace, position: number): CoordinateLocus => ({
   kind: "point",
@@ -232,7 +250,9 @@ export const createComplexMappingTranslators = (
   );
   const bySource = new Map(exact.map((row) => [row.sourceIndex, row]));
   const byStructure = new Map(exact.map((row) => [`${row.labelSeqId}|${row.authSeqId}`, row]));
-  const sourcePattern: CoordinateSpacePattern = { kind: "sequence" };
+  // A two-polymer document must never route through a generic sequence edge: the
+  // named source space is the identity that distinguishes barnase from barstar.
+  const sourcePattern: CoordinateSpacePattern = { id: sequence.id, kind: "sequence" };
   const targetPattern = structurePattern(accession === "P00648" ? "A" : "D");
   return Object.freeze([
     {
@@ -240,6 +260,8 @@ export const createComplexMappingTranslators = (
       source: sourcePattern,
       target: targetPattern,
       async map(request, signal) {
+        const incompatibleTarget =
+          request.target !== undefined && !coordinateSpaceMatches(targetPattern, request.target);
         const target =
           request.target !== undefined && coordinateSpaceMatches(targetPattern, request.target)
             ? request.target
@@ -248,7 +270,11 @@ export const createComplexMappingTranslators = (
           translatorIds: [this.id],
           diagnostics: [],
           associations: request.loci.map((source) => {
-            if (signal.aborted || !coordinateSpaceEquals(source.space, sequence))
+            if (
+              incompatibleTarget ||
+              signal.aborted ||
+              !coordinateSpaceEquals(source.space, sequence)
+            )
               return { source, targets: [], status: "unmapped" as const };
             const requested = positions(source);
             const mapped = requested.flatMap((position) => {
@@ -281,6 +307,8 @@ export const createComplexMappingTranslators = (
       source: targetPattern,
       target: sourcePattern,
       async map(request, signal) {
+        const incompatibleTarget =
+          request.target !== undefined && !coordinateSpaceEquals(request.target, sequence);
         const target =
           request.target !== undefined && coordinateSpaceEquals(request.target, sequence)
             ? request.target
@@ -290,6 +318,7 @@ export const createComplexMappingTranslators = (
           diagnostics: [],
           associations: request.loci.map((source) => {
             if (
+              incompatibleTarget ||
               signal.aborted ||
               !coordinateSpaceMatches(targetPattern, source.space) ||
               source.kind !== "point" ||
@@ -693,13 +722,23 @@ const compareSelectors = (left: MvsResidueSelector, right: MvsResidueSelector): 
   JSON.stringify(left).localeCompare(JSON.stringify(right));
 export interface ComplexMvsGeneration {
   readonly requestId: string;
-  readonly activation: "interface" | "contact";
+  readonly activation: ComplexMvsProfile;
   readonly relationshipId?: string;
   readonly endpointRoles: readonly {
     readonly role: "barnase" | "barstar";
     readonly selectors: readonly ReturnType<typeof selector>[];
   }[];
   readonly mappedContactIds: readonly string[];
+  /** JSON-safe evidence for the generic inspector; no MVS builder objects leak here. */
+  readonly summary: Readonly<{
+    readonly profile: ComplexMvsProfile;
+    readonly relationshipId?: string;
+    readonly endpointRoles: readonly ("barnase" | "barstar")[];
+    readonly selectorCounts: Readonly<Record<"barnase" | "barstar", number>>;
+    readonly mappedSelectors: number;
+    readonly unmappedSelectors: number;
+    readonly syntheticData: boolean;
+  }>;
   readonly document: MvsDocument;
 }
 const timestamp = <T extends MvsDocument>(document: T): T =>
@@ -710,24 +749,102 @@ const timestamp = <T extends MvsDocument>(document: T): T =>
     }),
   ) as T;
 
+export type ComplexMvsProfile =
+  | "neutral"
+  | "regions"
+  | "confidence"
+  | "interface"
+  | "contacts"
+  | "contact";
+
 type ComplexMvsOptions = Readonly<{
   contacts: readonly ComplexContact[];
   structureUrl: string;
   requestId: string;
+  /** Required only for profiles derived from frozen residue transforms. */
+  readonly barnaseMapping?: readonly ComplexMappingRow[];
+  readonly barstarMapping?: readonly ComplexMappingRow[];
+  readonly confidence?: readonly SyntheticConfidenceRow[];
 }> &
   (
-    | Readonly<{ activation: "interface"; relationshipId?: never }>
+    | Readonly<{
+        activation: "neutral" | "regions" | "confidence" | "interface" | "contacts";
+        relationshipId?: never;
+      }>
     | Readonly<{ activation: "contact"; relationshipId: string }>
   );
+
+const profileBaseColors = {
+  barnase: "#BFDBFE",
+  barstar: "#FDE68A",
+} as const;
+const roleColors = { barnase: "#2563EB", barstar: "#D97706" } as const;
+type ComplexRole = keyof typeof roleColors;
+
+const hexColor = (start: `#${string}`, end: `#${string}`, fraction: number): `#${string}` => {
+  const clamp = Math.min(1, Math.max(0, fraction));
+  const channel = (offset: number) =>
+    Math.round(
+      Number.parseInt(start.slice(offset, offset + 2), 16) +
+        (Number.parseInt(end.slice(offset, offset + 2), 16) -
+          Number.parseInt(start.slice(offset, offset + 2), 16)) *
+          clamp,
+    )
+      .toString(16)
+      .padStart(2, "0");
+  return `#${channel(1)}${channel(3)}${channel(5)}`.toUpperCase() as `#${string}`;
+};
+const mappedRows = (rows: readonly ComplexMappingRow[]): readonly ComplexMappingRow[] =>
+  rows.filter(
+    (row) =>
+      (row.status === "exact" || row.status === "exact_conflict") &&
+      row.labelSeqId !== undefined &&
+      row.authSeqId !== undefined,
+  );
+const selectorsForIndexes = (
+  role: ComplexRole,
+  rows: readonly ComplexMappingRow[],
+  indexes: readonly number[],
+): readonly MvsResidueSelector[] => {
+  const byIndex = new Map(rows.map((row) => [row.sourceIndex, row]));
+  return indexes.flatMap((index) => {
+    const row = byIndex.get(index);
+    return row === undefined ||
+      row.labelSeqId === undefined ||
+      row.authSeqId === undefined ||
+      !mappedRows([row]).length
+      ? []
+      : [selector(role, row.labelSeqId, row.authSeqId)];
+  });
+};
+const requireMappings = (options: ComplexMvsOptions) => {
+  if (options.barnaseMapping === undefined || options.barstarMapping === undefined)
+    throw new Error(`Complex MVS profile '${options.activation}' requires frozen mapping rows.`);
+  return { barnase: options.barnaseMapping, barstar: options.barstarMapping };
+};
+const group = (
+  semanticId: string,
+  color: `#${string}`,
+  selectors: readonly MvsResidueSelector[],
+): MvsCartoonStyle["residueColors"][number] => ({ semanticId, color, precedence: 1, selectors });
 
 /** Generates a complete, self-contained MVS request from frozen contacts, before any wrapper sees it. */
 export const generateComplexMvs = (options: ComplexMvsOptions): ComplexMvsGeneration => {
   const untrustedActivation = (options as { readonly activation?: unknown }).activation;
-  if (untrustedActivation !== "interface" && untrustedActivation !== "contact")
+  if (
+    untrustedActivation !== "neutral" &&
+    untrustedActivation !== "regions" &&
+    untrustedActivation !== "confidence" &&
+    untrustedActivation !== "interface" &&
+    untrustedActivation !== "contacts" &&
+    untrustedActivation !== "contact"
+  )
     throw new Error(`Unsupported complex MVS activation '${String(untrustedActivation)}'.`);
   const untrustedRelationshipId = (options as { readonly relationshipId?: unknown }).relationshipId;
-  if (options.activation === "interface" && untrustedRelationshipId !== undefined)
-    throw new Error("Interface activation must not include a relationship ID.");
+  if (options.activation !== "contact" && untrustedRelationshipId !== undefined)
+    throw new Error(
+      `${options.activation[0]?.toUpperCase()}${options.activation.slice(1)} activation must not include a relationship ID.`,
+    );
   if (
     options.activation === "contact" &&
     (typeof untrustedRelationshipId !== "string" || untrustedRelationshipId.trim().length === 0)
@@ -736,10 +853,13 @@ export const generateComplexMvs = (options: ComplexMvsOptions): ComplexMvsGenera
   const relationshipId =
     options.activation === "contact" ? (untrustedRelationshipId as string) : undefined;
   const selected =
-    relationshipId === undefined
+    options.activation === "interface" || options.activation === "contacts"
       ? options.contacts
-      : options.contacts.filter((contact) => contact.id === relationshipId);
-  if (selected.length === 0) throw new Error(`Unknown frozen contact '${relationshipId ?? ""}'.`);
+      : relationshipId === undefined
+        ? []
+        : options.contacts.filter((contact) => contact.id === relationshipId);
+  if (relationshipId !== undefined && selected.length === 0)
+    throw new Error(`Unknown frozen contact '${relationshipId}'.`);
   const barnase = [
     ...new Map(
       selected.map((contact) => [
@@ -756,6 +876,103 @@ export const generateComplexMvs = (options: ComplexMvsOptions): ComplexMvsGenera
       ]),
     ).values(),
   ].sort(compareSelectors);
+  const mappings =
+    options.activation === "regions" || options.activation === "confidence"
+      ? requireMappings(options)
+      : undefined;
+  const residueColors: Record<ComplexRole, MvsCartoonStyle["residueColors"]> = {
+    barnase: [],
+    barstar: [],
+  };
+  let unmappedSelectors = 0;
+  if (options.activation === "regions") {
+    const barnaseMature = selectorsForIndexes(
+      "barnase",
+      mappings?.barnase ?? [],
+      Array.from({ length: 110 }, (_, index) => index + 47),
+    );
+    const barstarMature = selectorsForIndexes(
+      "barstar",
+      mappings?.barstar ?? [],
+      Array.from({ length: 89 }, (_, index) => index + 1),
+    );
+    residueColors.barnase = [group("barnase-mature-chain", "#2563EB", barnaseMature)];
+    residueColors.barstar = [group("barstar-mature-chain", "#D97706", barstarMature)];
+    unmappedSelectors = 199 - barnaseMature.length - barstarMature.length;
+  } else if (options.activation === "confidence") {
+    if (options.confidence === undefined)
+      throw new Error("Complex MVS confidence profile requires frozen confidence rows.");
+    const mappingBySource = {
+      barnase: new Map((mappings?.barnase ?? []).map((row) => [row.sourceIndex, row])),
+      barstar: new Map((mappings?.barstar ?? []).map((row) => [row.sourceIndex, row])),
+    };
+    for (const role of ["barnase", "barstar"] as const) {
+      const start = role === "barnase" ? "#DBEAFE" : "#FDE68A";
+      const end = role === "barnase" ? "#1D4ED8" : "#B45309";
+      const groups = new Map<string, MvsResidueSelector[]>();
+      for (const confidence of options.confidence.filter((row) => row.polymerId === role)) {
+        const mapped = mappingBySource[role].get(confidence.sourceIndex);
+        if (
+          mapped === undefined ||
+          mapped.labelSeqId === undefined ||
+          mapped.authSeqId === undefined
+        ) {
+          unmappedSelectors++;
+          continue;
+        }
+        const color = hexColor(start, end, (confidence.score - 70) / 30);
+        const entries = groups.get(color) ?? [];
+        entries.push(selector(role, mapped.labelSeqId, mapped.authSeqId));
+        groups.set(color, entries);
+      }
+      residueColors[role] = [...groups.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([color, selectors]) =>
+          group(`${role}-confidence-${color.slice(1)}`, color as `#${string}`, selectors),
+        );
+    }
+  } else if (options.activation === "interface" || options.activation === "contact") {
+    residueColors.barnase = [group("barnase-interface-endpoints", roleColors.barnase, barnase)];
+    residueColors.barstar = [group("barstar-interface-endpoints", roleColors.barstar, barstar)];
+  } else if (options.activation === "contacts") {
+    const minDistance = new Map<string, number>();
+    for (const contact of options.contacts) {
+      const entries: readonly [ComplexRole, MvsResidueSelector][] = [
+        ["barnase", selector("barnase", contact.barnaseLabelSeqId, contact.barnaseAuthSeqId)],
+        ["barstar", selector("barstar", contact.barstarLabelSeqId, contact.barstarAuthSeqId)],
+      ];
+      for (const [role, currentSelector] of entries) {
+        const key = `${role}:${JSON.stringify(currentSelector)}`;
+        minDistance.set(key, Math.min(minDistance.get(key) ?? Infinity, contact.distance));
+      }
+    }
+    for (const role of ["barnase", "barstar"] as const) {
+      const groups = new Map<string, MvsResidueSelector[]>();
+      for (const [key, distance] of minDistance) {
+        if (!key.startsWith(`${role}:`)) continue;
+        const currentSelector = JSON.parse(key.slice(role.length + 1)) as MvsResidueSelector;
+        const color = hexColor("#94A3B8", "#7C3AED", distance / 4.5);
+        const entries = groups.get(color) ?? [];
+        entries.push(currentSelector);
+        groups.set(color, entries);
+      }
+      residueColors[role] = [...groups.entries()]
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([color, selectors]) =>
+          group(
+            `${role}-minimum-contact-distance-${color.slice(1)}`,
+            color as `#${string}`,
+            selectors,
+          ),
+        );
+    }
+  }
+  const profileSelectors = (role: ComplexRole): readonly MvsResidueSelector[] =>
+    options.activation === "regions" || options.activation === "confidence"
+      ? residueColors[role].flatMap((item) => item.selectors)
+      : role === "barnase"
+        ? barnase
+        : barstar;
   const builder = MVSData.createBuilder();
   builder.canvas({ background_color: "white" });
   const structure = builder
@@ -765,62 +982,78 @@ export const generateComplexMvs = (options: ComplexMvsOptions): ComplexMvsGenera
   const styles: readonly MvsCartoonStyle[] = [
     {
       componentSelector: { label_entity_id: "1", label_asym_id: "A", auth_asym_id: "A" },
-      baseColor: "#BFDBFE",
-      residueColors: [
-        {
-          semanticId: "barnase-interface-endpoints",
-          color: "#2563EB",
-          precedence: 1,
-          selectors: barnase,
-        },
-      ],
-      atomicDetails: [
-        {
-          semanticId:
-            options.activation === "contact"
-              ? "barnase-contact-endpoint"
-              : "barnase-interface-residues",
-          color: "#2563EB",
-          selectors: barnase,
-        },
-      ],
+      baseColor: profileBaseColors.barnase,
+      residueColors: residueColors.barnase,
+      ...(options.activation === "interface" || options.activation === "contact"
+        ? {
+            atomicDetails: [
+              {
+                semanticId:
+                  options.activation === "contact"
+                    ? "barnase-contact-endpoint"
+                    : "barnase-interface-residues",
+                color: roleColors.barnase,
+                selectors: barnase,
+              },
+            ],
+          }
+        : {}),
     },
     {
       componentSelector: { label_entity_id: "2", label_asym_id: "D", auth_asym_id: "D" },
-      baseColor: "#FDE68A",
-      residueColors: [
-        {
-          semanticId: "barstar-interface-endpoints",
-          color: "#D97706",
-          precedence: 1,
-          selectors: barstar,
-        },
-      ],
-      atomicDetails: [
-        {
-          semanticId:
-            options.activation === "contact"
-              ? "barstar-contact-endpoint"
-              : "barstar-interface-residues",
-          color: "#D97706",
-          selectors: barstar,
-        },
-      ],
+      baseColor: profileBaseColors.barstar,
+      residueColors: residueColors.barstar,
+      ...(options.activation === "interface" || options.activation === "contact"
+        ? {
+            atomicDetails: [
+              {
+                semanticId:
+                  options.activation === "contact"
+                    ? "barstar-contact-endpoint"
+                    : "barstar-interface-residues",
+                color: roleColors.barstar,
+                selectors: barstar,
+              },
+            ],
+          }
+        : {}),
     },
   ];
   appendMvsCartoonPresentation(structure, styles);
+  // Contacts retain one atomic union per polymer role. Their detail colors are
+  // selector-scoped on that union, so a residue's minimum frozen distance is
+  // visible without exploding into one representation per residue.
+  if (options.activation === "contacts") {
+    for (const role of ["barnase", "barstar"] as const) {
+      const atomic = structure
+        .component({
+          selector: profileSelectors(role).map((currentSelector) => ({ ...currentSelector })),
+        })
+        .representation({ type: "ball_and_stick" })
+        .color({ color: profileBaseColors[role] });
+      for (const colorGroup of residueColors[role])
+        atomic.color({
+          color: colorGroup.color,
+          selector: [...colorGroup.selectors]
+            .sort(compareSelectors)
+            .map((currentSelector) => ({ ...currentSelector })),
+        });
+    }
+  }
   if (options.activation === "contact")
     structure.component({ selector: [...barnase, ...barstar] }).focus();
   const document = timestamp(
     builder.getState({
       title:
         relationshipId === undefined
-          ? "1BRS interface endpoints"
+          ? `1BRS ${options.activation}`
           : `1BRS contact ${relationshipId}`,
       description:
         options.activation === "contact"
           ? `Two role-colored cartoons with bounded ball-and-stick atomic detail for both endpoints of contact ${relationshipId} and a union focus.`
-          : "Two role-colored cartoons with all mapped interface residues recolored and shown as bounded ball-and-stick overlays.",
+          : options.activation === "interface"
+            ? "Two role-colored cartoons with all mapped interface residues recolored and shown as bounded ball-and-stick overlays."
+            : `Two chain-colored cartoons for the 1BRS ${options.activation} profile.`,
       description_format: "plaintext",
     }),
   );
@@ -831,10 +1064,26 @@ export const generateComplexMvs = (options: ComplexMvsOptions): ComplexMvsGenera
     activation: options.activation,
     ...(relationshipId === undefined ? {} : { relationshipId }),
     endpointRoles: Object.freeze([
-      { role: "barnase" as const, selectors: Object.freeze(barnase) },
-      { role: "barstar" as const, selectors: Object.freeze(barstar) },
+      { role: "barnase" as const, selectors: Object.freeze(profileSelectors("barnase")) },
+      { role: "barstar" as const, selectors: Object.freeze(profileSelectors("barstar")) },
     ]),
     mappedContactIds: Object.freeze(selected.map((contact) => contact.id)),
+    summary: Object.freeze({
+      profile: options.activation,
+      ...(relationshipId === undefined ? {} : { relationshipId }),
+      endpointRoles: Object.freeze(["barnase", "barstar"] as const),
+      selectorCounts: Object.freeze({
+        barnase: profileSelectors("barnase").length,
+        barstar: profileSelectors("barstar").length,
+      }),
+      mappedSelectors: profileSelectors("barnase").length + profileSelectors("barstar").length,
+      unmappedSelectors,
+      syntheticData:
+        options.activation === "confidence" ||
+        options.activation === "contacts" ||
+        options.activation === "contact" ||
+        options.activation === "interface",
+    }),
     document,
   });
 };
@@ -856,9 +1105,24 @@ const schema = <T>(check: (value: unknown) => value is T) => ({
   schema: VisualizationRequestSchema,
   check,
 });
+const isComplexMvsProfile = (value: unknown): value is ComplexMvsProfile =>
+  value === "neutral" ||
+  value === "regions" ||
+  value === "confidence" ||
+  value === "interface" ||
+  value === "contacts" ||
+  value === "contact";
 const generationSchema = schema<ComplexMvsGeneration>(
   (value): value is ComplexMvsGeneration =>
-    isRecord(value) && typeof value.requestId === "string" && isRecord(value.document),
+    isRecord(value) &&
+    typeof value.requestId === "string" &&
+    isComplexMvsProfile(value.activation) &&
+    isRecord(value.document) &&
+    isRecord(value.summary) &&
+    value.summary.profile === value.activation &&
+    (value.activation === "contact"
+      ? typeof value.relationshipId === "string" && typeof value.summary.relationshipId === "string"
+      : value.relationshipId === undefined && value.summary.relationshipId === undefined),
 );
 const message = (
   type: string,
@@ -916,10 +1180,11 @@ export const createComplexPlugin = (options: ComplexPluginOptions): HarnessPlugi
     const barnaseRows = parseComplexMappingTsv(options.barnaseMappingTsv);
     const barstarRows = parseComplexMappingTsv(options.barstarMappingTsv);
     const contacts = parseComplexContactsTsv(options.contactsTsv);
+    const confidence = parseSyntheticConfidenceTsv(options.confidenceTsv);
     const document = createComplexSeqViewSpec({
       barnaseResidues: options.barnaseResidues,
       barstarResidues: options.barstarResidues,
-      confidence: parseSyntheticConfidenceTsv(options.confidenceTsv),
+      confidence,
       contacts,
     });
     const translators = [
@@ -932,6 +1197,8 @@ export const createComplexPlugin = (options: ComplexPluginOptions): HarnessPlugi
     context.messageSchemas.register("document.generated.mvs", "0.1.0", generationSchema);
     let sequenceAccepted = false;
     let generation = 0;
+    let visibleMvsRequestId: string | undefined;
+    let disposed = false;
     let relationshipLease: ComplexRelationshipLease | undefined;
     const relationshipAnnotation = document.annotations?.find(
       (annotation) => annotation.id === "barnase-barstar-contacts",
@@ -1031,6 +1298,7 @@ export const createComplexPlugin = (options: ComplexPluginOptions): HarnessPlugi
             componentId?: string;
             requestId?: string;
             status?: string;
+            visibleRequestId?: string;
           };
           if (
             payload.componentId === options.sequenceComponent &&
@@ -1044,13 +1312,17 @@ export const createComplexPlugin = (options: ComplexPluginOptions): HarnessPlugi
           if (
             payload.componentId === options.structureComponent &&
             currentLease !== undefined &&
+            incoming.correlationId === currentLease.correlationId &&
             payload.requestId === currentLease.requestId &&
+            visibleMvsRequestId === currentLease.requestId &&
+            payload.visibleRequestId === currentLease.requestId &&
             (payload.status === "rendered" || payload.status === "degraded")
           )
             await applyRelationship(currentLease, incoming.id, processorContext, signal);
           if (
             payload.componentId === options.structureComponent &&
             currentLease !== undefined &&
+            incoming.correlationId === currentLease.correlationId &&
             payload.requestId === currentLease.requestId &&
             (payload.status === "failed" || payload.status === "superseded")
           ) {
@@ -1077,32 +1349,48 @@ export const createComplexPlugin = (options: ComplexPluginOptions): HarnessPlugi
           !sequenceAccepted
         )
           return;
-        const isTrack =
-          event.interaction === "track-activate" &&
-          (event.origin.trackId === "interface" || event.origin.trackId === "contacts");
+        const headerProfiles: Readonly<Record<string, ComplexMvsProfile>> = {
+          sequences: "neutral",
+          "polymer-regions": "regions",
+          "synthetic-confidence": "confidence",
+          interface: "interface",
+          contacts: "contacts",
+        };
+        const profile =
+          event.interaction === "track-activate" && event.origin.trackId !== undefined
+            ? headerProfiles[event.origin.trackId]
+            : undefined;
         const rawRelationshipId =
           event.semanticTarget?.relationshipId ??
           (event.semanticTarget?.annotationId === "barnase-barstar-contacts"
             ? event.semanticTarget.itemId
             : undefined);
-        const relationshipId = rawRelationshipId?.replace(/^contact-/u, "");
-        const isContact =
-          (event.interaction === "select" || event.interaction === "focus") &&
-          relationshipId !== undefined;
-        if (!isTrack && !isContact) return;
+        // Hover/focus is intentionally transient; C20 maps its mixed-space loci
+        // directly and this plugin must never replace the static MVS for it.
+        const relationshipId =
+          event.interaction === "select" ? rawRelationshipId?.replace(/^contact-/u, "") : undefined;
+        const isContact = relationshipId !== undefined;
+        if (profile === undefined && !isContact) return;
         if (relationshipLease !== undefined) {
           clearRelationship(relationshipLease, incoming.id);
           relationshipLease = undefined;
         }
         const current = ++generation;
-        const requestId = `P50-${relationshipId === undefined ? "interface" : relationshipId}-${current}`;
+        const activation: Exclude<ComplexMvsProfile, "contact"> = profile as Exclude<
+          ComplexMvsProfile,
+          "contact"
+        >;
+        const requestId = `P50-${activation}${relationshipId === undefined ? "" : `-${relationshipId}`}-${current}`;
         const generated =
           relationshipId === undefined
             ? generateComplexMvs({
                 contacts,
                 structureUrl: options.structureUrl,
                 requestId,
-                activation: "interface",
+                activation,
+                barnaseMapping: barnaseRows,
+                barstarMapping: barstarRows,
+                confidence,
               })
             : generateComplexMvs({
                 contacts,
@@ -1110,8 +1398,12 @@ export const createComplexPlugin = (options: ComplexPluginOptions): HarnessPlugi
                 requestId,
                 activation: "contact",
                 relationshipId,
+                barnaseMapping: barnaseRows,
+                barstarMapping: barstarRows,
+                confidence,
               });
-        if (current !== generation) return;
+        if (disposed || current !== generation) return;
+        visibleMvsRequestId = generated.requestId;
         processorContext.fabric.publish(
           message("document.generated.mvs", generated, incoming.correlationId, incoming.id),
         );
@@ -1172,11 +1464,41 @@ export const createComplexPlugin = (options: ComplexPluginOptions): HarnessPlugi
         options.sequenceComponent,
       ),
     );
+    // Publish a complete neutral structure request immediately after the initial
+    // sequence request. It does not wait for user interaction or a sequence
+    // lifecycle acknowledgement, so the page opens with both documents pending.
+    const initialMvs = generateComplexMvs({
+      contacts,
+      structureUrl: options.structureUrl,
+      requestId: "P50-neutral-initial",
+      activation: "neutral",
+      barnaseMapping: barnaseRows,
+      barstarMapping: barstarRows,
+      confidence,
+    });
+    visibleMvsRequestId = initialMvs.requestId;
+    context.fabric.publish(message("document.generated.mvs", initialMvs, correlationId));
+    context.fabric.publish(
+      message(
+        "visualization.mvs.request",
+        {
+          format: "mvs",
+          requestId: initialMvs.requestId,
+          mode: "replace",
+          document: initialMvs.document,
+        },
+        correlationId,
+        undefined,
+        options.structureComponent,
+      ),
+    );
     return {
       dispose() {
+        disposed = true;
         if (relationshipLease !== undefined)
           clearRelationship(relationshipLease, relationshipLease.sourceMessageId);
         relationshipLease = undefined;
+        visibleMvsRequestId = undefined;
         generation += 1;
       },
     };

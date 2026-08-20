@@ -4,6 +4,7 @@ import {
   type HarnessMessage,
 } from "@seq-star/harness-core";
 import type { CoordinateLocus } from "@seq-star/seq-coords";
+import { evaluateColorEncoding } from "@seq-star/seq-view-spec";
 import { MVSData } from "molstar/lib/extensions/mvs/index.js";
 import { describe, expect, it } from "vitest";
 import confidenceText from "../../../fixtures/complex/expected/synthetic-confidence.tsv?raw";
@@ -34,6 +35,29 @@ const barnaseRows = parseComplexMappingTsv(barnaseText);
 const barstarRows = parseComplexMappingTsv(barstarText);
 const contacts = parseComplexContactsTsv(contactsText);
 const confidence = parseSyntheticConfidenceTsv(confidenceText);
+
+const selectorKey = (selector: Readonly<Record<string, unknown>>): string =>
+  [
+    selector.label_entity_id,
+    selector.label_asym_id,
+    selector.auth_asym_id,
+    selector.label_seq_id,
+    selector.auth_seq_id,
+  ].join("|");
+const selectorColors = (
+  document: Parameters<typeof queryMvsTree>[0],
+): ReadonlyMap<string, string> =>
+  new Map(
+    queryMvsTree(document, "color").flatMap((node) => {
+      const params = node.params as
+        | { readonly color?: string; readonly selector?: readonly Record<string, unknown>[] }
+        | undefined;
+      const color = params?.color;
+      return color === undefined || params?.selector === undefined
+        ? []
+        : params.selector.map((selector) => [selectorKey(selector), color] as const);
+    }),
+  );
 
 describe("P50 frozen 1BRS complex integration", () => {
   it("uses the approved transforms exactly, including missing coordinates and verified construct conflicts", () => {
@@ -85,7 +109,83 @@ describe("P50 frozen 1BRS complex integration", () => {
   it("maps only registered named polymer/chain pairs and preserves missing and conflict semantics", async () => {
     const [barnaseForward, barnaseReverse] = createComplexMappingTranslators(barnaseRows);
     const [barstarForward, barstarReverse] = createComplexMappingTranslators(barstarRows);
+    expect(barnaseForward.source).toEqual({ id: barnaseSequenceSpace.id, kind: "sequence" });
+    expect(barstarForward.source).toEqual({ id: barstarSequenceSpace.id, kind: "sequence" });
+    expect(barnaseForward.target).toEqual({
+      id: "structure-residue",
+      kind: "structure-residue",
+      authority: "molstar",
+      context: { entry: "1BRS", entity: "1", "label-asym": "A", "auth-asym": "A" },
+    });
+    expect(barstarForward.target).toEqual({
+      id: "structure-residue",
+      kind: "structure-residue",
+      authority: "molstar",
+      context: { entry: "1BRS", entity: "2", "label-asym": "D", "auth-asym": "D" },
+    });
+    expect(barnaseReverse.target).toEqual({ id: barnaseSequenceSpace.id, kind: "sequence" });
+    expect(barstarReverse.target).toEqual({ id: barstarSequenceSpace.id, kind: "sequence" });
     const signal = new AbortController().signal;
+    const dynamicBarnaseStructure = {
+      ...barnaseStructureSpace,
+      context: {
+        ...barnaseStructureSpace.context,
+        structure: "1brs-assembly-1",
+        model: "1",
+        "model-index": "0",
+        "model-number": "1",
+        unit: "42",
+        operator: "1_555",
+        instance: "A-1",
+      },
+    } as const;
+    const barnasePoint: CoordinateLocus = {
+      kind: "point",
+      space: barnaseSequenceSpace,
+      position: { kind: "index", value: 73 },
+    };
+    const dynamicForward = await barnaseForward.map(
+      { loci: [barnasePoint], target: dynamicBarnaseStructure },
+      signal,
+    );
+    expect(dynamicForward.associations[0]).toMatchObject({
+      status: "exact",
+      targets: [
+        {
+          space: dynamicBarnaseStructure,
+          position: { kind: "label", value: "label:27|auth:27" },
+        },
+      ],
+    });
+    expect(
+      await barnaseReverse.map(
+        { loci: dynamicForward.associations[0]?.targets ?? [], target: barnaseSequenceSpace },
+        signal,
+      ),
+    ).toMatchObject({ associations: [{ status: "exact" }] });
+    for (const incompatibleTarget of [
+      barstarStructureSpace,
+      { ...dynamicBarnaseStructure, id: "other-structure-residue" },
+      {
+        ...dynamicBarnaseStructure,
+        context: { ...dynamicBarnaseStructure.context, entity: "2" },
+      },
+      {
+        ...dynamicBarnaseStructure,
+        context: { ...dynamicBarnaseStructure.context, "label-asym": "D", "auth-asym": "D" },
+      },
+    ]) {
+      const rejected = await barnaseForward.map(
+        { loci: [barnasePoint], target: incompatibleTarget },
+        signal,
+      );
+      expect(rejected.associations[0]).toMatchObject({ status: "unmapped", targets: [] });
+    }
+    const reverseWrongTarget = await barnaseReverse.map(
+      { loci: dynamicForward.associations[0]?.targets ?? [], target: barstarSequenceSpace },
+      signal,
+    );
+    expect(reverseWrongTarget.associations[0]).toMatchObject({ status: "unmapped", targets: [] });
     const barnase = await barnaseForward.map(
       {
         loci: [{ kind: "interval", space: barnaseSequenceSpace, start: 47, end: 51 }],
@@ -362,6 +462,147 @@ describe("P50 frozen 1BRS complex integration", () => {
     );
   });
 
+  it("builds all six frozen profiles with bounded geometry, exact mapped counts, and stable colors", () => {
+    const common = {
+      contacts,
+      structureUrl: "/fixtures/1BRS.cif",
+      barnaseMapping: barnaseRows,
+      barstarMapping: barstarRows,
+      confidence,
+    } as const;
+    const neutral = generateComplexMvs({ ...common, requestId: "neutral", activation: "neutral" });
+    const regions = generateComplexMvs({ ...common, requestId: "regions", activation: "regions" });
+    const confidenceProfile = generateComplexMvs({
+      ...common,
+      requestId: "confidence",
+      activation: "confidence",
+    });
+    const contactsProfile = generateComplexMvs({
+      ...common,
+      requestId: "contacts",
+      activation: "contacts",
+    });
+    const oneContact = generateComplexMvs({
+      ...common,
+      requestId: "contact",
+      activation: "contact",
+      relationshipId: "1brs-A-D-001",
+    });
+    for (const profile of [neutral, regions, confidenceProfile, contactsProfile, oneContact])
+      expect(MVSData.validationIssues(profile.document, { noExtra: true })).toBeUndefined();
+    expect(countMvsRepresentationTypes(neutral.document)).toEqual({ cartoon: 2 });
+    expect(countMvsTreeNodes(neutral.document)).toMatchObject({ component: 2, representation: 2 });
+    expect(queryMvsTree(neutral.document, "focus")).toHaveLength(0);
+    expect(neutral.summary).toMatchObject({
+      profile: "neutral",
+      selectorCounts: { barnase: 0, barstar: 0 },
+      mappedSelectors: 0,
+      unmappedSelectors: 0,
+      syntheticData: false,
+    });
+    expect(queryMvsTree(neutral.document, "color").map((node) => node.params)).toEqual([
+      { color: "#BFDBFE" },
+      { color: "#FDE68A" },
+    ]);
+    for (const profile of [regions, confidenceProfile]) {
+      expect(countMvsRepresentationTypes(profile.document)).toEqual({ cartoon: 2 });
+      expect(queryMvsTree(profile.document, "focus")).toHaveLength(0);
+      expect(profile.summary).toMatchObject({ mappedSelectors: 195, unmappedSelectors: 4 });
+      expect(profile.endpointRoles.map((endpoint) => endpoint.selectors.length)).toEqual([108, 87]);
+    }
+    expect(regions.summary.profile).toBe("regions");
+    expect(confidenceProfile.summary).toMatchObject({ profile: "confidence", syntheticData: true });
+    const confidenceColors = selectorColors(confidenceProfile.document);
+    for (const row of confidence) {
+      const mapping = (row.polymerId === "barnase" ? barnaseRows : barstarRows)[row.sourceIndex];
+      if (mapping?.labelSeqId === undefined || mapping.authSeqId === undefined) continue;
+      const role = row.polymerId;
+      const expected = evaluateColorEncoding(
+        {
+          kind: "continuous",
+          field: "value",
+          domain: [70, 100],
+          range: role === "barnase" ? ["#DBEAFE", "#1D4ED8"] : ["#FDE68A", "#B45309"],
+          clamp: true,
+          missing: "#000000",
+        },
+        row.score,
+      );
+      expect(
+        confidenceColors.get(
+          selectorKey({
+            label_entity_id: role === "barnase" ? "1" : "2",
+            label_asym_id: role === "barnase" ? "A" : "D",
+            auth_asym_id: role === "barnase" ? "A" : "D",
+            label_seq_id: mapping.labelSeqId,
+            auth_seq_id: mapping.authSeqId,
+          }),
+        ),
+      ).toBe(expected);
+    }
+    expect(countMvsRepresentationTypes(contactsProfile.document)).toEqual({
+      ball_and_stick: 2,
+      cartoon: 2,
+    });
+    expect(contactsProfile.mappedContactIds).toEqual(contacts.map((contact) => contact.id));
+    expect(contactsProfile.summary.selectorCounts).toEqual({ barnase: 19, barstar: 16 });
+    expect(contactsProfile.endpointRoles.map((endpoint) => endpoint.selectors.length)).toEqual([
+      19, 16,
+    ]);
+    const contactColors = selectorColors(contactsProfile.document);
+    for (const endpoint of contactsProfile.endpointRoles) {
+      for (const endpointSelector of endpoint.selectors) {
+        const minimumDistance = Math.min(
+          ...contacts
+            .filter((contact) =>
+              endpoint.role === "barnase"
+                ? contact.barnaseLabelSeqId === endpointSelector.label_seq_id &&
+                  contact.barnaseAuthSeqId === endpointSelector.auth_seq_id
+                : contact.barstarLabelSeqId === endpointSelector.label_seq_id &&
+                  contact.barstarAuthSeqId === endpointSelector.auth_seq_id,
+            )
+            .map((contact) => contact.distance),
+        );
+        expect(contactColors.get(selectorKey(endpointSelector))).toBe(
+          evaluateColorEncoding(
+            {
+              kind: "continuous",
+              field: "value",
+              domain: [0, 4.5],
+              range: ["#94A3B8", "#7C3AED"],
+              clamp: true,
+              missing: "#000000",
+            },
+            minimumDistance,
+          ),
+        );
+      }
+    }
+    expect(queryMvsTree(contactsProfile.document, "focus")).toHaveLength(0);
+    expect(oneContact.summary).toMatchObject({
+      profile: "contact",
+      relationshipId: "1brs-A-D-001",
+      selectorCounts: { barnase: 1, barstar: 1 },
+    });
+    expect(countMvsRepresentationTypes(oneContact.document)).toEqual({
+      ball_and_stick: 2,
+      cartoon: 2,
+    });
+    expect(queryMvsTree(oneContact.document, "focus")).toHaveLength(1);
+    const reordered = generateComplexMvs({
+      ...common,
+      contacts: [...contacts].reverse(),
+      barnaseMapping: [...barnaseRows].reverse(),
+      barstarMapping: [...barstarRows].reverse(),
+      confidence: [...confidence].reverse(),
+      requestId: "contacts-reordered",
+      activation: "contacts",
+    });
+    expect(JSON.stringify(queryMvsTree(contactsProfile.document))).toBe(
+      JSON.stringify(queryMvsTree(reordered.document)),
+    );
+  });
+
   it("publishes each inspectable complete document before its targeted MVS request in replacement order", async () => {
     const factory = (type: string, capabilities: readonly string[]): ComponentFactory => ({
       type,
@@ -426,6 +667,30 @@ describe("P50 frozen 1BRS complex integration", () => {
     const observed: HarnessMessage[] = [];
     harness.fabric.observe().subscribe((item) => observed.push(item));
     await harness.start();
+    const startupSequence = observed.find(
+      (item) =>
+        item.type === "visualization.seqviewspec.request" &&
+        (item.payload as { requestId?: string }).requestId === "P50-sequence-initial",
+    );
+    const startupGenerated = observed.find(
+      (item) =>
+        item.type === "document.generated.mvs" &&
+        (item.payload as unknown as ComplexMvsGeneration).activation === "neutral",
+    );
+    const startupMvs = observed.find(
+      (item) =>
+        item.type === "visualization.mvs.request" &&
+        (item.payload as { requestId?: string }).requestId === "P50-neutral-initial",
+    );
+    expect(startupSequence).toBeDefined();
+    expect(startupGenerated).toBeDefined();
+    expect(startupMvs).toBeDefined();
+    expect(observed.indexOf(startupSequence as HarnessMessage)).toBeLessThan(
+      observed.indexOf(startupGenerated as HarnessMessage),
+    );
+    expect(observed.indexOf(startupGenerated as HarnessMessage)).toBeLessThan(
+      observed.indexOf(startupMvs as HarnessMessage),
+    );
     const publish = (type: string, payload: unknown, correlationId = crypto.randomUUID()) =>
       harness.fabric.publish({
         id: crypto.randomUUID(),
@@ -443,7 +708,45 @@ describe("P50 frozen 1BRS complex integration", () => {
       status: "accepted",
       diagnostics: [],
     });
-    const activate = (trackId: "interface" | "contacts") => {
+    const hoverCorrelation = crypto.randomUUID();
+    publish(
+      "interaction.native",
+      {
+        interactionId: crypto.randomUUID(),
+        interaction: "focus",
+        phase: "set",
+        origin: {
+          componentId: "sequence",
+          documentId: "complex-1BRS-barnase-barstar",
+          viewId: "complex-1BRS-main",
+          trackId: "contacts",
+          layerId: "contact-links",
+        },
+        semanticTarget: {
+          annotationId: "barnase-barstar-contacts",
+          itemId: "contact-1brs-A-D-001",
+          endpointRole: "barnase",
+          locusIndex: 0,
+        },
+        loci: [
+          {
+            kind: "point",
+            space: barnaseSequenceSpace,
+            position: { kind: "index", value: 73 },
+          },
+        ],
+      },
+      hoverCorrelation,
+    );
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(
+      observed.filter(
+        (item) => item.correlationId === hoverCorrelation && item.type === "document.generated.mvs",
+      ),
+    ).toHaveLength(0);
+    const activate = (
+      trackId: "sequences" | "polymer-regions" | "synthetic-confidence" | "interface" | "contacts",
+    ) => {
       const correlationId = crypto.randomUUID();
       publish(
         "interaction.native",
@@ -462,23 +765,34 @@ describe("P50 frozen 1BRS complex integration", () => {
         correlationId,
       );
     };
+    activate("sequences");
+    activate("polymer-regions");
+    activate("synthetic-confidence");
     activate("interface");
     activate("contacts");
     await new Promise((resolve) => setTimeout(resolve, 40));
-    const generated = observed.filter((item) => item.type === "document.generated.mvs");
+    const generated = observed.filter(
+      (item) => item.type === "document.generated.mvs" && item !== startupGenerated,
+    );
     const requests = observed.filter(
       (item) =>
+        item !== startupMvs &&
         item.type === "visualization.mvs.request" &&
-        (item.payload as { requestId?: string }).requestId?.startsWith("P50-interface-"),
+        /^(P50-neutral-|P50-regions-|P50-confidence-|P50-interface-|P50-contacts-)/u.test(
+          (item.payload as { requestId?: string }).requestId ?? "",
+        ),
     );
-    expect(generated).toHaveLength(2);
-    expect(requests).toHaveLength(2);
-    const latest = generated[1];
-    const latestRequest = requests[1];
+    expect(generated).toHaveLength(5);
+    expect(requests).toHaveLength(5);
+    expect(
+      generated.map((item) => (item.payload as unknown as ComplexMvsGeneration).activation),
+    ).toEqual(["neutral", "regions", "confidence", "interface", "contacts"]);
+    const latest = generated[4];
+    const latestRequest = requests[4];
     if (latest === undefined || latestRequest === undefined)
       throw new Error("Expected generated MVS messages.");
     expect((latest.payload as unknown as ComplexMvsGeneration).requestId).toContain(
-      "P50-interface-2",
+      "P50-contacts-5",
     );
     expect(observed.indexOf(latest)).toBeLessThan(observed.indexOf(latestRequest));
     expect((latestRequest.payload as { requestId?: string }).requestId).toBe(
