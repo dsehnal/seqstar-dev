@@ -556,3 +556,121 @@ describe("inspect panel safety", () => {
     expect(prepareInspectDownload(document, stale)).toBeUndefined();
   });
 });
+
+describe("inspect panel generic generated-document binding", () => {
+  const genericSequence = () =>
+    request(1200, "seqviewspec", "complex-sequence", "complex-doc", 1199);
+  const genericGeneration = (index = 1203, options: { readonly sourcePlugin?: string } = {}) =>
+    message(
+      index,
+      "document.generated.mvs",
+      {
+        requestId: "complex-profile",
+        activation: "contact",
+        relationshipId: "43",
+        endpointRoles: [
+          { role: "barnase", selectors: [{ label_asym_id: "A" }] },
+          { role: "barstar", selectors: [{ label_asym_id: "D" }] },
+        ],
+        mappedContactIds: ["43"],
+      },
+      { correlation: 1201, causation: 1202, sourcePlugin: options.sourcePlugin ?? "datasets" },
+    );
+  const genericRequest = (index = 1204) => ({
+    ...request(index, "mvs", "complex-profile", "complex-mvs", 1201),
+    causationId: id(1202),
+  });
+
+  it("binds a catalog-free profile only to the matching lifecycle-confirmed MVS", () => {
+    const sequence = genericSequence();
+    const generated = genericGeneration();
+    const mvs = genericRequest();
+    let state = rendered(emptyInspectPanelState(), sequence, "sequence", 1201);
+    state = reduce(state, generated, mvs);
+    expect(state.generation).toBeUndefined();
+    expect(state.boundGeneration).toMatchObject({ generation: { profile: "contact" } });
+    state = reduce(
+      state,
+      lifecycle(1205, mvs, "structure", "accepted"),
+      lifecycle(1206, mvs, "structure", "rendered", {
+        generation: 1205,
+        visibleRequestId: "complex-profile",
+      }),
+    );
+    expect(state.structureDocument?.identity).toBe(mvs.id);
+    expect(state.generation).toMatchObject({
+      requestId: "complex-profile",
+      profile: "contact",
+      relationshipId: "43",
+      mappedContactCount: 1,
+      endpointRoles: [
+        { role: "barnase", selectorCount: 1 },
+        { role: "barstar", selectorCount: 1 },
+      ],
+    });
+  });
+
+  it("rejects forged generations and lifecycle envelopes without replacing the visible document", () => {
+    const sequence = genericSequence();
+    const generated = genericGeneration();
+    const mvs = genericRequest();
+    let state = rendered(emptyInspectPanelState(), sequence, "sequence", 1201);
+    state = reduce(state, genericGeneration(1207, { sourcePlugin: "forged" }), mvs);
+    expect(state.boundGeneration).toBeUndefined();
+    state = reduce(state, generated);
+    const forgedLifecycle = message(
+      1208,
+      "lifecycle.visualization",
+      {
+        requestId: "complex-profile",
+        generation: 1208,
+        componentId: "structure",
+        status: "rendered",
+        visibleRequestId: "complex-profile",
+      },
+      { correlation: 1201, causation: 1204, sourcePlugin: "forged" },
+    );
+    state = reduce(state, forgedLifecycle);
+    expect(state.structureDocument).toBeUndefined();
+    expect(state.generation).toBeUndefined();
+  });
+
+  it("does not cross-bind a reused request ID with a different envelope", () => {
+    const sequence = genericSequence();
+    const generated = genericGeneration();
+    const reused = {
+      ...request(1210, "mvs", "complex-profile", "different-mvs", 1211),
+      causationId: id(1212),
+    };
+    let state = rendered(emptyInspectPanelState(), sequence, "sequence", 1201);
+    state = reduce(state, generated, reused);
+    expect(state.boundGeneration).toBeUndefined();
+    state = reduce(
+      state,
+      lifecycle(1213, reused, "structure", "accepted"),
+      lifecycle(1214, reused, "structure", "rendered", {
+        generation: 1213,
+        visibleRequestId: "complex-profile",
+      }),
+    );
+    expect(state.structureDocument?.identity).toBe(reused.id);
+    expect(state.generation).toBeUndefined();
+  });
+
+  it("drops a late generic generation after its matching request was superseded", () => {
+    const sequence = genericSequence();
+    const mvs = genericRequest();
+    let state = rendered(emptyInspectPanelState(), sequence, "sequence", 1201);
+    state = reduce(
+      state,
+      mvs,
+      lifecycle(1215, mvs, "structure", "accepted"),
+      lifecycle(1216, mvs, "structure", "superseded", { generation: 1215 }),
+      genericGeneration(1217),
+    );
+    expect(state.pendingStructureDocument).toBeUndefined();
+    expect(state.boundGeneration).toBeUndefined();
+    expect(state.unboundGenerations).toHaveLength(0);
+    expect(state.generation).toBeUndefined();
+  });
+});

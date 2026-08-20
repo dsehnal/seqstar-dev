@@ -214,16 +214,28 @@ export function InspectPanel({ state }: { readonly state: InspectPanelState }) {
         role="tabpanel"
       >
         <div data-testid="inspect-dataset-summary">
-          <h3 className="font-semibold">Dataset and request lifecycle</h3>
-          <p className="mt-1 text-slate-300 text-sm">
-            {activeDataset?.label ?? "Waiting for dataset catalog"} ·{" "}
-            {state.datasetStatus?.status ?? "pending"}
-          </p>
-          <p className="text-slate-400 text-xs">
-            generation {state.datasetStatus?.generation ?? "—"} · sequence{" "}
-            {state.datasetStatus?.sequenceRequestId ?? "—"} · structure{" "}
-            {state.datasetStatus?.structureRequestId ?? "—"}
-          </p>
+          {state.catalog === undefined ? (
+            <>
+              <h3 className="font-semibold">Generic request lifecycle</h3>
+              <p className="mt-1 text-slate-300 text-sm" data-testid="inspect-generic-summary">
+                No dataset catalog published. Documents below are shown only after their target
+                wrapper confirms them visible.
+              </p>
+            </>
+          ) : (
+            <>
+              <h3 className="font-semibold">Dataset and request lifecycle</h3>
+              <p className="mt-1 text-slate-300 text-sm">
+                {activeDataset?.label ?? "Waiting for dataset catalog"} ·{" "}
+                {state.datasetStatus?.status ?? "pending"}
+              </p>
+              <p className="text-slate-400 text-xs">
+                generation {state.datasetStatus?.generation ?? "—"} · sequence{" "}
+                {state.datasetStatus?.sequenceRequestId ?? "—"} · structure{" "}
+                {state.datasetStatus?.structureRequestId ?? "—"}
+              </p>
+            </>
+          )}
         </div>
         <div>
           <h3 className="font-semibold">Current displayed documents</h3>
@@ -250,25 +262,58 @@ export function InspectPanel({ state }: { readonly state: InspectPanelState }) {
           <h3 className="font-semibold">Current mapping summary</h3>
           {state.generation === undefined ? (
             <p className="mt-1 text-slate-300 text-sm">
-              Neutral structure view; activate a track for mapped detail.
+              {state.catalog === undefined
+                ? "No lifecycle-bound generated profile is visible."
+                : "Neutral structure view; activate a track for mapped detail."}
             </p>
           ) : (
             <>
-              <p className="mt-1 text-slate-300 text-sm" data-testid="inspect-mapping-counts">
-                mapped {state.generation.counts.mapped} · partial {state.generation.counts.partial}{" "}
-                · ambiguous {state.generation.counts.ambiguous} · unmapped{" "}
-                {state.generation.counts.unmapped}
-              </p>
-              <ul
-                className="mt-2 grid gap-1 text-slate-300 text-xs"
-                data-testid="inspect-mapping-items"
-              >
-                {state.generation.mapping.map((item) => (
-                  <li key={item.itemId}>
-                    {item.itemId}: {item.status} · {item.selectors.length} residues · {item.color}
-                  </li>
-                ))}
-              </ul>
+              {state.generation.profile === undefined &&
+              state.generation.relationshipId === undefined &&
+              state.generation.endpointRoles === undefined ? null : (
+                <p className="mt-1 text-slate-300 text-sm" data-testid="inspect-profile-summary">
+                  {state.generation.profile === undefined
+                    ? "Generated profile"
+                    : `Profile ${state.generation.profile}`}
+                  {state.generation.relationshipId === undefined
+                    ? ""
+                    : ` · relationship ${state.generation.relationshipId}`}
+                  {state.generation.mappedContactCount === undefined
+                    ? ""
+                    : ` · ${state.generation.mappedContactCount} contacts`}
+                </p>
+              )}
+              {state.generation.endpointRoles === undefined ? null : (
+                <ul
+                  className="mt-2 grid gap-1 text-slate-300 text-xs"
+                  data-testid="inspect-endpoint-summary"
+                >
+                  {state.generation.endpointRoles.map((endpoint) => (
+                    <li key={endpoint.role}>
+                      {endpoint.role}: {endpoint.selectorCount} selectors
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {state.generation.counts === undefined ? null : (
+                <p className="mt-1 text-slate-300 text-sm" data-testid="inspect-mapping-counts">
+                  mapped {state.generation.counts.mapped} · partial{" "}
+                  {state.generation.counts.partial} · ambiguous {state.generation.counts.ambiguous}{" "}
+                  · unmapped {state.generation.counts.unmapped}
+                </p>
+              )}
+              {state.generation.mapping === undefined ? null : (
+                <ul
+                  className="mt-2 grid gap-1 text-slate-300 text-xs"
+                  data-testid="inspect-mapping-items"
+                >
+                  {state.generation.mapping.map((item) => (
+                    <li key={item.itemId}>
+                      {item.itemId}: {item.status} · {item.selectors.length} residues · {item.color}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </>
           )}
         </div>

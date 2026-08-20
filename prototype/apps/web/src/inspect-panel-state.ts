@@ -42,13 +42,22 @@ export type InspectDatasetStatus = {
 };
 
 export type InspectGeneration = {
-  readonly documentId: string;
-  readonly viewId: string;
-  readonly trackId: string;
-  readonly layerId: string;
   readonly requestId: string;
-  readonly counts: Readonly<Record<"mapped" | "partial" | "ambiguous" | "unmapped", number>>;
-  readonly mapping: readonly {
+  /** Dataset generators supply these; generic generators may omit them. */
+  readonly documentId?: string;
+  readonly viewId?: string;
+  readonly trackId?: string;
+  readonly layerId?: string;
+  /** A generic generator may call this either `profile` or `activation`. */
+  readonly profile?: string;
+  readonly relationshipId?: string;
+  readonly endpointRoles?: readonly {
+    readonly role: string;
+    readonly selectorCount: number;
+  }[];
+  readonly mappedContactCount?: number;
+  readonly counts?: Readonly<Record<"mapped" | "partial" | "ambiguous" | "unmapped", number>>;
+  readonly mapping?: readonly {
     readonly itemId: string;
     readonly status: string;
     readonly selectors: readonly unknown[];
@@ -114,6 +123,82 @@ const record = (value: unknown): Record<string, unknown> | undefined =>
   value !== null && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
     : undefined;
+
+const nonemptyString = (value: unknown): string | undefined =>
+  typeof value === "string" && value.length > 0 ? value : undefined;
+
+const nonnegativeInteger = (value: unknown): number | undefined =>
+  typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+
+const generationFrom = (value: unknown): InspectGeneration | undefined => {
+  const payload = record(value);
+  const requestId = nonemptyString(payload?.requestId);
+  if (requestId === undefined) return undefined;
+  const countsRecord = record(payload?.counts);
+  const counts =
+    countsRecord === undefined
+      ? undefined
+      : {
+          mapped: nonnegativeInteger(countsRecord.mapped),
+          partial: nonnegativeInteger(countsRecord.partial),
+          ambiguous: nonnegativeInteger(countsRecord.ambiguous),
+          unmapped: nonnegativeInteger(countsRecord.unmapped),
+        };
+  const completeCounts =
+    counts === undefined || Object.values(counts).some((count) => count === undefined)
+      ? undefined
+      : (counts as Readonly<Record<"mapped" | "partial" | "ambiguous" | "unmapped", number>>);
+  const mapping = Array.isArray(payload?.mapping)
+    ? payload.mapping
+        .flatMap((entry) => {
+          const item = record(entry);
+          const itemId = nonemptyString(item?.itemId);
+          const status = nonemptyString(item?.status);
+          const color = nonemptyString(item?.color);
+          return itemId === undefined ||
+            status === undefined ||
+            color === undefined ||
+            !Array.isArray(item?.selectors)
+            ? []
+            : [{ itemId, status, color, selectors: item.selectors }];
+        })
+        .slice(-100)
+    : undefined;
+  const endpointRoles = Array.isArray(payload?.endpointRoles)
+    ? payload.endpointRoles
+        .flatMap((entry) => {
+          const endpoint = record(entry);
+          const role = nonemptyString(endpoint?.role);
+          const selectorCount = Array.isArray(endpoint?.selectors)
+            ? endpoint.selectors.length
+            : nonnegativeInteger(endpoint?.selectorCount);
+          return role === undefined || selectorCount === undefined ? [] : [{ role, selectorCount }];
+        })
+        .slice(-16)
+    : undefined;
+  const profile = nonemptyString(payload?.profile) ?? nonemptyString(payload?.activation);
+  const documentId = nonemptyString(payload?.documentId);
+  const viewId = nonemptyString(payload?.viewId);
+  const trackId = nonemptyString(payload?.trackId);
+  const layerId = nonemptyString(payload?.layerId);
+  const relationshipId = nonemptyString(payload?.relationshipId);
+  const mappedContactCount = Array.isArray(payload?.mappedContactIds)
+    ? payload.mappedContactIds.length
+    : nonnegativeInteger(payload?.mappedContactCount);
+  return {
+    requestId,
+    ...(documentId === undefined ? {} : { documentId }),
+    ...(viewId === undefined ? {} : { viewId }),
+    ...(trackId === undefined ? {} : { trackId }),
+    ...(layerId === undefined ? {} : { layerId }),
+    ...(profile === undefined ? {} : { profile }),
+    ...(relationshipId === undefined ? {} : { relationshipId }),
+    ...(endpointRoles === undefined ? {} : { endpointRoles }),
+    ...(mappedContactCount === undefined ? {} : { mappedContactCount }),
+    ...(completeCounts === undefined ? {} : { counts: completeCounts }),
+    ...(mapping === undefined ? {} : { mapping }),
+  };
+};
 
 const targetComponent = (message: HarnessMessage): string | undefined =>
   message.target !== undefined && "component" in message.target
@@ -195,6 +280,12 @@ const requestBindingKey = (request: InspectRequestBinding): string =>
     request.source.plugin ?? "",
   ].join("\u0000");
 
+const hasObservedStructureRequest = (
+  history: readonly InspectRequestBinding[],
+  candidate: InspectGenerationCandidate,
+): boolean =>
+  history.some((request) => generationCandidateKey(candidate) === requestBindingKey(request));
+
 const upsertUnboundGeneration = (
   values: readonly InspectGenerationCandidate[],
   incoming: InspectGenerationCandidate,
@@ -213,11 +304,23 @@ const generationBelongsToActiveDataset = (
 ): boolean => {
   const sequence = state.sequenceDocument;
   const sequenceDocumentId = record(sequence?.document)?.id;
+  if (
+    sequence === undefined ||
+    sequence.lifecycle === "requested" ||
+    !sameSource(sequence.source, source)
+  )
+    return false;
+  if (state.catalog === undefined) {
+    return (
+      (generation.documentId === undefined || generation.documentId === sequenceDocumentId) &&
+      (generation.viewId === undefined || generation.viewId === sequence.viewId)
+    );
+  }
   const active = state.catalog?.datasets.find(
     (dataset) => dataset.id === state.datasetStatus?.datasetId,
   );
   return (
-    sequence !== undefined &&
+    active !== undefined &&
     state.catalogSource !== undefined &&
     sameSource(state.catalogSource, source) &&
     sequenceDocumentId === generation.documentId &&
@@ -232,9 +335,13 @@ const lifecycleMatchesCandidate = (
   payload: Record<string, unknown>,
   candidate: InspectDocument | undefined,
 ): candidate is InspectDocument => {
-  if (candidate === undefined || payload.requestId !== candidate.requestId) return false;
-  if (message.causationId !== undefined) return message.causationId === candidate.identity;
-  return message.correlationId === candidate.correlationId;
+  return (
+    candidate !== undefined &&
+    payload.requestId === candidate.requestId &&
+    message.source.component === candidate.targetComponent &&
+    message.correlationId === candidate.correlationId &&
+    message.causationId === candidate.identity
+  );
 };
 
 type LifecycleReduction = {
@@ -369,8 +476,11 @@ export const reduceInspectPanelMessage = (
     }
   }
   if (message.type === "document.generated.mvs") {
-    const generation = message.payload as unknown as InspectGeneration;
-    if (generationBelongsToActiveDataset(next, generation, message.source)) {
+    const generation = generationFrom(message.payload);
+    if (
+      generation !== undefined &&
+      generationBelongsToActiveDataset(next, generation, message.source)
+    ) {
       const candidate: InspectGenerationCandidate = {
         generation,
         identity: message.id,
@@ -381,18 +491,26 @@ export const reduceInspectPanelMessage = (
       const matchesCurrent =
         next.pendingStructureDocument !== undefined &&
         generationMatchesRequest(candidate, next.pendingStructureDocument);
-      next = matchesCurrent
-        ? {
-            ...next,
-            boundGeneration: candidate,
-            unboundGenerations: next.unboundGenerations.filter(
-              (item) => generationCandidateKey(item) !== generationCandidateKey(candidate),
-            ),
-          }
-        : {
-            ...next,
-            unboundGenerations: upsertUnboundGeneration(next.unboundGenerations, candidate),
-          };
+      // Catalog-driven UniProt keeps its reviewed out-of-order behavior. Generic profiles reject
+      // a late generation for an already-retired request before it can bind a reused request ID.
+      const retiredGenericCandidate =
+        next.catalog === undefined &&
+        !matchesCurrent &&
+        hasObservedStructureRequest(next.structureRequestHistory, candidate);
+      next = retiredGenericCandidate
+        ? next
+        : matchesCurrent
+          ? {
+              ...next,
+              boundGeneration: candidate,
+              unboundGenerations: next.unboundGenerations.filter(
+                (item) => generationCandidateKey(item) !== generationCandidateKey(candidate),
+              ),
+            }
+          : {
+              ...next,
+              unboundGenerations: upsertUnboundGeneration(next.unboundGenerations, candidate),
+            };
     }
   }
   if (message.type === "lifecycle.visualization") {
