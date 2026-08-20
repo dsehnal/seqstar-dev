@@ -230,3 +230,16 @@ export {
   rendererPortabilityDocumentDigest,
   rendererPortabilitySequenceSpace,
 } from "./renderer-portability.js";
+export {
+  createNeutral1TupMvs,
+  createP04637MappingTranslators,
+  createUniProtStructurePlugin,
+  createUniProtStructureSeqViewSpec,
+  generateUniProtAnnotationMvs,
+  type P04637MappingRow,
+  p53StructureSpace,
+  parseP04637MappingTsv,
+  type UniProtMvsGeneration,
+  type UniProtStructurePluginOptions,
+  uniprotSequenceSpace,
+} from "./uniprot-structure.js";
