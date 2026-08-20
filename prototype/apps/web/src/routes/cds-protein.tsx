@@ -15,6 +15,7 @@ import {
   type RendererMode,
   rendererSearch,
 } from "../components/case-renderer-chooser";
+import { VisualizationCard } from "../components/presentation";
 
 const nucleotideComponent = "cds-nucleotide-view";
 const proteinComponent = "cds-protein-view";
@@ -70,15 +71,14 @@ const createPageHarness = (
 function Panel({ id, title }: { readonly id: string; readonly title: string }) {
   const host = useHarnessHost(id);
   return (
-    <section className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm sm:p-4">
-      <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
+    <VisualizationCard className="visualization-card--flush" title={title}>
       <section
         aria-label={title}
-        className="mt-3 h-[22rem] min-h-0 w-full overflow-hidden rounded border border-slate-200"
+        className="viewer-host cds-viewer-host"
         data-testid={`${id}-host`}
         ref={host}
       />
-    </section>
+    </VisualizationCard>
   );
 }
 function Content({
@@ -108,11 +108,9 @@ function Content({
     }, []),
   );
   return (
-    <main className="mx-auto grid max-w-7xl gap-6 px-3 py-8 sm:px-6" data-testid="case-cds-protein">
+    <main className="mx-auto grid max-w-7xl gap-5 px-3 py-6 sm:px-6" data-testid="case-cds-protein">
       <section>
-        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">
-          Case study 5 · optional stretch
-        </p>
+        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study 5</p>
         <h1 className="mt-2 font-bold text-3xl text-slate-950">Nucleotide to protein CDS</h1>
         <p className="mt-3 max-w-4xl text-lg text-slate-600">
           Two independent Seq* viewers exchange named coordinate loci only through the harness. A
@@ -129,10 +127,7 @@ function Content({
       >
         {() => null}
       </CaseRendererChooser>
-      <section
-        className="rounded border border-sky-200 bg-sky-50 p-3 text-sm text-slate-700"
-        data-testid="p70-coordinate-convention"
-      >
+      <section className="status-card status-card--info" data-testid="p70-coordinate-convention">
         CDS: nucleotide [3, 21), strand +, phase 0; protein offset 0. Hover a nucleotide or protein
         letter; select an interval to report partial-codon edges.
       </section>

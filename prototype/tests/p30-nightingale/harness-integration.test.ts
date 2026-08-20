@@ -8,6 +8,28 @@ import {
 import type { CoordinateLocus } from "@seq-star/seq-coords";
 import { digestSeqViewSpec, type SeqViewSpec } from "@seq-star/seq-view-spec";
 import type { SeqViewer, SeqViewerInteraction } from "@seq-star/seq-viewer";
+import { describe, expect, it, vi } from "vitest";
+
+vi.hoisted(() => {
+  const elements = new Map<string, CustomElementConstructor>();
+  class TestResizeObserver {
+    observe(): void {}
+    disconnect(): void {}
+  }
+  Object.assign(globalThis, {
+    ResizeObserver: TestResizeObserver,
+    customElements: {
+      define(name: string, elementClass: CustomElementConstructor): void {
+        elements.set(name, elementClass);
+      },
+      get(name: string): CustomElementConstructor | undefined {
+        return elements.get(name);
+      },
+    },
+    window: globalThis,
+  });
+});
+
 import {
   type NightingaleIdentity,
   type NightingaleLoadResult,
@@ -16,7 +38,6 @@ import {
   NightingaleWrapper,
 } from "@seq-star/wrapper-nightingale";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
-import { describe, expect, it } from "vitest";
 
 const referenceId = "reference";
 const nightingaleId = "nightingale";

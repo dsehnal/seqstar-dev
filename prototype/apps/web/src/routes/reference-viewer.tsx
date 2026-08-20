@@ -12,7 +12,9 @@ import {
 } from "@seq-star/integration-plugins";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
+import { Eraser, Send } from "lucide-react";
 import { useCallback, useState } from "react";
+import { VisualizationCard } from "../components/presentation";
 
 const fixtures = createCheckedFixtureProvider([referenceViewerDiagnosticFixture]);
 
@@ -162,70 +164,71 @@ function ReferenceViewerContent() {
   };
   return (
     <main className="mx-auto grid max-w-6xl gap-6 px-6 py-8">
-      <section>
-        <p className="font-medium text-sky-700 text-sm">P22 diagnostic route</p>
-        <h1 className="mt-1 font-semibold text-3xl text-slate-950">Seq* reference viewer</h1>
-        <p className="mt-3 max-w-3xl text-slate-600">
+      <section className="page-intro">
+        <p className="page-intro__eyebrow">Reference sequence viewer lab</p>
+        <h1 className="page-intro__title">Reference sequence viewer</h1>
+        <p className="page-intro__description">
           This deliberately small, offline route exercises one page-scoped harness and one wrapper.
           Hover or select residues, then use the checked relationship row to inspect all endpoint
           loci. The navigation band emits its serializable viewport descriptor; external controls
           target this one owner only.
         </p>
       </section>
-      <section className="grid gap-3 rounded-lg border border-sky-200 bg-sky-50 p-5">
-        <div>
-          <h2 className="font-semibold text-slate-950 text-lg">Targeted external owner command</h2>
-          <p className="mt-1 text-slate-600 text-sm">
+      <VisualizationCard
+        className="visualization-card--flush"
+        title="Targeted external owner command"
+        description="Publish typed highlight commands to this viewer without creating native events or synchronizing another visualizer."
+      >
+        <div className="p-4">
+          <p className="sr-only">
             These diagnostics publish typed highlight commands directly to this single viewer. They
             do not create native events or synchronize another visualizer.
           </p>
-        </div>
-        <div className="flex flex-wrap gap-3">
-          <button
-            className="rounded bg-sky-700 px-3 py-2 font-medium text-sm text-white"
-            data-testid="reference-viewer-apply-external"
-            onClick={applyExternalHighlight}
-            type="button"
+          <div className="flex flex-wrap gap-3">
+            <button
+              className="icon-button-with-label"
+              data-testid="reference-viewer-apply-external"
+              onClick={applyExternalHighlight}
+              type="button"
+            >
+              <Send aria-hidden="true" size={15} />
+              Apply external highlight
+            </button>
+            <button
+              className="icon-button-with-label"
+              data-testid="reference-viewer-clear-external"
+              disabled={externalOwner === undefined}
+              onClick={clearExternalHighlight}
+              type="button"
+            >
+              <Eraser aria-hidden="true" size={15} />
+              Clear external highlight
+            </button>
+          </div>
+          <output
+            className="font-mono text-xs text-slate-700"
+            data-testid="reference-viewer-external"
           >
-            Apply external highlight
-          </button>
-          <button
-            className="rounded border border-sky-700 px-3 py-2 font-medium text-sky-900 text-sm disabled:opacity-50"
-            data-testid="reference-viewer-clear-external"
-            disabled={externalOwner === undefined}
-            onClick={clearExternalHighlight}
-            type="button"
-          >
-            Clear external highlight
-          </button>
+            {externalOwner === undefined ? "no external owner active" : "external owner active"}
+          </output>
         </div>
-        <output
-          className="font-mono text-xs text-slate-700"
-          data-testid="reference-viewer-external"
-        >
-          {externalOwner === undefined ? "no external owner active" : "external owner active"}
-        </output>
-      </section>
-      <section
-        aria-labelledby="reference-viewer-heading"
-        className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
+      </VisualizationCard>
+      <VisualizationCard
+        className="visualization-card--flush"
+        title="Reference viewer"
+        description="Interact with residues, relationship endpoints, and the shared navigation viewport."
         data-testid="visualizer-panel-reference-viewer-diagnostic"
       >
-        <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold text-slate-950 text-xl" id="reference-viewer-heading">
-            Reference viewer
-          </h2>
-        </div>
         <section
           aria-label="Seq* reference viewer canvas"
-          className="mt-4 h-72 overflow-hidden rounded border border-slate-200"
+          className="viewer-host reference-diagnostic-host"
           data-testid="reference-viewer-host"
           ref={hostRef}
         />
         <p className="mt-3 text-slate-600 text-sm" data-testid="reference-viewer-harness-status">
           Harness: {status}
         </p>
-      </section>
+      </VisualizationCard>
       <section
         aria-labelledby="reference-native-diagnostics-heading"
         className="grid gap-3 rounded-lg bg-slate-950 p-5 text-slate-100"

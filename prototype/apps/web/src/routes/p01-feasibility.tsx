@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { CheckCircle2, Play, RefreshCw, Send } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import "molstar/build/viewer/molstar.css";
 import type { MolstarSpikeViewer, NativeResidueEvent } from "@seq-star/wrapper-molstar";
@@ -18,6 +19,7 @@ import {
   mountNightingaleFeasibilitySpike,
   type NightingaleFeasibilitySpike,
 } from "@seq-star/wrapper-nightingale/p01a-feasibility-spike";
+import { IconButton, VisualizationCard } from "../components/presentation";
 
 export const Route = createFileRoute("/p01-feasibility")({ component: P01FeasibilityPage });
 
@@ -185,53 +187,72 @@ function P01FeasibilityPage() {
       className="mx-auto grid min-w-0 max-w-6xl gap-8 px-6 py-10"
       data-testid="p01-feasibility-page"
     >
-      <section>
-        <p className="font-semibold text-sky-700 text-sm uppercase tracking-[0.16em]">P01 gate</p>
-        <h1 className="mt-2 font-bold text-3xl text-slate-950">Offline renderer feasibility</h1>
+      <section className="page-intro">
+        <p className="page-intro__eyebrow">Compatibility lab</p>
+        <h1 className="page-intro__title">Offline renderer compatibility</h1>
+        <p className="page-intro__description">
+          Small, offline probes for renderer output and Mol* interaction-stream/locus normalization.
+        </p>
       </section>
-      <section className="min-w-0 rounded border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold text-xl text-slate-900">
-          Nightingale renderer-output feasibility
-        </h2>
-        <output
-          className="mt-3 block max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950 p-3 font-mono text-slate-100 text-xs"
-          data-session={session}
-          data-source="workspace-local"
-          data-status={nightingaleStatus}
-          data-testid="p01a-status"
-        >
-          {nightingaleText || nightingaleStatus}
-        </output>
-        <button onClick={proveNightingale} type="button">
-          Prove Nightingale highlight
-        </button>
-        <div className="mt-4 min-w-0 max-w-full overflow-x-auto" ref={nightingaleTarget} />
-      </section>
-      <section className="min-w-0 rounded border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="font-semibold text-xl text-slate-900">
-          Mol* interaction-stream/locus normalization feasibility
-        </h2>
-        <output
-          className="mt-3 block max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950 p-3 font-mono text-slate-100 text-xs"
-          data-session={session}
-          data-source="synthetic-data-uri"
-          data-status={molstarStatus}
-          data-testid="p01b-status"
-        >
-          {molstarText || molstarStatus}
-        </output>
-        <button onClick={proveExternal} type="button">
-          Prove external Mol* commands
-        </button>
-        <div
-          className="relative mt-4 h-[420px] min-w-0 max-w-full overflow-hidden rounded border border-slate-200"
-          data-testid="p01b-canvas-host"
-          ref={molstarTarget}
-        />
-      </section>
-      <button onClick={disposeAndRemount} type="button">
-        Dispose and remount feasibility probes
-      </button>
+      <VisualizationCard
+        className="visualization-card--flush"
+        title="Nightingale renderer output"
+        description="A bounded local probe for feature highlighting and renderer output."
+      >
+        <div className="p-4">
+          <output
+            className="mt-3 block max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950 p-3 font-mono text-slate-100 text-xs"
+            data-session={session}
+            data-source="workspace-local"
+            data-status={nightingaleStatus}
+            data-testid="p01a-status"
+          >
+            {nightingaleText || nightingaleStatus}
+          </output>
+          <div className="compact-toolbar mt-3">
+            <button className="icon-button-with-label" onClick={proveNightingale} type="button">
+              <Play aria-hidden="true" size={15} />
+              <span>Prove Nightingale highlight</span>
+            </button>
+            <span className="status-card__body" data-status={nightingaleStatus}>
+              {nightingaleStatus === "ready" ? <CheckCircle2 aria-hidden="true" size={15} /> : null}
+              {nightingaleStatus}
+            </span>
+          </div>
+          <div className="mt-4 min-w-0 max-w-full overflow-x-auto" ref={nightingaleTarget} />
+        </div>
+      </VisualizationCard>
+      <VisualizationCard
+        className="visualization-card--flush"
+        title="Mol* interaction-stream and locus normalization"
+        description="A bounded local probe for native interaction events and external locus commands."
+      >
+        <div className="p-4">
+          <output
+            className="mt-3 block max-h-48 overflow-auto whitespace-pre-wrap break-words rounded bg-slate-950 p-3 font-mono text-slate-100 text-xs"
+            data-session={session}
+            data-source="synthetic-data-uri"
+            data-status={molstarStatus}
+            data-testid="p01b-status"
+          >
+            {molstarText || molstarStatus}
+          </output>
+          <div className="compact-toolbar mt-3">
+            <button className="icon-button-with-label" onClick={proveExternal} type="button">
+              <Send aria-hidden="true" size={15} />
+              <span>Prove external Mol* commands</span>
+            </button>
+          </div>
+          <div
+            className="relative mt-4 h-[420px] min-w-0 max-w-full overflow-hidden rounded border border-slate-200"
+            data-testid="p01b-canvas-host"
+            ref={molstarTarget}
+          />
+        </div>
+      </VisualizationCard>
+      <IconButton label="Dispose and remount feasibility probes" onClick={disposeAndRemount}>
+        <RefreshCw aria-hidden="true" size={16} />
+      </IconButton>
     </main>
   );
 }

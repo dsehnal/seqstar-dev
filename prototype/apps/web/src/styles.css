@@ -249,6 +249,41 @@ select {
   overflow: auto;
   background: rgba(255, 255, 255, 0.32);
 }
+.cds-viewer-host {
+  /* Keep both Seq* roots inside a fixed M10-sized box during renderer swaps. */
+  height: 22rem;
+  min-height: 22rem;
+  max-height: 22rem;
+  overflow: hidden;
+}
+.reference-diagnostic-host {
+  height: 18rem;
+  min-height: 18rem;
+  max-height: 18rem;
+  overflow: hidden;
+}
+.icon-button-with-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--shell-line-strong);
+  border-radius: 7px;
+  color: var(--shell-accent-strong);
+  background: rgba(255, 255, 255, 0.72);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 650;
+}
+.icon-button-with-label:hover {
+  border-color: rgba(39, 103, 156, 0.6);
+  background: #ffffff;
+}
+.icon-button-with-label:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
 .viewer-note {
   margin: 0;
   padding: 8px 14px 12px;

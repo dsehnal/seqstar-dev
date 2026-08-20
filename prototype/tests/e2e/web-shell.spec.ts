@@ -12,14 +12,14 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
     "aria-current",
     "page",
   );
-  await expect(page.getByTestId("visualizer-panel-reference-viewer")).toBeVisible();
+  await expect(page.getByTestId("visualizer-panel-base-sequence")).toBeVisible();
   await expect(page.getByTestId("visualizer-panel-nightingale")).toBeVisible();
 
   await page.getByRole("link", { name: "Protein complex" }).focus();
   await expect(page.getByRole("link", { name: "Protein complex" })).toBeFocused();
 
   await page.setViewportSize({ width: 480, height: 900 });
-  await expect(page.getByTestId("visualizer-panel-reference-viewer")).toBeVisible();
+  await expect(page.getByTestId("visualizer-panel-base-sequence")).toBeVisible();
   await expect(page.getByTestId("visualizer-panel-nightingale")).toBeVisible();
 });
 

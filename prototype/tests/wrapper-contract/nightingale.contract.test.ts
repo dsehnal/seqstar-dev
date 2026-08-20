@@ -2,11 +2,23 @@ import type { CoordinateLocus } from "@seq-star/seq-coords";
 import { describe, expect, it, vi } from "vitest";
 
 vi.hoisted(() => {
+  const elements = new Map<string, CustomElementConstructor>();
   class TestResizeObserver {
     observe(): void {}
     disconnect(): void {}
   }
-  Object.assign(globalThis, { ResizeObserver: TestResizeObserver });
+  Object.assign(globalThis, {
+    ResizeObserver: TestResizeObserver,
+    customElements: {
+      define(name: string, elementClass: CustomElementConstructor): void {
+        elements.set(name, elementClass);
+      },
+      get(name: string): CustomElementConstructor | undefined {
+        return elements.get(name);
+      },
+    },
+    window: globalThis,
+  });
 });
 
 import {

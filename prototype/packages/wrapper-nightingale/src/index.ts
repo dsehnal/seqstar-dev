@@ -1,3 +1,6 @@
+import NightingaleLinegraphTrack from "@nightingale-elements/nightingale-linegraph-track";
+import NightingaleSequence from "@nightingale-elements/nightingale-sequence";
+import NightingaleTrack from "@nightingale-elements/nightingale-track";
 import {
   type Capability,
   type ComponentContext,
@@ -87,13 +90,18 @@ const capabilities = Object.freeze([
   "seqstar:nightingale/fallback-links-endpoints",
 ] satisfies readonly Capability[]);
 
-let registrations: Promise<void> | undefined;
-const registerNightingaleElements = (): Promise<void> =>
-  (registrations ??= Promise.all([
-    import("@nightingale-elements/nightingale-linegraph-track"),
-    import("@nightingale-elements/nightingale-sequence"),
-    import("@nightingale-elements/nightingale-track"),
-  ]).then(() => undefined));
+// The vendor packages declare `sideEffects: false` even though module evaluation registers
+// their custom elements. Retain the exported classes in this runtime readiness check so a
+// production bundler cannot prune the eager registrations.
+const registeredElementClasses = Object.freeze([
+  NightingaleLinegraphTrack,
+  NightingaleSequence,
+  NightingaleTrack,
+]);
+const registerNightingaleElements = async (): Promise<void> => {
+  if (registeredElementClasses.some((elementClass) => typeof elementClass !== "function"))
+    throw new Error("Nightingale custom-element registration failed.");
+};
 
 const newId = (): string => globalThis.crypto.randomUUID();
 const now = (): string => new Date().toISOString();

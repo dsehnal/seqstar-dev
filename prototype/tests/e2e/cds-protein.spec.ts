@@ -18,6 +18,129 @@ test("shows two local CDS/protein viewers without a runtime network dependency",
   expect(external).toEqual([]);
 });
 
+test("switches one shared CDS chooser 20 times without duplicate harness telemetry", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await page.goto("/#/cds-protein?renderer=reference");
+  await expect(page.getByTestId("p70-harness-status")).toContainText("ready");
+  const chooser = page.getByLabel("Sequence renderer");
+  const status = page.getByTestId("renderer-chooser-status");
+  const modes = ["nightingale", "reference"] as const;
+  for (let index = 0; index < 20; index += 1) {
+    const mode = modes[index % modes.length];
+    await chooser.selectOption(mode);
+    await expect(status).toContainText(`${mode} renderer ready`);
+    await expect(page.getByTestId("cds-nucleotide-view-host")).toBeVisible();
+    await expect(page.getByTestId("cds-protein-view-host")).toBeVisible();
+    if (mode === "reference") {
+      await expect(
+        page.getByTestId("cds-nucleotide-view-host").locator('[data-seq-viewer="canvas"]'),
+      ).toHaveCount(1);
+      await expect(
+        page.getByTestId("cds-protein-view-host").locator('[data-seq-viewer="canvas"]'),
+      ).toHaveCount(1);
+    } else {
+      await expect(
+        page.getByTestId("cds-nucleotide-view-host").locator('[data-seqstar-nightingale="root"]'),
+      ).toHaveCount(1);
+      await expect(
+        page.getByTestId("cds-protein-view-host").locator('[data-seqstar-nightingale="root"]'),
+      ).toHaveCount(1);
+    }
+    await expect(page.locator("html")).toHaveAttribute(
+      "data-seqstar-harness-telemetry-subscriptions",
+      "1",
+    );
+  }
+  const settledMessages = await page
+    .locator("html")
+    .getAttribute("data-seqstar-harness-message-count");
+  await page.waitForTimeout(300);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-seqstar-harness-message-count",
+    settledMessages ?? "0",
+  );
+});
+
+test("switches to Nightingale offline after Reference is ready", async ({ context, page }) => {
+  const failedRequests: string[] = [];
+  page.on("requestfailed", (request) => failedRequests.push(request.url()));
+  await page.goto("/#/cds-protein?renderer=reference");
+  await expect(page.getByTestId("p70-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText(
+    "reference renderer ready",
+  );
+  await expect(
+    page.getByTestId("cds-nucleotide-view-host").locator('[data-seq-viewer="canvas"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.getByTestId("cds-protein-view-host").locator('[data-seq-viewer="canvas"]'),
+  ).toHaveCount(1);
+
+  await page.waitForTimeout(250);
+  await context.setOffline(true);
+  await page.getByLabel("Sequence renderer").selectOption("nightingale");
+
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText(
+    "nightingale renderer ready",
+  );
+  await expect(
+    page.getByTestId("cds-nucleotide-view-host").locator('[data-seqstar-nightingale="root"]'),
+  ).toHaveCount(1);
+  await expect(
+    page.getByTestId("cds-protein-view-host").locator('[data-seqstar-nightingale="root"]'),
+  ).toHaveCount(1);
+  await expect(page.locator("html")).toHaveAttribute(
+    "data-seqstar-harness-telemetry-subscriptions",
+    "1",
+  );
+  expect(failedRequests).toEqual([]);
+});
+
+test("keeps real CDS host and canvas geometry stable for 30 seconds in both renderers", async ({
+  page,
+}) => {
+  test.setTimeout(75_000);
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await page.goto("/#/cds-protein?renderer=reference");
+  await expect(page.getByTestId("p70-harness-status")).toContainText("ready");
+  const sample = () =>
+    page.evaluate(() => {
+      const surface = (id: string) => {
+        const host = document.querySelector<HTMLElement>(`[data-testid="${id}"]`);
+        const canvas = host?.querySelector<HTMLElement>(
+          '[data-seq-viewer="canvas"], [data-seqstar-nightingale="root"]',
+        );
+        return {
+          host: Math.round(host?.getBoundingClientRect().height ?? 0),
+          canvas: Math.round(canvas?.getBoundingClientRect().height ?? 0),
+        };
+      };
+      return {
+        document: document.documentElement.scrollHeight,
+        nucleotide: surface("cds-nucleotide-view-host"),
+        protein: surface("cds-protein-view-host"),
+      };
+    });
+  const assertStable = async () => {
+    const first = await sample();
+    for (let index = 0; index < 6; index += 1) {
+      await page.waitForTimeout(5_000);
+      const current = await sample();
+      expect(current.document).toBe(first.document);
+      expect(current.nucleotide).toEqual(first.nucleotide);
+      expect(current.protein).toEqual(first.protein);
+    }
+  };
+  await assertStable();
+  await page.getByLabel("Sequence renderer").selectOption("nightingale");
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText(
+    "nightingale renderer ready",
+  );
+  await assertStable();
+});
+
 test("keeps bounded CDS canvases and document height stable across observer notifications", async ({
   page,
 }) => {
