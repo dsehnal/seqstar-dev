@@ -38,6 +38,11 @@ unimplemented.
 | CASE-3 | 1BRS named polymers, interface/contact endpoints and two-chain MVS; synthetic values conspicuous | `complex.ts`; `complex.spec.ts`; fixture metadata | `test`, e2e | signed off |
 | CASE-4 | 32-row PF00042/P69905/1A3N alignment, virtual rows and composed two-step mapping | `alignment-structure.ts`; its unit/e2e tests | `test`, e2e | signed off |
 | CASE-5 | nucleotide/protein CDS mapping is optional, explicit and offline | `cds-protein.ts`; `cds-protein.spec.ts` | `test`, e2e | optional stretch signed off |
+| MVS-01 | MolViewStory evidence is decoded by inflating before MessagePack decoding, using the single pinned Mol* runtime | `spec/mvs-features.msgpack`; `scripts/read-mvs-story.mjs`; `molviewspec-improvements.md` | `pnpm run inspect:mvs-story`, `check:p80` | reviewed checkpoint `84babdb` |
+| MVS-02 | selector-scoped semantic colors use deterministic one-cartoon presentation, not per-residue geometry | `mvs-presentation.ts`; `mvs-presentation.test.ts` | focused Vitest, `test` | reviewed checkpoint `46a14ea` |
+| MVS-03 | all P04637 score, coverage, regions, sites, and variants profiles are valid one-cartoon MVS documents; 196 mapped AlphaMissense-like selectors retain exact colors | `uniprot-structure.ts`; `uniprot-structure.test.ts`; `molviewspec-hardening.test.ts`; `uniprot-structure.spec.ts`; `molviewspec-improvements.spec.ts` | focused Vitest/Playwright, `test`, `test:e2e` | reviewed checkpoint `3f641db` |
+| MVS-04 | 1BRS interface preserves two cartoons without atomic detail; one frozen contact uses only two bounded atomic-detail representations and a union focus | `complex.ts`; `complex.test.ts`; `molviewspec-hardening.test.ts`; `complex.spec.ts`; `molviewspec-improvements.spec.ts` | focused Vitest/Playwright, `test`, `test:e2e` | reviewed checkpoint `16efb27` |
+| MVS-05 | P69905/1A3N remains one neutral cartoon with no static annotation geometry; all revised request profiles are structurally counted and browser-exercised offline | `alignment-structure.ts`; `molviewspec-hardening.test.ts`; `alignment-structure.test.ts`; `molviewspec-improvements.spec.ts`; `hardening.spec.ts` | `mise exec -- pnpm exec vitest run packages/integration-plugins/src/molviewspec-hardening.test.ts`; `mise exec -- pnpm exec playwright test tests/e2e/molviewspec-improvements.spec.ts`; final commands below | independently reviewed G40 checkpoint |
 | P00 | pinned mise/pnpm/toolchain, workspace, project refs, empty shell and smoke test | `c784ecd`; root tooling | `mise install`, check/test/build/e2e | signed off |
 | P01 | Nightingale/Mol*/fixture feasibility and one-Mol*/local-vendor gates | `0102cc4`; `P01*-FEASIBILITY.md`; fixture audit | `check:dependencies`, `check:fixtures`, e2e | signed off |
 | P02 | public-contract freeze, digest and coordinate/lifecycle golden tests | `3984c77`; contract tests | `test`, `check` | signed off |
@@ -55,7 +60,14 @@ unimplemented.
 | P80-03 | clean offline checkout recipe and final traceability | this file; `README.md` | orchestrator clean-worktree gate | signed off |
 | FUTURE-01 | EMDB/tomogram third-visualizer validation | `spec/case-studies.md` | none | future, not prototype scope |
 
-The final clean worktree passed `mise install --locked`,
+The original P80 clean worktree passed `mise install --locked`,
 `mise exec -- pnpm install --offline --frozen-lockfile`, `mise run check:p80`,
 `mise run check`, `mise run test`, `mise run build`, and `mise run test:e2e`.
+
+The MolViewSpec-improvements final gate additionally runs, from `prototype/`:
+`mise exec -- pnpm install --offline --frozen-lockfile`, `mise run check:p80`,
+`mise run check`, `mise run test`, `mise run build`, `mise run test:e2e`,
+`mise exec -- pnpm exec vitest run packages/integration-plugins/src/molviewspec-hardening.test.ts`,
+`mise exec -- pnpm exec playwright test tests/e2e/molviewspec-improvements.spec.ts`,
+`git diff --check`, and `git status --short`.
 P80 reviewed checkpoint: REVIEWED (this checkpoint commit; see Git history).
