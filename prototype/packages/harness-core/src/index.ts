@@ -127,6 +127,9 @@ export interface InteractionOrigin {
   readonly sectionId?: string;
   readonly trackId?: string;
   readonly layerId?: string;
+  readonly sequenceId?: string;
+  readonly alignmentId?: string;
+  readonly alignmentMemberId?: string;
 }
 export interface SemanticTarget {
   readonly annotationId?: string;
@@ -134,6 +137,8 @@ export interface SemanticTarget {
   readonly relationshipId?: string;
   readonly trackId?: string;
   readonly structureObjectId?: string;
+  readonly endpointRole?: string;
+  readonly locusIndex?: number;
 }
 export interface InteractionEvent {
   readonly interactionId: string;
@@ -187,6 +192,9 @@ export const InteractionOriginSchema = Type.Object(
     sectionId: Type.Optional(Type.String()),
     trackId: Type.Optional(Type.String()),
     layerId: Type.Optional(Type.String()),
+    sequenceId: Type.Optional(Type.String()),
+    alignmentId: Type.Optional(Type.String()),
+    alignmentMemberId: Type.Optional(Type.String()),
   },
   { additionalProperties: false },
 );
@@ -197,6 +205,8 @@ export const SemanticTargetSchema = Type.Object(
     relationshipId: Type.Optional(Type.String()),
     trackId: Type.Optional(Type.String()),
     structureObjectId: Type.Optional(Type.String()),
+    endpointRole: Type.Optional(Type.String()),
+    locusIndex: Type.Optional(Type.Integer({ minimum: 0 })),
   },
   { additionalProperties: false },
 );

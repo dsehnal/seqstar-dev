@@ -48,10 +48,35 @@ describe("harness contract golden examples", () => {
         interactionId: "native-1",
         interaction: "hover",
         phase: "set",
-        origin: { componentId: "sequence" },
+        origin: {
+          componentId: "sequence",
+          sequenceId: "p53",
+          alignmentId: "msa",
+          alignmentMemberId: "member-a",
+        },
+        semanticTarget: { endpointRole: "source", locusIndex: 0 },
         loci: [],
       }),
     ).toBe(true);
+    expect(
+      payloadSchema(InteractionEventSchema).check({
+        interactionId: "native-1",
+        interaction: "hover",
+        phase: "set",
+        origin: { componentId: "sequence", nativeEvent: "not-portable" },
+        loci: [],
+      }),
+    ).toBe(false);
+    expect(
+      payloadSchema(InteractionEventSchema).check({
+        interactionId: "native-1",
+        interaction: "hover",
+        phase: "set",
+        origin: { componentId: "sequence" },
+        semanticTarget: { locusIndex: -1 },
+        loci: [],
+      }),
+    ).toBe(false);
     const cycle: { self?: unknown } = {};
     cycle.self = cycle;
     const guarded = payloadSchema(InteractionEventSchema);

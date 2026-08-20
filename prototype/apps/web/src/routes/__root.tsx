@@ -28,6 +28,9 @@ function RootLayout() {
             <Link activeProps={{ "aria-current": "page" }} to="/p01-feasibility">
               P01 evidence
             </Link>
+            <Link activeProps={{ "aria-current": "page" }} to="/reference-viewer">
+              Reference viewer
+            </Link>
           </nav>
         </div>
       </header>

@@ -11,7 +11,9 @@
   "dependencies": {
     "@seq-star/harness-core": "workspace:*",
     "@seq-star/harness-react": "workspace:*",
+    "@seq-star/integration-plugins": "workspace:*",
     "@seq-star/seq-view-spec": "workspace:*",
+    "@seq-star/wrapper-seq-viewer": "workspace:*",
     "@seq-star/wrapper-molstar": "workspace:*",
     "@seq-star/wrapper-nightingale": "workspace:*",
     "@tanstack/react-router": "catalog:",

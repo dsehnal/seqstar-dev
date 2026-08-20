@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlignmentStructureRouteImport } from './routes/alignment-structure'
 import { Route as ComplexRouteImport } from './routes/complex'
 import { Route as P01FeasibilityRouteImport } from './routes/p01-feasibility'
+import { Route as ReferenceViewerRouteImport } from './routes/reference-viewer'
 import { Route as RendererPortabilityRouteImport } from './routes/renderer-portability'
 import { Route as UniprotStructureRouteImport } from './routes/uniprot-structure'
 
@@ -36,6 +37,11 @@ const P01FeasibilityRoute = P01FeasibilityRouteImport.update({
   path: '/p01-feasibility',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ReferenceViewerRoute = ReferenceViewerRouteImport.update({
+  id: '/reference-viewer',
+  path: '/reference-viewer',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const RendererPortabilityRoute = RendererPortabilityRouteImport.update({
   id: '/renderer-portability',
   path: '/renderer-portability',
@@ -52,6 +58,7 @@ export interface FileRoutesByFullPath {
   '/alignment-structure': typeof AlignmentStructureRoute
   '/complex': typeof ComplexRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
+  '/reference-viewer': typeof ReferenceViewerRoute
   '/renderer-portability': typeof RendererPortabilityRoute
   '/uniprot-structure': typeof UniprotStructureRoute
 }
@@ -60,6 +67,7 @@ export interface FileRoutesByTo {
   '/alignment-structure': typeof AlignmentStructureRoute
   '/complex': typeof ComplexRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
+  '/reference-viewer': typeof ReferenceViewerRoute
   '/renderer-portability': typeof RendererPortabilityRoute
   '/uniprot-structure': typeof UniprotStructureRoute
 }
@@ -69,6 +77,7 @@ export interface FileRoutesById {
   '/alignment-structure': typeof AlignmentStructureRoute
   '/complex': typeof ComplexRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
+  '/reference-viewer': typeof ReferenceViewerRoute
   '/renderer-portability': typeof RendererPortabilityRoute
   '/uniprot-structure': typeof UniprotStructureRoute
 }
@@ -79,6 +88,7 @@ export interface FileRouteTypes {
     | '/alignment-structure'
     | '/complex'
     | '/p01-feasibility'
+    | '/reference-viewer'
     | '/renderer-portability'
     | '/uniprot-structure'
   fileRoutesByTo: FileRoutesByTo
@@ -87,6 +97,7 @@ export interface FileRouteTypes {
     | '/alignment-structure'
     | '/complex'
     | '/p01-feasibility'
+    | '/reference-viewer'
     | '/renderer-portability'
     | '/uniprot-structure'
   id:
@@ -95,6 +106,7 @@ export interface FileRouteTypes {
     | '/alignment-structure'
     | '/complex'
     | '/p01-feasibility'
+    | '/reference-viewer'
     | '/renderer-portability'
     | '/uniprot-structure'
   fileRoutesById: FileRoutesById
@@ -104,6 +116,7 @@ export interface RootRouteChildren {
   AlignmentStructureRoute: typeof AlignmentStructureRoute
   ComplexRoute: typeof ComplexRoute
   P01FeasibilityRoute: typeof P01FeasibilityRoute
+  ReferenceViewerRoute: typeof ReferenceViewerRoute
   RendererPortabilityRoute: typeof RendererPortabilityRoute
   UniprotStructureRoute: typeof UniprotStructureRoute
 }
@@ -138,6 +151,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof P01FeasibilityRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reference-viewer': {
+      id: '/reference-viewer'
+      path: '/reference-viewer'
+      fullPath: '/reference-viewer'
+      preLoaderRoute: typeof ReferenceViewerRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/renderer-portability': {
       id: '/renderer-portability'
       path: '/renderer-portability'
@@ -160,6 +180,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlignmentStructureRoute: AlignmentStructureRoute,
   ComplexRoute: ComplexRoute,
   P01FeasibilityRoute: P01FeasibilityRoute,
+  ReferenceViewerRoute: ReferenceViewerRoute,
   RendererPortabilityRoute: RendererPortabilityRoute,
   UniprotStructureRoute: UniprotStructureRoute,
 }

@@ -68,6 +68,9 @@ importers:
       '@seq-star/harness-react':
         specifier: workspace:*
         version: link:../../packages/harness-react
+      '@seq-star/integration-plugins':
+        specifier: workspace:*
+        version: link:../../packages/integration-plugins
       '@seq-star/seq-view-spec':
         specifier: workspace:*
         version: link:../../packages/seq-view-spec
@@ -77,6 +80,9 @@ importers:
       '@seq-star/wrapper-nightingale':
         specifier: workspace:*
         version: link:../../packages/wrapper-nightingale
+      '@seq-star/wrapper-seq-viewer':
+        specifier: workspace:*
+        version: link:../../packages/wrapper-seq-viewer
       '@tanstack/react-router':
         specifier: 'catalog:'
         version: 1.170.31(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -226,6 +232,15 @@ importers:
       '@seq-star/harness-core':
         specifier: workspace:*
         version: link:../harness-core
+      '@seq-star/seq-coords':
+        specifier: workspace:*
+        version: link:../seq-coords
+      '@seq-star/seq-core':
+        specifier: workspace:*
+        version: link:../seq-core
+      '@seq-star/seq-view-spec':
+        specifier: workspace:*
+        version: link:../seq-view-spec
       '@seq-star/seq-viewer':
         specifier: workspace:*
         version: link:../seq-viewer
