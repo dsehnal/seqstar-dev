@@ -1176,6 +1176,321 @@ describe("harness runtime", () => {
     await harness.disposeAsync();
   });
 
+  it("unions independently resolved barnase and barstar loci into one destination command", async () => {
+    const barnase: CoordinateSpace = {
+      id: "P00648",
+      kind: "sequence",
+      context: { role: "barnase" },
+    };
+    const barstar: CoordinateSpace = {
+      id: "P11540",
+      kind: "sequence",
+      context: { role: "barstar" },
+    };
+    const missing: CoordinateSpace = { id: "missing", kind: "sequence" };
+    const chainA: CoordinateSpace = {
+      id: "1BRS-A",
+      kind: "structure",
+      context: { chain: "A" },
+    };
+    const chainD: CoordinateSpace = {
+      id: "1BRS-D",
+      kind: "structure",
+      context: { chain: "D" },
+    };
+    const commands: HarnessMessage[] = [];
+    const diagnostics: string[] = [];
+    const harness = createApplicationHarness(
+      {
+        id: "app",
+        components: [
+          { id: "sequence", type: "mock" },
+          { id: "structure", type: "mock" },
+        ],
+        synchronization: [
+          { id: "contact", interaction: "select", between: ["sequence", "structure"] },
+        ],
+      },
+      {
+        componentFactories: [
+          {
+            type: "mock",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                if (id === "sequence") {
+                  for (const [translatorId, source, target] of [
+                    ["barnase-to-a", barnase, chainA],
+                    ["barstar-to-d", barstar, chainD],
+                  ] as const)
+                    context.translators.register({
+                      id: translatorId,
+                      source: { kind: "sequence", context: { role: source.context?.role ?? "" } },
+                      target: {
+                        kind: "structure",
+                        context: { chain: target.context?.chain ?? "" },
+                      },
+                      async map(request) {
+                        return {
+                          translatorIds: [translatorId],
+                          diagnostics: [],
+                          associations: request.loci.map((locus) => ({
+                            source: locus,
+                            targets: [{ ...locus, space: target }],
+                            status: "exact" as const,
+                          })),
+                        };
+                      },
+                    });
+                  return;
+                }
+                context.reportCoordinateSpaces([chainA, chainD]);
+                context.fabric.observe({ targetComponent: id }).subscribe((entry) => {
+                  if (entry.type === "interaction.selection.apply") commands.push(entry);
+                });
+              },
+              dispose() {},
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    harness.fabric
+      .observe({ types: ["harness.diagnostic"] })
+      .subscribe((entry) => diagnostics.push(JSON.stringify(entry.payload)));
+    harness.fabric.publish(
+      message("interaction.native", {
+        interactionId: "barnase-barstar-contact",
+        interaction: "select",
+        phase: "set",
+        origin: { componentId: "sequence" },
+        loci: [
+          { kind: "point", space: barnase, position: { kind: "index", value: 39 } },
+          { kind: "point", space: barstar, position: { kind: "index", value: 27 } },
+          { kind: "point", space: missing, position: { kind: "index", value: 1 } },
+        ],
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(commands).toHaveLength(1);
+    const firstCommand = commands[0];
+    if (firstCommand === undefined) throw new Error("Expected a synchronized selection command.");
+    expect(
+      (firstCommand.payload as { loci: readonly { space: CoordinateSpace }[] }).loci.map(
+        (locus) => locus.space.id,
+      ),
+    ).toEqual(["1BRS-A", "1BRS-D"]);
+    expect(diagnostics.join("\n")).toContain("harness.translation.unmapped");
+    await harness.disposeAsync();
+  });
+
+  it("diagnoses one ambiguous locus without dropping a separately resolvable contact endpoint", async () => {
+    const unique: CoordinateSpace = { id: "unique", kind: "sequence", context: { role: "unique" } };
+    const ambiguous: CoordinateSpace = {
+      id: "ambiguous",
+      kind: "sequence",
+      context: { role: "ambiguous" },
+    };
+    const chainA: CoordinateSpace = { id: "A", kind: "structure", context: { chain: "A" } };
+    const chainD: CoordinateSpace = { id: "D", kind: "structure", context: { chain: "D" } };
+    const commands: HarnessMessage[] = [];
+    const diagnostics: string[] = [];
+    const harness = createApplicationHarness(
+      {
+        id: "app",
+        components: [
+          { id: "sequence", type: "mock" },
+          { id: "structure", type: "mock" },
+        ],
+        synchronization: [
+          { id: "select", interaction: "select", between: ["sequence", "structure"] },
+        ],
+      },
+      {
+        componentFactories: [
+          {
+            type: "mock",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                if (id === "sequence") {
+                  const register = (
+                    translatorId: string,
+                    source: CoordinateSpace,
+                    target: CoordinateSpace,
+                  ) =>
+                    context.translators.register({
+                      id: translatorId,
+                      source: { kind: "sequence", context: { role: source.context?.role ?? "" } },
+                      target: {
+                        kind: "structure",
+                        context: { chain: target.context?.chain ?? "" },
+                      },
+                      async map(request) {
+                        return {
+                          translatorIds: [translatorId],
+                          diagnostics: [],
+                          associations: request.loci.map((locus) => ({
+                            source: locus,
+                            targets: [{ ...locus, space: target }],
+                            status: "exact" as const,
+                          })),
+                        };
+                      },
+                    });
+                  register("unique-a", unique, chainA);
+                  register("ambiguous-a", ambiguous, chainA);
+                  register("ambiguous-d", ambiguous, chainD);
+                  return;
+                }
+                context.reportCoordinateSpaces([chainA, chainD]);
+                context.fabric.observe({ targetComponent: id }).subscribe((entry) => {
+                  if (entry.type === "interaction.selection.apply") commands.push(entry);
+                });
+              },
+              dispose() {},
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    harness.fabric
+      .observe({ types: ["harness.diagnostic"] })
+      .subscribe((entry) => diagnostics.push(JSON.stringify(entry.payload)));
+    harness.fabric.publish(
+      message("interaction.native", {
+        interactionId: "partially-ambiguous-contact",
+        interaction: "select",
+        phase: "set",
+        origin: { componentId: "sequence" },
+        loci: [
+          { kind: "point", space: unique, position: { kind: "index", value: 2 } },
+          { kind: "point", space: ambiguous, position: { kind: "index", value: 4 } },
+        ],
+      }),
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(commands).toHaveLength(1);
+    const firstCommand = commands[0];
+    if (firstCommand === undefined) throw new Error("Expected a synchronized selection command.");
+    expect(
+      (firstCommand.payload as { loci: readonly { space: CoordinateSpace }[] }).loci.map(
+        (locus) => locus.space.id,
+      ),
+    ).toEqual(["A"]);
+    expect(diagnostics.join("\n")).toContain("harness.translation.ambiguous");
+    await harness.disposeAsync();
+  });
+
+  it("aborts every grouped hover mapper on disposal and never publishes their late union", async () => {
+    const barnase: CoordinateSpace = {
+      id: "barnase",
+      kind: "sequence",
+      context: { role: "barnase" },
+    };
+    const barstar: CoordinateSpace = {
+      id: "barstar",
+      kind: "sequence",
+      context: { role: "barstar" },
+    };
+    const chainA: CoordinateSpace = { id: "A", kind: "structure", context: { chain: "A" } };
+    const chainD: CoordinateSpace = { id: "D", kind: "structure", context: { chain: "D" } };
+    const signals: AbortSignal[] = [];
+    const deferred: (() => void)[] = [];
+    const commands: string[] = [];
+    let startedResolve: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      startedResolve = resolve;
+    });
+    const harness = createApplicationHarness(
+      {
+        id: "app",
+        components: [
+          { id: "sequence", type: "mock" },
+          { id: "structure", type: "mock" },
+        ],
+        synchronization: [
+          { id: "hover", interaction: "hover", between: ["sequence", "structure"] },
+        ],
+      },
+      {
+        componentFactories: [
+          {
+            type: "mock",
+            create: ({ id }) => ({
+              id,
+              capabilities: [],
+              async start(context) {
+                if (id === "sequence") {
+                  for (const [translatorId, source, target] of [
+                    ["barnase-a", barnase, chainA],
+                    ["barstar-d", barstar, chainD],
+                  ] as const)
+                    context.translators.register({
+                      id: translatorId,
+                      source: { kind: "sequence", context: { role: source.context?.role ?? "" } },
+                      target: {
+                        kind: "structure",
+                        context: { chain: target.context?.chain ?? "" },
+                      },
+                      map(request, signal) {
+                        signals.push(signal);
+                        if (signals.length === 2) startedResolve?.();
+                        return new Promise((resolve) => {
+                          deferred.push(() =>
+                            resolve({
+                              translatorIds: [translatorId],
+                              diagnostics: [],
+                              associations: request.loci.map((locus) => ({
+                                source: locus,
+                                targets: [{ ...locus, space: target }],
+                                status: "exact" as const,
+                              })),
+                            }),
+                          );
+                        });
+                      },
+                    });
+                  return;
+                }
+                context.reportCoordinateSpaces([chainA, chainD]);
+                context.fabric.observe({ targetComponent: id }).subscribe((entry) => {
+                  if (entry.type.startsWith("interaction.highlight.")) commands.push(entry.type);
+                });
+              },
+              dispose() {},
+            }),
+          },
+        ],
+      },
+    );
+    await harness.start();
+    harness.fabric.publish(
+      message("interaction.native", {
+        interactionId: "slow-contact",
+        interaction: "hover",
+        phase: "set",
+        origin: { componentId: "sequence" },
+        loci: [
+          { kind: "point", space: barnase, position: { kind: "index", value: 10 } },
+          { kind: "point", space: barstar, position: { kind: "index", value: 11 } },
+        ],
+      }),
+    );
+    await started;
+    await harness.disposeAsync();
+    expect(signals).toHaveLength(2);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    for (const resolve of deferred) resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(commands).toEqual([]);
+  });
+
   it("retires synchronization reflection keys after clear, map, failure, ambiguity, and no-space exits", async () => {
     const source: CoordinateSpace = { id: "source", kind: "index", context: { name: "source" } };
     const target: CoordinateSpace = { id: "target", kind: "index", context: { name: "target" } };

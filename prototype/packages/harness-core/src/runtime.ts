@@ -538,6 +538,19 @@ const defaultPolicy = (message: HarnessMessage): RoutePolicy =>
       : "all";
 const commandFamily = (interaction: string): "highlight" | "selection" | "focus" =>
   interaction === "hover" ? "highlight" : interaction === "select" ? "selection" : "focus";
+const coordinateSpaceKey = (space: CoordinateSpace): string =>
+  JSON.stringify({
+    id: space.id,
+    kind: space.kind,
+    ...(space.authority === undefined ? {} : { authority: space.authority }),
+    ...(space.context === undefined
+      ? {}
+      : {
+          context: Object.fromEntries(
+            Object.entries(space.context).sort(([left], [right]) => left.localeCompare(right)),
+          ),
+        }),
+  });
 
 export const createApplicationHarness = (
   spec: ApplicationHarnessSpec,
@@ -576,6 +589,7 @@ export const createApplicationHarness = (
   let started = false;
   let disposed = false;
   let disposePromise: Promise<void> | undefined;
+  let synchronizationGeneration = 0;
   const context: HarnessPluginContext = {
     fabric,
     translators,
@@ -758,12 +772,20 @@ export const createApplicationHarness = (
             const owner = event.interaction === "hover" ? hoverLease.owner : incomingOwner;
             const interactionId =
               event.interaction === "hover" ? hoverLease.interactionId : event.interactionId;
+            // A hover's lease is one destination-wide union.  Its controller deliberately
+            // covers every per-locus mapping group, so a replacement or clear cannot let a
+            // slower group publish a stale fragment after a newer hover has been applied.
+            const controllerKey =
+              event.interaction === "hover" ? key : `${key}\u0000${++synchronizationGeneration}`;
             if (event.interaction === "hover") {
-              synchronizationControllers.get(key)?.abort();
-              synchronizationControllers.set(key, new AbortController());
-              if (event.phase === "set") hoverSynchronizationLeases.set(key, hoverLease);
-            }
-            const signal = synchronizationControllers.get(key)?.signal;
+              synchronizationControllers.get(controllerKey)?.abort();
+              if (event.phase === "set") {
+                synchronizationControllers.set(controllerKey, new AbortController());
+                hoverSynchronizationLeases.set(key, hoverLease);
+              } else synchronizationControllers.delete(controllerKey);
+            } else if (event.phase === "set")
+              synchronizationControllers.set(controllerKey, new AbortController());
+            const signal = synchronizationControllers.get(controllerKey)?.signal;
             if (event.phase === "clear") {
               if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
               fabric.publish({
@@ -777,34 +799,53 @@ export const createApplicationHarness = (
               reflections.delete(reflection);
               continue;
             }
-            const scoredSpaces = component.coordinateSpaces
-              .map((space) => ({
-                space,
-                matches: event.loci.filter(
-                  (locus) =>
-                    coordinateSpaceEquals(locus.space, space) ||
-                    translators.findPaths(locus.space, space).length > 0,
-                ).length,
-              }))
-              .filter((candidate) => candidate.matches > 0);
-            const maximumMatches = Math.max(
-              0,
-              ...scoredSpaces.map((candidate) => candidate.matches),
-            );
-            const candidateSpaces = scoredSpaces.filter(
-              (candidate) => candidate.matches === maximumMatches,
-            );
-            if (candidateSpaces.length !== 1) {
-              diagnosis(
-                candidateSpaces.length === 0
-                  ? `Synchronization '${rule.id}' has no compatible space for '${destination}'.`
-                  : `Synchronization '${rule.id}' has ambiguous destination spaces for '${destination}'.`,
-                message,
-              );
-              if (
-                (rule.unmapped ?? (event.interaction === "hover" ? "clear" : "preserve")) ===
-                "clear"
-              ) {
+            type MappingGroup = {
+              readonly target: CoordinateSpace;
+              readonly path: readonly string[];
+              readonly entries: readonly {
+                readonly sourceIndex: number;
+                readonly locus: CoordinateLocus;
+              }[];
+            };
+            const groups = new Map<string, MappingGroup>();
+            for (const [sourceIndex, locus] of event.loci.entries()) {
+              const candidates = component.coordinateSpaces
+                .map((target) => ({
+                  target,
+                  paths: coordinateSpaceEquals(locus.space, target)
+                    ? ([[]] as readonly (readonly string[])[])
+                    : translators.findPaths(locus.space, target).map((path) => path.translatorIds),
+                }))
+                .filter((candidate) => candidate.paths.length > 0);
+              if (candidates.length !== 1) {
+                diagnosis(
+                  candidates.length === 0
+                    ? `Synchronization '${rule.id}' locus ${sourceIndex} is unmapped for '${destination}' (harness.translation.unmapped).`
+                    : `Synchronization '${rule.id}' locus ${sourceIndex} has ambiguous destination spaces for '${destination}' (harness.translation.ambiguous).`,
+                  message,
+                );
+                continue;
+              }
+              const candidate = candidates[0];
+              if (candidate === undefined) continue;
+              // Registry path ordering is deterministic.  Retain the selected path in the
+              // group key and request policy so unlike routes cannot be conflated.
+              const path = candidate.paths[0] ?? [];
+              const groupKey = `${coordinateSpaceKey(candidate.target)}\u0000${path.join("\u0000")}`;
+              const existing = groups.get(groupKey);
+              groups.set(groupKey, {
+                target: candidate.target,
+                path,
+                entries: [...(existing?.entries ?? []), { sourceIndex, locus }],
+              });
+            }
+            const unmappedPolicy =
+              rule.unmapped ?? (event.interaction === "hover" ? "clear" : "preserve");
+            // There is no asynchronous group to retire the reflection key in this
+            // case.  Do it before returning so an immediately retried selection
+            // after a space-capability update is not mistaken for a feedback loop.
+            if (groups.size === 0) {
+              if (unmappedPolicy === "clear") {
                 if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
                 fabric.publish({
                   ...message,
@@ -815,25 +856,47 @@ export const createApplicationHarness = (
                   payload: { interactionId, owner },
                 });
               }
+              synchronizationControllers.delete(controllerKey);
               reflections.delete(reflection);
               continue;
             }
-            const target = candidateSpaces[0]?.space;
-            if (target === undefined) continue;
-            void translators
-              .map({ loci: event.loci, target }, signal)
-              .then((mapped) => {
+            void Promise.all(
+              [...groups.values()].map(async (group) => ({
+                group,
+                mapped: await translators.map(
+                  {
+                    loci: group.entries.map((entry) => entry.locus),
+                    target: group.target,
+                    policy: { preferredTranslatorIds: [...group.path] },
+                  },
+                  signal,
+                ),
+              })),
+            )
+              .then((results) => {
                 if (signal?.aborted || disposed) return;
-                if (mapped.paths.length > 0)
+                const mapped = results.flatMap(({ mapped }) => mapped.associations);
+                const paths = results.flatMap(({ mapped }) => mapped.paths);
+                if (paths.length > 0)
                   diagnosis(
-                    `Synchronization '${rule.id}' used ${mapped.paths.map((path) => path.translatorIds.join(" -> ")).join(", ") || "identity"}.`,
+                    `Synchronization '${rule.id}' used ${paths.map((path) => path.translatorIds.join(" -> ") || "identity").join(", ")}.`,
                     message,
                   );
-                if (
-                  mapped.associations.every((item) => item.targets.length === 0) &&
-                  (rule.unmapped ?? (event.interaction === "hover" ? "clear" : "preserve")) ===
-                    "clear"
-                ) {
+                for (const { group, mapped: result } of results) {
+                  for (const entry of result.diagnostics)
+                    diagnosis(
+                      `Synchronization '${rule.id}': ${entry.code}: ${entry.message}`,
+                      message,
+                    );
+                  for (const [associationIndex, association] of result.associations.entries())
+                    if (association.status !== "exact")
+                      diagnosis(
+                        `Synchronization '${rule.id}' locus ${group.entries[associationIndex]?.sourceIndex ?? associationIndex} mapped as ${association.status} (harness.translation.${association.status}).`,
+                        message,
+                      );
+                }
+                const loci = mapped.flatMap((item) => item.targets);
+                if (loci.length === 0 && unmappedPolicy === "clear") {
                   if (event.interaction === "hover") hoverSynchronizationLeases.delete(key);
                   fabric.publish({
                     ...message,
@@ -845,12 +908,6 @@ export const createApplicationHarness = (
                   });
                   return;
                 }
-                for (const entry of mapped.diagnostics)
-                  diagnosis(
-                    `Synchronization '${rule.id}': ${entry.code}: ${entry.message}`,
-                    message,
-                  );
-                const loci = mapped.associations.flatMap((item) => item.targets);
                 if (loci.length > 0)
                   fabric.publish({
                     ...message,
@@ -872,7 +929,7 @@ export const createApplicationHarness = (
               .catch(() => {
                 if (signal?.aborted || disposed) return;
                 diagnosis(`Synchronization '${rule.id}' failed.`, message);
-                if (event.interaction === "hover" && (rule.unmapped ?? "clear") === "clear") {
+                if (event.interaction === "hover" && unmappedPolicy === "clear") {
                   hoverSynchronizationLeases.delete(key);
                   fabric.publish({
                     ...message,
@@ -884,7 +941,11 @@ export const createApplicationHarness = (
                   });
                 }
               })
-              .finally(() => reflections.delete(reflection));
+              .finally(() => {
+                if (synchronizationControllers.get(controllerKey)?.signal === signal)
+                  synchronizationControllers.delete(controllerKey);
+                reflections.delete(reflection);
+              });
           }
         },
       });
