@@ -1,43 +1,67 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
+import { Atom } from "lucide-react";
+import { useLayoutEffect, useRef } from "react";
 
 export const Route = createRootRoute({
   component: RootLayout,
 });
 
 function RootLayout() {
+  const headerRef = useRef<HTMLElement>(null);
+
+  useLayoutEffect(() => {
+    const header = headerRef.current;
+    if (header === null) return;
+
+    const syncHeaderHeight = () => {
+      document.documentElement.style.setProperty(
+        "--shell-header-height",
+        `${Math.ceil(header.getBoundingClientRect().height)}px`,
+      );
+    };
+
+    syncHeaderHeight();
+    const observer = new ResizeObserver(syncHeaderHeight);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="min-h-screen">
-      <header className="border-slate-200 border-b bg-white">
-        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-4 px-6 py-5">
-          <Link className="font-semibold text-slate-900 text-xl" to="/">
-            Seq* Prototype
+    <div className="app-shell min-h-screen">
+      <header className="app-shell-header" ref={headerRef}>
+        <div className="app-shell-header__inner">
+          <Link className="app-brand" to="/" activeProps={{ "aria-current": "page" }}>
+            <Atom aria-hidden="true" className="app-brand__icon" size={20} strokeWidth={1.8} />
+            <span>Mol* Harness Prototype</span>
           </Link>
-          <nav aria-label="Case studies" className="flex flex-wrap gap-x-4 gap-y-2 text-sm">
+          <nav aria-label="Case studies" className="app-nav">
             <Link activeProps={{ "aria-current": "page" }} to="/renderer-portability">
-              Renderer portability
+              Renderer comparison
             </Link>
             <Link activeProps={{ "aria-current": "page" }} to="/uniprot-structure">
-              UniProt + structure
+              Protein + structure
             </Link>
             <Link activeProps={{ "aria-current": "page" }} to="/complex">
-              Complex
+              Protein complex
             </Link>
             <Link activeProps={{ "aria-current": "page" }} to="/alignment-structure">
-              Alignment + structure
+              Alignment ensemble
             </Link>
             <Link activeProps={{ "aria-current": "page" }} to="/cds-protein">
-              CDS + protein
+              CDS translation
             </Link>
             <Link activeProps={{ "aria-current": "page" }} to="/p01-feasibility">
-              P01 evidence
+              Compatibility lab
             </Link>
             <Link activeProps={{ "aria-current": "page" }} to="/reference-viewer">
-              Reference viewer
+              Reference sequence viewer lab
             </Link>
           </nav>
         </div>
       </header>
-      <Outlet />
+      <div className="app-shell-content">
+        <Outlet />
+      </div>
     </div>
   );
 }

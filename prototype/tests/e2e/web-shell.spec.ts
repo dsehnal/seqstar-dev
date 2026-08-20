@@ -8,15 +8,15 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
 
   await expect(page).toHaveURL(/#\/renderer-portability$/u);
   await expect(page.getByTestId("case-renderer-portability")).toBeVisible();
-  await expect(page.getByRole("link", { name: "Renderer portability" })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: "Renderer comparison" })).toHaveAttribute(
     "aria-current",
     "page",
   );
   await expect(page.getByTestId("visualizer-panel-reference-viewer")).toBeVisible();
   await expect(page.getByTestId("visualizer-panel-nightingale")).toBeVisible();
 
-  await page.getByRole("link", { name: "Complex" }).focus();
-  await expect(page.getByRole("link", { name: "Complex" })).toBeFocused();
+  await page.getByRole("link", { name: "Protein complex" }).focus();
+  await expect(page.getByRole("link", { name: "Protein complex" })).toBeFocused();
 
   await page.setViewportSize({ width: 480, height: 900 });
   await expect(page.getByTestId("visualizer-panel-reference-viewer")).toBeVisible();
@@ -61,7 +61,7 @@ test("disposes connected hosts and remounts a fresh StrictMode-safe harness", as
   await expect(inspector.getByRole("status")).toContainText("Document is invalid");
   await expect(inspector.getByRole("button", { name: "Download validated JSON" })).toBeDisabled();
 
-  await page.getByRole("link", { name: "Seq* Prototype" }).click();
+  await page.getByRole("link", { name: "Mol* Harness Prototype" }).click();
   await expect(page.getByTestId("prototype-shell")).toBeVisible();
   expect(
     await page.evaluate(
