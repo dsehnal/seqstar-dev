@@ -134,7 +134,11 @@ unless the orchestrator explicitly approves a public export after review.
 - accept already-mapped selectors and semantic color groups;
 - create one component/cartoon baseline per supplied polymer style;
 - apply the base color first and selector colors in deterministic order;
-- deduplicate selectors without dropping label/auth/insertion identity;
+- accept explicit numeric semantic precedence from the caller, resolve each
+  selector to the greatest precedence, and reject equal-precedence conflicting
+  colors;
+- deduplicate selectors across all final colors without dropping
+  label/auth/insertion identity;
 - group selectors only when their final evaluated color is identical;
 - optionally create one bounded atomic-detail component/representation for an
   explicitly permitted sparse semantic group;

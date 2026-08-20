@@ -209,24 +209,32 @@ translation or import wrapper state.
 interface MvsResidueColorGroup {
   readonly semanticId: string;
   readonly color: `#${string}`;
+  /** Larger values win, matching later SeqViewSpec layer/item precedence. */
+  readonly precedence: number;
+  readonly selectors: readonly MvsResidueSelector[];
+}
+
+interface MvsAtomicDetailGroup {
+  readonly semanticId: string;
+  readonly color: `#${string}`;
   readonly selectors: readonly MvsResidueSelector[];
 }
 
 interface MvsCartoonStyle {
-  readonly componentSelector: MvsSelector;
+  readonly componentSelector: MvsResidueSelector;
   readonly baseColor: `#${string}`;
   readonly residueColors: readonly MvsResidueColorGroup[];
-  readonly atomicDetail?: {
-    readonly reason: "sparse-site" | "variant" | "relationship-endpoint";
-    readonly selectors: readonly MvsResidueSelector[];
-  };
+  readonly atomicDetail?: MvsAtomicDetailGroup;
 }
 ```
 
 The helper owns only MVS tree construction, stable ordering, selector
 deduplication, and presentation diagnostics. Each case plugin remains
 responsible for mapping, semantic IDs, color evaluation, and item-level result
-summaries.
+summaries. Case plugins assign precedence from their SeqViewSpec layer/item
+order. The helper resolves each structural selector to the greatest precedence
+and rejects equal-precedence conflicts with different final colors instead of
+choosing by incidental color or input order.
 
 ## 6. Acceptance criteria
 
