@@ -136,6 +136,19 @@ const colorCounts = (value: unknown): Readonly<Record<string, number>> => {
     Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)),
   );
 };
+const selectorColorCounts = (value: unknown): Readonly<Record<string, number>> => {
+  const counts: Record<string, number> = {};
+  for (const node of mvsNodes(value).filter((item) => item.kind === "color")) {
+    const selector = node.params?.selector;
+    const count = Array.isArray(selector) ? selector.length : selector === undefined ? 0 : 1;
+    if (count === 0) continue;
+    const color = String(node.params?.color);
+    counts[color] = (counts[color] ?? 0) + count;
+  }
+  return Object.fromEntries(
+    Object.entries(counts).sort(([left], [right]) => left.localeCompare(right)),
+  );
+};
 
 describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
   it("uses the checked AFA through Seq* normalization and produces one valid 32-row alignment", () => {
@@ -390,43 +403,45 @@ describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
       const nodes = mvsNodes(profile);
       expect(nodes.filter((node) => node.kind === "download")).toHaveLength(4);
       expect(nodes.filter((node) => node.kind === "transform")).toHaveLength(3);
-      expect(nodes.filter((node) => node.kind === "component")).toHaveLength(448);
-      expect(nodes.filter((node) => node.kind === "representation")).toHaveLength(448);
-      expect(nodes.filter((node) => node.kind === "color")).toHaveLength(448);
+      expect(nodes.filter((node) => node.kind === "component")).toHaveLength(4);
+      expect(nodes.filter((node) => node.kind === "representation")).toHaveLength(4);
       expect(
         nodes.filter(
           (node) => node.kind === "component" && typeof node.params?.selector === "object",
         ),
-      ).toHaveLength(448);
+      ).toHaveLength(4);
       const roots = ((profile as unknown as { readonly root: MvsNode }).root.children ?? []).filter(
         (node) => node.kind === "download",
       );
       expect(
         roots.map((root) => mvsNodes({ root }).filter((node) => node.kind === "component").length),
-      ).toEqual([112, 113, 112, 111]);
+      ).toEqual([1, 1, 1, 1]);
       expect(
         nodes.filter((node) => {
-          if (node.kind !== "component" || typeof node.params?.selector !== "object") return false;
-          return "label_seq_id" in (node.params.selector as object);
+          if (node.kind !== "color" || !Array.isArray(node.params?.selector)) return false;
+          return node.params.selector.every(
+            (selector) =>
+              typeof selector === "object" &&
+              selector !== null &&
+              "label_seq_id" in selector &&
+              "auth_seq_id" in selector,
+          );
         }),
-      ).toHaveLength(444);
+      ).not.toHaveLength(0);
     }
-    expect(colorCounts(consensusMvs)).toEqual({
+    expect(selectorColorCounts(consensusMvs)).toEqual({
       "#2563EB": 216,
-      "#CBD5E1": 4,
       "#DC2626": 228,
     });
-    expect(colorCounts(conservationMvs)).toEqual({
+    expect(selectorColorCounts(conservationMvs)).toEqual({
       "#0EA5E9": 95,
       "#2563EB": 8,
       "#312E81": 14,
       "#94A3B8": 327,
-      "#CBD5E1": 4,
     });
-    expect(colorCounts(subgroupMvs)).toEqual({
+    expect(selectorColorCounts(subgroupMvs)).toEqual({
       "#64748B": 192,
       "#7C3AED": 248,
-      "#CBD5E1": 4,
       "#D97706": 4,
     });
     const p02197Root = ((subgroupMvs as unknown as { readonly root: MvsNode }).root.children ?? [])
@@ -434,17 +449,19 @@ describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
       .find((node) => node.params?.url === "/input/AF-P02197-F1-model_v6.cif");
     if (p02197Root === undefined) throw new Error("P02197 subgroup root missing");
     const colorAtLabelSeqId = (labelSeqId: number): unknown => {
-      const component = mvsNodes({ root: p02197Root }).find(
+      const color = mvsNodes({ root: p02197Root }).find(
         (node) =>
-          node.kind === "component" &&
-          typeof node.params?.selector === "object" &&
-          node.params.selector !== null &&
-          "label_seq_id" in node.params.selector &&
-          node.params.selector.label_seq_id === labelSeqId,
+          node.kind === "color" &&
+          Array.isArray(node.params?.selector) &&
+          node.params.selector.some(
+            (selector) =>
+              typeof selector === "object" &&
+              selector !== null &&
+              "label_seq_id" in selector &&
+              selector.label_seq_id === labelSeqId,
+          ),
       );
-      return component === undefined
-        ? undefined
-        : mvsNodes({ root: component }).find((node) => node.kind === "color")?.params?.color;
+      return color?.params?.color;
     };
     // Exact fixture-backed boundary selectors: [21,25) is orange through
     // column 24, while columns 25 and 91 are outside their half-open ranges.
@@ -575,6 +592,49 @@ describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
       return id;
     };
     const settle = () => new Promise((resolve) => setTimeout(resolve, 30));
+    const publishAction = (type: string, payload: Record<string, string>): string => {
+      const correlationId = crypto.randomUUID();
+      harness.fabric.publish({
+        id: crypto.randomUUID(),
+        type,
+        version: "0.1.0",
+        source: { component: "alignment" },
+        correlationId,
+        timestamp: new Date().toISOString(),
+        payload: payload as never,
+      });
+      return correlationId;
+    };
+    const defaultShowAll = publishAction("alignment.structure.show-all", {
+      ensembleId: "PF00042.29-P69905-1A3N-plus-AFDB-v6-3",
+    });
+    await settle();
+    const defaultShowAllRequest = observed.find(
+      (message) =>
+        message.correlationId === defaultShowAll && message.type === "visualization.mvs.request",
+    );
+    if (defaultShowAllRequest === undefined) throw new Error("Default show-all request missing");
+    expect(
+      selectorColorCounts(
+        (defaultShowAllRequest.payload as unknown as { readonly document?: unknown }).document,
+      ),
+    ).toEqual({
+      "#0EA5E9": 95,
+      "#2563EB": 8,
+      "#312E81": 14,
+      "#94A3B8": 327,
+    });
+    expect(
+      colorCounts(
+        (defaultShowAllRequest.payload as unknown as { readonly document?: unknown }).document,
+      )["#CBD5E1"],
+    ).toBe(4);
+    expect(
+      observed.find(
+        (message) =>
+          message.correlationId === defaultShowAll && message.type === "alignment-structure.action",
+      )?.payload,
+    ).toMatchObject({ kind: "show-all", profile: "conservation" });
     const before = publishNative("hover", "set", 1);
     await settle();
     expect(
@@ -654,6 +714,38 @@ describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
           message.correlationId === gap && message.type === "interaction.highlight.apply",
       ),
     ).toHaveLength(0);
+    publishAction("alignment.profile.activate", { profile: "subgroup" });
+    await settle();
+    const subgroupShowAll = publishAction("alignment.structure.show-all", {
+      ensembleId: "PF00042.29-P69905-1A3N-plus-AFDB-v6-3",
+    });
+    await settle();
+    const subgroupShowAllRequest = observed.find(
+      (message) =>
+        message.correlationId === subgroupShowAll && message.type === "visualization.mvs.request",
+    );
+    if (subgroupShowAllRequest === undefined) throw new Error("Subgroup show-all request missing");
+    expect(
+      selectorColorCounts(
+        (subgroupShowAllRequest.payload as unknown as { readonly document?: unknown }).document,
+      ),
+    ).toEqual({
+      "#64748B": 192,
+      "#7C3AED": 248,
+      "#D97706": 4,
+    });
+    expect(
+      colorCounts(
+        (subgroupShowAllRequest.payload as unknown as { readonly document?: unknown }).document,
+      )["#CBD5E1"],
+    ).toBe(4);
+    expect(
+      observed.find(
+        (message) =>
+          message.correlationId === subgroupShowAll &&
+          message.type === "alignment-structure.action",
+      )?.payload,
+    ).toMatchObject({ kind: "show-all", profile: "subgroup" });
     await harness.disposeAsync();
   });
 

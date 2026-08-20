@@ -1,5 +1,5 @@
 import { createRootRoute, Link, Outlet } from "@tanstack/react-router";
-import { Atom } from "lucide-react";
+import { Atom, ChevronDown } from "lucide-react";
 import { useLayoutEffect, useRef } from "react";
 
 export const Route = createRootRoute({
@@ -38,13 +38,6 @@ function RootLayout() {
             <Link
               activeProps={{ "aria-current": "page" }}
               search={{ renderer: undefined }}
-              to="/renderer-portability"
-            >
-              Renderer comparison
-            </Link>
-            <Link
-              activeProps={{ "aria-current": "page" }}
-              search={{ renderer: undefined }}
               to="/uniprot-structure"
             >
               Protein + structure
@@ -70,12 +63,27 @@ function RootLayout() {
             >
               CDS translation
             </Link>
-            <Link activeProps={{ "aria-current": "page" }} to="/p01-feasibility">
-              Compatibility lab
-            </Link>
-            <Link activeProps={{ "aria-current": "page" }} to="/reference-viewer">
-              Reference sequence viewer lab
-            </Link>
+            <details className="app-nav__more">
+              <summary>
+                More
+                <ChevronDown aria-hidden="true" size={14} strokeWidth={1.8} />
+              </summary>
+              <div className="app-nav__menu">
+                <Link
+                  activeProps={{ "aria-current": "page" }}
+                  search={{ renderer: undefined }}
+                  to="/renderer-portability"
+                >
+                  Renderer comparison
+                </Link>
+                <Link activeProps={{ "aria-current": "page" }} to="/p01-feasibility">
+                  Compatibility lab
+                </Link>
+                <Link activeProps={{ "aria-current": "page" }} to="/reference-viewer">
+                  Reference sequence viewer lab
+                </Link>
+              </div>
+            </details>
           </nav>
         </div>
       </header>

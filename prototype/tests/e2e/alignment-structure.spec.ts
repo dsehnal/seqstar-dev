@@ -13,7 +13,7 @@ test("loads the offline PF00042.29 alignment / 1A3N structure case", async ({ pa
   await expect(
     page.getByTestId("pf00042-alignment-host").locator('[data-seq-viewer="canvas"]'),
   ).toBeVisible();
-  await expect(page.getByTestId("p69905-structure-host").getByRole("combobox")).toBeVisible({
+  await expect(page.getByTestId("p69905-structure-host").locator("canvas").first()).toBeVisible({
     timeout: 20_000,
   });
   await expect(page.getByTestId("p60-mapping-summary")).toContainText("118 columns");
@@ -31,7 +31,7 @@ test("keeps the query member identity stable while its row scrolls out and back 
   });
   await page.goto("/#/alignment-structure");
   await expect(page.getByTestId("p60-harness-status")).toContainText("ready", { timeout: 20_000 });
-  await expect(page.getByTestId("p69905-structure-host").getByRole("combobox")).toBeVisible({
+  await expect(page.getByTestId("p69905-structure-host").locator("canvas").first()).toBeVisible({
     timeout: 20_000,
   });
 
@@ -228,8 +228,13 @@ test("profile tracks, member actions, and show-all publish checked local structu
   await page.getByRole("button", { name: "Activate track Subgroup annotations" }).click();
   await expect(page.getByTestId("m50-action-summary")).toHaveText("Profile: subgroup");
   await expect(page.getByTestId("m50-structure-state")).toHaveText("M50-profile-4");
-  await page.getByRole("button", { name: "Show all checked structures" }).click();
-  await expect(page.getByTestId("m50-action-summary")).toHaveText("All four checked structures");
+  await page.getByRole("button", { name: "Show all with annotations" }).click();
+  await expect(page.getByTestId("m50-action-summary")).toHaveText(
+    "All four checked structures · subgroup annotations",
+  );
+  await expect(page.getByTestId("m50-action-payload")).toHaveText(
+    '{"kind":"show-all","ensembleId":"PF00042.29-P69905-1A3N-plus-AFDB-v6-3","profile":"subgroup","requestId":"M50-show-all-5"}',
+  );
   await expect(page.getByTestId("m50-structure-state")).toHaveText("M50-show-all-5");
   expect(external).toEqual([]);
 });

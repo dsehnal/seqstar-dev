@@ -214,7 +214,12 @@ type MappingSummary = {
 type ActionSummary =
   | { readonly kind: "profile"; readonly profile: string; readonly requestId: string }
   | { readonly kind: "member"; readonly memberId: string; readonly requestId: string }
-  | { readonly kind: "show-all"; readonly ensembleId: string; readonly requestId: string };
+  | {
+      readonly kind: "show-all";
+      readonly ensembleId: string;
+      readonly profile: string;
+      readonly requestId: string;
+    };
 
 function AlignmentStructureContent({
   initialMode,
@@ -298,11 +303,12 @@ function AlignmentStructureContent({
         aria-label="Alignment structure actions"
       >
         <button className="toolbar-button" onClick={showAll} type="button">
-          Show all checked structures
+          Show all with annotations
         </button>
         <span className="text-slate-600 text-sm">
           Click Consensus, Conservation, or Subgroup annotations to color every mapped checked
-          structure. A member cube shows that member alone.
+          structure. Show all retains the active profile (conservation by default); a member cube
+          shows that member alone.
         </span>
       </section>
       <div className="grid gap-5 xl:grid-cols-2">
@@ -341,7 +347,7 @@ function AlignmentStructureContent({
               ? `Profile: ${action.profile}`
               : action.kind === "member"
                 ? `Member: ${action.memberId}`
-                : "All four checked structures"}
+                : `All four checked structures · ${action.profile} annotations`}
         </p>
         <p className="sr-only" data-testid="m50-structure-state">
           {renderedRequest ?? "waiting for structure frame"}

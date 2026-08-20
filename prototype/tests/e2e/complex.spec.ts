@@ -190,6 +190,7 @@ test("uses actual sequence contact input, retains both endpoint roles, and remou
 
   const previousHost = await page.getByTestId("complex-structure-host").elementHandle();
   if (previousHost === null) throw new Error("Expected the mounted Mol* host.");
+  await page.locator(".app-nav__more > summary").click();
   await page.getByRole("link", { name: "Renderer comparison" }).click();
   await expect(page.getByTestId("case-renderer-portability")).toBeVisible();
   await expect

@@ -819,7 +819,7 @@ export const createAlignmentEnsembleMvs = (options: {
         : structure.transform({ matrix: [...entry.transform] });
     const full = transformed.component({ selector: chainSelector });
     if (!entry.predicted) full.focus();
-    full
+    const cartoon = full
       .representation({ type: "cartoon" })
       .color({ color: (options.profile === undefined ? entry.color : "#CBD5E1") as never });
     if (options.profile === undefined) continue;
@@ -837,15 +837,21 @@ export const createAlignmentEnsembleMvs = (options: {
       );
       if (color !== undefined) groups.set(color, [...(groups.get(color) ?? []), residue]);
     }
-    for (const [color, residues] of groups) {
-      // One selector per frozen category/bin/member is deterministic and keeps
-      // every mapped structure represented without a custom color theme.
-      for (const residue of residues)
-        transformed
-          .component({ selector: { ...chainSelector, label_seq_id: residue.labelSeqId } })
-          .representation({ type: "cartoon" })
-          .color({ color: color as never });
-    }
+    // Keep one cartoon per model and apply checked mapping rows as
+    // selector-scoped colors on that representation. Separate residue
+    // cartoons compete with the gray base geometry and can render gray due
+    // to depth ordering; scoped color layers have deterministic precedence.
+    for (const [color, residues] of [...groups].sort(([left], [right]) =>
+      left.localeCompare(right),
+    ))
+      cartoon.color({
+        color: color as never,
+        selector: residues.map((residue) => ({
+          ...chainSelector,
+          label_seq_id: residue.labelSeqId,
+          auth_seq_id: residue.authSeqId,
+        })),
+      });
   }
   return exactMvs(
     fixedTimestamp(
@@ -889,7 +895,12 @@ type ShowAllIntentPayload = { readonly ensembleId: string };
 type AlignmentActionPayload =
   | { readonly kind: "profile"; readonly profile: AlignmentProfile; readonly requestId: string }
   | { readonly kind: "member"; readonly memberId: string; readonly requestId: string }
-  | { readonly kind: "show-all"; readonly ensembleId: string; readonly requestId: string };
+  | {
+      readonly kind: "show-all";
+      readonly ensembleId: string;
+      readonly profile: AlignmentProfile;
+      readonly requestId: string;
+    };
 const readySchema = customSchema<ReadyPayload>(
   (value): value is ReadyPayload =>
     isObject(value) &&
@@ -939,7 +950,11 @@ const actionSchema = customSchema<AlignmentActionPayload>(
         value.profile === "conservation" ||
         value.profile === "subgroup")) ||
       (value.kind === "member" && typeof value.memberId === "string") ||
-      (value.kind === "show-all" && typeof value.ensembleId === "string")),
+      (value.kind === "show-all" &&
+        typeof value.ensembleId === "string" &&
+        (value.profile === "consensus" ||
+          value.profile === "conservation" ||
+          value.profile === "subgroup"))),
 );
 const message = <T>(
   type: string,
@@ -1058,6 +1073,10 @@ export const createAlignmentStructurePlugin = (
     if (ensembleByMember.size !== 4 || !ensembleByMember.has(queryMember.id))
       throw new Error("The alignment ensemble must expose the exact four approved members.");
     let actionGeneration = 0;
+    // “Show all” should never discard the annotation colors. Conservation is
+    // the initial structural profile; activating another annotation track
+    // changes the profile retained by subsequent ensemble displays.
+    let activeProfile: AlignmentProfile = "conservation";
     const actionRequest = (
       incoming: HarnessMessage,
       action:
@@ -1069,6 +1088,7 @@ export const createAlignmentStructurePlugin = (
       let document: MvsDocument;
       let detail: AlignmentActionPayload;
       if (action.kind === "profile") {
+        activeProfile = action.profile;
         document = createAlignmentEnsembleMvs({
           members: options.ensemble,
           profile: action.profile,
@@ -1110,12 +1130,17 @@ export const createAlignmentStructurePlugin = (
         if (action.ensembleId !== options.ensembleId) return;
         document = createAlignmentEnsembleMvs({
           members: options.ensemble,
+          profile: activeProfile,
           alignment: data.normalized.alignment,
-          title: "PF00042.29 experimental 1A3N plus three AlphaFold DB v6 predictions",
-          description:
-            "Comparative experimental-plus-predicted display; this is not a biological ensemble. Every model uses a frozen local transform into the P69905/1A3N frame.",
+          title: `PF00042.29 ${activeProfile} annotations across the checked structures`,
+          description: `Comparative experimental-plus-predicted display colored by the active ${activeProfile} annotation profile; this is not a biological ensemble. Every model uses a frozen local transform into the P69905/1A3N frame.`,
         });
-        detail = { kind: "show-all", ensembleId: action.ensembleId, requestId };
+        detail = {
+          kind: "show-all",
+          ensembleId: action.ensembleId,
+          profile: activeProfile,
+          requestId,
+        };
       }
       context.fabric.publish(
         message(

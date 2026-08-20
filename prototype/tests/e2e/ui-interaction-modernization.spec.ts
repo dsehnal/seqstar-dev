@@ -120,6 +120,53 @@ test("keeps Nightingale chrome synchronized, fixed, compact, and readable after 
   expect(new Set(chrome.displayRanges.map((range) => range.join(":"))).size).toBe(1);
 });
 
+test("keeps sequence viewers inset while Mol* stays flush and borderless", async ({ page }) => {
+  await page.goto("/#/alignment-structure?renderer=reference");
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText(
+    "reference renderer ready",
+    { timeout: 20_000 },
+  );
+  const sequenceHost = page.getByTestId("pf00042-alignment-host");
+  const structureHost = page.getByTestId("p69905-structure-host");
+  const molstarContent = structureHost.locator(".msp-plugin-content");
+  await expect(molstarContent).toBeVisible({ timeout: 20_000 });
+
+  expect(await sequenceHost.evaluate((element) => getComputedStyle(element).paddingLeft)).toBe(
+    "12px",
+  );
+  expect(await structureHost.evaluate((element) => getComputedStyle(element).paddingLeft)).toBe(
+    "0px",
+  );
+  expect(
+    await molstarContent.evaluate((element) => {
+      const style = getComputedStyle(element);
+      return [
+        style.borderTopWidth,
+        style.borderRightWidth,
+        style.borderBottomWidth,
+        style.borderLeftWidth,
+      ];
+    }),
+  ).toEqual(["0px", "0px", "0px", "0px"]);
+  expect(
+    await structureHost.evaluate((element) => {
+      const classes = [
+        "msp-snapshot-description-wrapper",
+        "msp-state-snapshot-viewport-controls",
+        "msp-animation-viewport-controls",
+      ];
+      return classes.map((className) => {
+        const probe = document.createElement("div");
+        probe.className = className;
+        element.append(probe);
+        const display = getComputedStyle(probe).display;
+        probe.remove();
+        return display;
+      });
+    }),
+  ).toEqual(["none", "none", "none"]);
+});
+
 test("retains the accessible glass shell under reduced motion, forced colors, narrow width, and zoom", async ({
   page,
 }) => {

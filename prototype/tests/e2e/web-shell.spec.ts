@@ -8,6 +8,7 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
 
   await expect(page).toHaveURL(/#\/renderer-portability$/u);
   await expect(page.getByTestId("case-renderer-portability")).toBeVisible();
+  await page.locator(".app-nav__more > summary").click();
   await expect(page.getByRole("link", { name: "Renderer comparison" })).toHaveAttribute(
     "aria-current",
     "page",
@@ -18,9 +19,15 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
   await page.getByRole("link", { name: "Protein complex" }).focus();
   await expect(page.getByRole("link", { name: "Protein complex" })).toBeFocused();
 
+  await page.getByRole("link", { name: "Mol* Harness Prototype" }).click();
+  await expect(page.getByText("Vibe-coded research prototype")).toBeVisible();
+  await expect(page.getByText("This is a vibe-coded prototype, not a product.")).toBeVisible();
+  await expect(page.getByRole("link", { name: "Explore case shells" })).toHaveCount(0);
+  await expect(page.locator(".app-nav > a")).toHaveCount(4);
+  await expect(page.locator(".app-nav__menu > a")).toHaveCount(3);
+
   await page.setViewportSize({ width: 480, height: 900 });
-  await expect(page.getByTestId("visualizer-panel-base-sequence")).toBeVisible();
-  await expect(page.getByTestId("visualizer-panel-nightingale")).toBeVisible();
+  await expect(page.getByTestId("prototype-shell")).toBeVisible();
 });
 
 test("disposes connected hosts and remounts a fresh StrictMode-safe harness", async ({ page }) => {

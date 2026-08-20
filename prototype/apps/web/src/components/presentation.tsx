@@ -113,7 +113,7 @@ export function ViewerPanel({
     >
       <section
         aria-label={`${title} visualizer`}
-        className="viewer-host"
+        className={`viewer-host viewer-host--${kind}`}
         data-testid={`${id}-host`}
         ref={hostRef}
       />
