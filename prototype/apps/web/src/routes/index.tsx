@@ -15,8 +15,9 @@ function OverviewPage() {
       </h1>
       <p className="mt-5 max-w-2xl text-lg text-slate-600 leading-8">
         This exploration connects many kinds of source data—including sequences, alignments,
-        annotations, coordinate mappings, experimental structures, and predicted models—to
-        independent 1D and 3D renderers through a shared interaction harness.
+        annotations, coordinate mappings, experimental structures, predicted models, live tomograms,
+        particle annotations, and EM densities—to independent spatial, 1D, and 3D renderers through
+        a shared interaction harness.
       </p>
       <p className="mt-6 max-w-2xl rounded-lg border border-amber-300/70 bg-amber-50/80 px-4 py-3 text-amber-950 leading-7">
         This is a vibe-coded prototype, not a product. It is intended to test interaction contracts,

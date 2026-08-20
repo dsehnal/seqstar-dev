@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lockfileSha256": "609ba0790e12dd7b39231a832966d923ad2f4c2366788ff8f5957f59958a1131",
+  "lockfileSha256": "8d625d8e515a40927a8bdebe19625c91b20a8a8e7ebeb73862e500d277420be1",
   "resolutions": {
     "@babel/code-frame@7.29.7": {
       "evidence": "sha256:f9cccb2e601db93851f10935b4e723c95a730c467f187462eb54b16bb353b036",

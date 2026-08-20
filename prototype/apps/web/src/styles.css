@@ -602,3 +602,201 @@ select {
     background: var(--shell-surface-solid);
   }
 }
+
+.tomogram-host {
+  min-height: 31rem;
+  overflow: hidden;
+  background: #0b1220;
+}
+.tomogram-placeholder {
+  margin: 0;
+  padding: 2rem;
+  color: #dbeafe;
+}
+.tomogram-viewer {
+  display: grid;
+  min-height: 31rem;
+  color: #e2e8f0;
+  background: #0b1220;
+}
+.tomogram-viewer__heading,
+.tomogram-viewer__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.9rem;
+  background: rgba(15, 23, 42, 0.94);
+}
+.tomogram-viewer__heading > div {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+.tomogram-viewer__heading span,
+.tomogram-viewer__footer {
+  color: #94a3b8;
+  font-size: 0.75rem;
+}
+.tomogram-viewer a {
+  flex: 0 0 auto;
+  color: #7dd3fc;
+}
+.tomogram-viewer__stage {
+  position: relative;
+  min-height: 22rem;
+  overflow: hidden;
+  background: #020617;
+}
+.tomogram-viewer__stage > img {
+  width: 100%;
+  height: 100%;
+  min-height: 22rem;
+  object-fit: cover;
+  opacity: 0.72;
+  filter: grayscale(1) contrast(1.18);
+}
+.tomogram-viewer__particles {
+  position: absolute;
+  inset: 0;
+}
+.tomogram-particle {
+  position: absolute;
+  width: 0.58rem;
+  height: 0.58rem;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.74);
+  box-shadow: 0 0 0 2px rgba(2, 6, 23, 0.32);
+  transform: translate(-50%, -50%);
+}
+.tomogram-particle:hover,
+.tomogram-particle[data-external-highlight] {
+  z-index: 2;
+  background: #fbbf24;
+  transform: translate(-50%, -50%) scale(1.65);
+}
+.tomogram-particle[data-selected],
+.tomogram-particle[data-external-selection] {
+  z-index: 3;
+  background: #fb7185;
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.72);
+  transform: translate(-50%, -50%) scale(1.7);
+}
+.tomogram-viewer__neuroglancer {
+  width: 100%;
+  height: 24rem;
+  border: 0;
+  border-top: 1px solid rgba(148, 163, 184, 0.22);
+  background: #020617;
+}
+.cryoet-object {
+  display: grid;
+  gap: 1.1rem;
+  padding: 1.1rem;
+}
+.cryoet-object__identity {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--shell-accent-strong);
+}
+.cryoet-object__identity > div {
+  display: grid;
+  gap: 0.15rem;
+}
+.cryoet-object__identity span,
+.cryoet-object__source {
+  color: var(--shell-muted);
+  font-size: 0.78rem;
+}
+.cryoet-object__facts {
+  display: grid;
+  gap: 0.62rem;
+  margin: 0;
+}
+.cryoet-object__facts > div {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 0.7rem;
+  padding-bottom: 0.55rem;
+  border-bottom: 1px solid var(--shell-line);
+}
+.cryoet-object__facts dt {
+  color: var(--shell-faint);
+  font-size: 0.75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+.cryoet-object__facts dd {
+  min-width: 0;
+  margin: 0;
+  color: var(--shell-ink);
+  font-size: 0.88rem;
+}
+.cryoet-object__facts a {
+  color: var(--shell-accent-strong);
+  font-weight: 700;
+}
+.cryoet-object__accession {
+  padding: 0;
+  border: 0;
+  color: var(--shell-accent-strong);
+  background: transparent;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+.cryoet-object__accession:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 0.16em;
+}
+.cryoet-object__accession:disabled {
+  cursor: wait;
+  opacity: 0.68;
+}
+.cryoet-object__external {
+  display: inline-flex;
+  align-items: center;
+  margin-inline: 0.22rem 0.08rem;
+  vertical-align: -0.12em;
+}
+.cryoet-page {
+  gap: 0.9rem;
+  padding-block: 1rem;
+}
+.cryoet-page .tomogram-host,
+.cryoet-page .tomogram-viewer {
+  min-height: 0;
+}
+.cryoet-page .tomogram-viewer__stage,
+.cryoet-page .tomogram-viewer__stage > img {
+  min-height: 13rem;
+  height: 13rem;
+}
+.cryoet-page .cryoet-object {
+  gap: 0.68rem;
+  padding: 0.82rem;
+}
+.cryoet-page .cryoet-object__facts {
+  gap: 0.35rem;
+}
+.cryoet-page .cryoet-object__facts > div {
+  padding-bottom: 0.35rem;
+}
+.cryoet-page .viewer-host {
+  height: 18rem;
+  min-height: 18rem;
+}
+@media (max-width: 640px) {
+  .tomogram-viewer__heading,
+  .tomogram-viewer__footer {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .cryoet-object__facts > div {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0.2rem;
+  }
+}

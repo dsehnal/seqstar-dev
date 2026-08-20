@@ -26,7 +26,7 @@ The cases deliberately exercise different layers:
 | Required | 3. AlphaFold-style complex | Multi-polymer data, pairwise annotations, and cross-chain mappings work. |
 | Required | 4. Alignment to sequence to structure | Translator composition works across alignment, sequence, and structure spaces. |
 | Stretch | 5. Nucleotide to protein | One-to-many and reverse-orientation mappings work across viewer instances. |
-| Future validation | 6. EMDB tomogram ecosystem | A third visualizer type can join without changing existing viewers. |
+| Live-data validation | 6. Cryo-ET particle linkage | A spatial visualizer can join without changing existing viewers. |
 
 ## Shared page behavior
 
@@ -320,32 +320,64 @@ and one-to-many semantics remain explicit.
 - Reverse mapping does not rely on array-valued `start`/`end` fields.
 - The two viewers are synchronized only through the harness.
 
-## Case 6: EMDB + Neuroglancer ecosystem extension (future validation)
-
-This case is not implemented in the first prototype, but it constrains the
-harness contracts.
+## Case 6: live Cryo-ET particle linkage
 
 ### Scenario
 
-Compose a sequence viewer, Mol*, and Neuroglancer for an EMDB/tomogram story.
-Registered translators connect sequence loci to structure residues and
-structure/spatial loci to tomogram coordinates or identified regions.
+Compose a sequence viewer, Mol*, and a spatial particle viewer around CryoET
+Data Portal dataset DS-10493 / run RN-34483. A deliberately small local join
+index connects particle class `AN-134660` to EMD-77085, representative PDB
+1DWN, and UniProt P03630. Particle coordinates, EMDB metadata and density,
+SIFTS mappings, atomic coordinates, and protein annotations load from their
+official live services rather than checked-in scientific copies.
 
 ### Expected flow
 
 ```text
-sequence hover
-  -> sequence locus
-  -> structure translator
-  -> Mol* highlight
-  -> spatial/tomogram translator
-  -> Neuroglancer highlight or focus
+particle selection
+  -> spatial-particle locus + stable annotation item ID
+  -> curated particle-class join
+  -> EMD-77085 density request + P03630 annotation context
+
+sequence hover/select <-> exact P03630 / 1DWN chain-A translator <-> Mol*
 ```
 
-The interaction may originate in any visualizer. Adding this case should
-require a Neuroglancer wrapper, its visualization-request payload contract,
-translator plugins, and harness configuration. It must not require changes to
-SeqViewSpec, MolViewSpec, the Seq* viewer, Nightingale, or the Mol* wrapper.
+The wrapper-owned particle projection publishes normal native hover/selection
+events. The full Zarr tomogram remains available through an explicit external
+Neuroglancer link; its control-heavy cross-origin iframe is not embedded in the
+compact case-study layout because it cannot expose a trusted harness event
+bridge. Density and representative structure are separate MVS presentations:
+clicking the EMDB or PDB accession selects and scrolls to the corresponding
+Mol* view, while UniProt track-header actions generate track-specific annotated
+1DWN presentations. 1DWN is biologically linked through live SIFTS and is not
+claimed as a fitted model for EMD-77085. The case adds a new portable tomogram
+request/wrapper and plugin without changing SeqViewSpec, MolViewSpec, the Seq*
+viewer, Nightingale, or the Mol* wrapper.
+
+### Live-data acceptance
+
+- exactly 128 live PP7 oriented-point annotations receive stable line-derived
+  IDs and retain x/y/z plus orientation;
+- EMDB title, 3.0 Å resolution, deposited contour, and map statistics are read
+  from the live EMD-77085 API; its downsampled BCIF is loaded through PDBe
+  Volume Server with an MVS isosurface at an explicit 3.7σ preview level (never
+  the incompatible full-resolution absolute contour);
+- live UniProt P03630 sequence/features generate a validated SeqViewSpec;
+- live SIFTS establishes exact P03630 residue 2–128 to 1DWN chain-A residue
+  1–127 mapping, preserving the actual Mol* generation coordinate space;
+- selecting a particle shows its class and coordinates and presents the class
+  density; the user can explicitly switch to the representative structure;
+- separate source-link icons preserve direct access to CryoET Portal, EMDB,
+  PDBe, and UniProt records without conflating source navigation with in-app
+  presentation selection;
+- sequence, regions, sites, and mutagenesis track headers generate validated
+  1DWN cartoons; sites and mutagenesis additionally use one bounded colored
+  ball-and-stick detail group;
+- the inspector exposes the currently rendered SeqViewSpec/MVS and bounded
+  harness messages;
+- deterministic tests mock the official response shapes and URLs, while a
+  separate live probe verifies current endpoints. No scientific response body
+  is committed as a fixture.
 
 ## Coverage summary
 

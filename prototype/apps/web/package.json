@@ -16,6 +16,7 @@
     "@seq-star/wrapper-seq-viewer": "workspace:*",
     "@seq-star/wrapper-molstar": "workspace:*",
     "@seq-star/wrapper-nightingale": "workspace:*",
+    "@seq-star/wrapper-tomogram": "workspace:*",
     "@tanstack/react-router": "catalog:",
     "lucide-react": "catalog:",
     "molstar": "5.11.0",

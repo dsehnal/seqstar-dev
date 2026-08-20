@@ -25,7 +25,8 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
   await expect(page.getByText("Vibe-coded research prototype")).toBeVisible();
   await expect(page.getByText("This is a vibe-coded prototype, not a product.")).toBeVisible();
   await expect(page.getByRole("link", { name: "Explore case shells" })).toHaveCount(0);
-  await expect(page.locator(".app-nav > a")).toHaveCount(4);
+  await expect(page.locator(".app-nav > a")).toHaveCount(5);
+  await expect(page.getByRole("link", { name: "Cryo-ET story" })).toBeVisible();
   await expect(page.locator(".app-nav__menu > a")).toHaveCount(3);
 
   await page.setViewportSize({ width: 480, height: 900 });

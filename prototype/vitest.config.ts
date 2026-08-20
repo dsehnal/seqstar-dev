@@ -13,6 +13,7 @@ export default defineConfig({
       "@seq-star/seq-view-spec": source("./packages/seq-view-spec/src/index.ts"),
       "@seq-star/wrapper-nightingale": source("./packages/wrapper-nightingale/src/index.ts"),
       "@seq-star/wrapper-seq-viewer": source("./packages/wrapper-seq-viewer/src/index.ts"),
+      "@seq-star/wrapper-tomogram": source("./packages/wrapper-tomogram/src/index.ts"),
     },
   },
   test: {

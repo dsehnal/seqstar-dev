@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AlignmentStructureRouteImport } from './routes/alignment-structure'
 import { Route as CdsProteinRouteImport } from './routes/cds-protein'
 import { Route as ComplexRouteImport } from './routes/complex'
+import { Route as CryoetTomogramRouteImport } from './routes/cryoet-tomogram'
 import { Route as HarnessDiagnosticsRouteImport } from './routes/harness-diagnostics'
 import { Route as P01FeasibilityRouteImport } from './routes/p01-feasibility'
 import { Route as ReferenceViewerRouteImport } from './routes/reference-viewer'
@@ -37,6 +38,11 @@ const CdsProteinRoute = CdsProteinRouteImport.update({
 const ComplexRoute = ComplexRouteImport.update({
   id: '/complex',
   path: '/complex',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CryoetTomogramRoute = CryoetTomogramRouteImport.update({
+  id: '/cryoet-tomogram',
+  path: '/cryoet-tomogram',
   getParentRoute: () => rootRouteImport,
 } as any)
 const HarnessDiagnosticsRoute = HarnessDiagnosticsRouteImport.update({
@@ -70,6 +76,7 @@ export interface FileRoutesByFullPath {
   '/alignment-structure': typeof AlignmentStructureRoute
   '/cds-protein': typeof CdsProteinRoute
   '/complex': typeof ComplexRoute
+  '/cryoet-tomogram': typeof CryoetTomogramRoute
   '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
   '/reference-viewer': typeof ReferenceViewerRoute
@@ -81,6 +88,7 @@ export interface FileRoutesByTo {
   '/alignment-structure': typeof AlignmentStructureRoute
   '/cds-protein': typeof CdsProteinRoute
   '/complex': typeof ComplexRoute
+  '/cryoet-tomogram': typeof CryoetTomogramRoute
   '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
   '/reference-viewer': typeof ReferenceViewerRoute
@@ -93,6 +101,7 @@ export interface FileRoutesById {
   '/alignment-structure': typeof AlignmentStructureRoute
   '/cds-protein': typeof CdsProteinRoute
   '/complex': typeof ComplexRoute
+  '/cryoet-tomogram': typeof CryoetTomogramRoute
   '/harness-diagnostics': typeof HarnessDiagnosticsRoute
   '/p01-feasibility': typeof P01FeasibilityRoute
   '/reference-viewer': typeof ReferenceViewerRoute
@@ -106,6 +115,7 @@ export interface FileRouteTypes {
     | '/alignment-structure'
     | '/cds-protein'
     | '/complex'
+    | '/cryoet-tomogram'
     | '/harness-diagnostics'
     | '/p01-feasibility'
     | '/reference-viewer'
@@ -117,6 +127,7 @@ export interface FileRouteTypes {
     | '/alignment-structure'
     | '/cds-protein'
     | '/complex'
+    | '/cryoet-tomogram'
     | '/harness-diagnostics'
     | '/p01-feasibility'
     | '/reference-viewer'
@@ -128,6 +139,7 @@ export interface FileRouteTypes {
     | '/alignment-structure'
     | '/cds-protein'
     | '/complex'
+    | '/cryoet-tomogram'
     | '/harness-diagnostics'
     | '/p01-feasibility'
     | '/reference-viewer'
@@ -140,6 +152,7 @@ export interface RootRouteChildren {
   AlignmentStructureRoute: typeof AlignmentStructureRoute
   CdsProteinRoute: typeof CdsProteinRoute
   ComplexRoute: typeof ComplexRoute
+  CryoetTomogramRoute: typeof CryoetTomogramRoute
   HarnessDiagnosticsRoute: typeof HarnessDiagnosticsRoute
   P01FeasibilityRoute: typeof P01FeasibilityRoute
   ReferenceViewerRoute: typeof ReferenceViewerRoute
@@ -175,6 +188,13 @@ declare module '@tanstack/react-router' {
       path: '/complex'
       fullPath: '/complex'
       preLoaderRoute: typeof ComplexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cryoet-tomogram': {
+      id: '/cryoet-tomogram'
+      path: '/cryoet-tomogram'
+      fullPath: '/cryoet-tomogram'
+      preLoaderRoute: typeof CryoetTomogramRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/harness-diagnostics': {
@@ -220,6 +240,7 @@ const rootRouteChildren: RootRouteChildren = {
   AlignmentStructureRoute: AlignmentStructureRoute,
   CdsProteinRoute: CdsProteinRoute,
   ComplexRoute: ComplexRoute,
+  CryoetTomogramRoute: CryoetTomogramRoute,
   HarnessDiagnosticsRoute: HarnessDiagnosticsRoute,
   P01FeasibilityRoute: P01FeasibilityRoute,
   ReferenceViewerRoute: ReferenceViewerRoute,

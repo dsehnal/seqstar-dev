@@ -89,6 +89,9 @@ importers:
       '@seq-star/wrapper-seq-viewer':
         specifier: workspace:*
         version: link:../../packages/wrapper-seq-viewer
+      '@seq-star/wrapper-tomogram':
+        specifier: workspace:*
+        version: link:../../packages/wrapper-tomogram
       '@tanstack/react-router':
         specifier: 'catalog:'
         version: 1.170.31(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
@@ -280,6 +283,18 @@ importers:
       '@seq-star/seq-viewer':
         specifier: workspace:*
         version: link:../seq-viewer
+
+  packages/wrapper-tomogram:
+    dependencies:
+      '@seq-star/harness-core':
+        specifier: workspace:*
+        version: link:../harness-core
+      '@seq-star/seq-coords':
+        specifier: workspace:*
+        version: link:../seq-coords
+      '@seq-star/seq-core':
+        specifier: workspace:*
+        version: link:../seq-core
 
   vendor/nightingale/nightingale-linegraph-track:
     dependencies:

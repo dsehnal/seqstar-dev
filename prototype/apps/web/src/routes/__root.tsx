@@ -63,6 +63,13 @@ function RootLayout() {
             >
               CDS translation
             </Link>
+            <Link
+              activeProps={{ "aria-current": "page" }}
+              search={{ renderer: undefined }}
+              to="/cryoet-tomogram"
+            >
+              Cryo-ET story
+            </Link>
             <details className="app-nav__more">
               <summary>
                 More

@@ -341,7 +341,11 @@ for (const entry of packages) {
   packageByName.set(entry.value.name, entry);
 }
 
-assert(packageByName.size === 15, `expected 15 workspace packages; found ${packageByName.size}`);
+assert(packageByName.size === 16, `expected 16 workspace packages; found ${packageByName.size}`);
+assert(
+  packageByName.has("@seq-star/wrapper-tomogram"),
+  "live tomogram wrapper workspace package is missing",
+);
 assert(lockfile.includes("lockfileVersion: '9.0'"), "pnpm lockfile v9 is required");
 assert(
   (lockfile.match(/^ {2}molstar@5\.11\.0:$/gm) ?? []).length === 1,

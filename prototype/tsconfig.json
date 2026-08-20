@@ -10,6 +10,7 @@
     { "path": "packages/wrapper-seq-viewer" },
     { "path": "packages/wrapper-nightingale" },
     { "path": "packages/wrapper-molstar" },
+    { "path": "packages/wrapper-tomogram" },
     { "path": "packages/integration-plugins" }
   ]
 }

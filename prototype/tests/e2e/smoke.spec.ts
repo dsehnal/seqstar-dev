@@ -5,6 +5,6 @@ test("loads the empty prototype shell", async ({ page }) => {
 
   await expect(page.getByTestId("prototype-shell")).toBeVisible();
   await expect(page.getByRole("heading", { level: 1 })).toContainText(
-    "interoperable sequence visualization",
+    "interoperable molecular and biological visualization",
   );
 });
