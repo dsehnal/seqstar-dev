@@ -71,6 +71,7 @@ unimplemented.
 | C40 | generic inspector binds rendered SeqViewSpec/MVS lifecycle identity, generated summaries and bounded redacted messages without a dataset catalog | `apps/web/src/inspect-panel*`; `inspect-panel-state.test.ts` | `mise run test`, app e2e | reviewed checkpoint `aadb8ca` |
 | C41 | Complex and reference pages prove offline startup, native sequence relationship events, exact MVS summaries, bounded navigation, remount disposal and P01 evidence overflow | `tests/e2e/{complex,reference-viewer,p01-feasibility}.spec.ts`; `tests/e2e/molviewspec-improvements.spec.ts` | focused Playwright, `test:e2e` | reviewed checkpoint `ded26bd` |
 | C50 | integrated audit covers startup/document identity, six MVS profiles, local/applied owner isolation, bidirectional mapping/clear, relationship endpoints, cancellation/no echo, navigation/remount, P01 narrow/wide overflow, and offline/dependency/fixture/license checks; narrow P01 host shrink fix is the authorized production reconciliation | cumulative C00–C41 tests; `tests/e2e/p01-feasibility.spec.ts`; `scripts/audit-p80-hardening.mjs` | final C50 command matrix in `spec/complex-interaction-improvement-plan.md` | implemented, pending independent review |
+| M70 | UI modernization aggregate matrix: complete semantic hover and replace-only transfer/clear, wrapper selection toggles, Nightingale chrome, all chooser modes and disposal, alignment ensemble states, CDS stability, diagnostic labs, offline routing, and accessible glass shell; renderer terminal failure is accepted/replay-lineage exact; complex links fall back to inspectable dual-role markers; P01 host remains bounded without clipping | `packages/harness-react/src/index.test.ts`; focused wrapper/harness tests; `tests/e2e/{renderer-portability,uniprot-structure,complex,alignment-structure,cds-protein,reference-viewer,p01-feasibility,hardening,ui-interaction-modernization}.spec.ts` | final M70 command matrix in `spec/ui-interaction-modernization-plan.md` | implemented and independently reviewed |
 | FUTURE-01 | EMDB/tomogram third-visualizer validation | `spec/case-studies.md` | none | future, not prototype scope |
 
 The original P80 clean worktree passed `mise install --locked`,
@@ -90,3 +91,19 @@ The H10–H40 integrated gate runs, from `prototype/`:
 `mise run check`, `mise run test`, `mise run build`, `mise run test:e2e`,
 `mise exec -- pnpm exec playwright test tests/e2e/uniprot-structure.spec.ts`,
 `git diff --check`, and `git status --short`.
+
+The M70 aggregate gate runs the command matrix in
+`spec/ui-interaction-modernization-plan.md` from `prototype/`. Its browser
+evidence combines focused behavioral probes (to retain exact native-event and
+owner assertions) with `tests/e2e/ui-interaction-modernization.spec.ts`, which
+checks every case-study chooser mode, actual Nightingale viewport chrome, and
+the forced-colors/reduced-motion/narrow-width/zoom shell. Results are pending
+the final independent review checkpoint. The implementer run passed `mise
+install --locked`, offline frozen install, `check:p80`, `check`, `test` (24
+files / 197 tests), `build`, and `test:e2e` (33 application tests, plus 1
+P01B, 22 P20, 6 P30, and 1 P40 browser probes), followed by the single-Mol*
+and local-Nightingale dependency listings and `git diff --check`.
+The final reconciliation additionally passed the exact accepted-replay failure
+lineage unit matrix and focused `renderer-portability`, `complex`, and P01
+browser tests (9 browser probes); the Nightingale complex test verifies the
+declared `links`-to-`markers` diagnostic and both named endpoint roles/loci.

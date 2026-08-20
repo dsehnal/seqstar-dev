@@ -59,6 +59,21 @@ const inspectLatestMessageWithoutPointerMove = async (
   return (await page.getByTestId("inspect-message-json").textContent()) ?? "";
 };
 
+const inspectMessageContaining = async (
+  page: Page,
+  type: string,
+  text: string,
+): Promise<string> => {
+  await page.getByTestId("inspect-tab-messages").click();
+  const messages = page.getByTestId(`inspect-message-${type}`);
+  for (let index = await messages.count(); index > 0; index--) {
+    await messages.nth(index - 1).evaluate((element: HTMLButtonElement) => element.click());
+    const json = (await page.getByTestId("inspect-message-json").textContent()) ?? "";
+    if (json.includes(text)) return json;
+  }
+  throw new Error(`No ${type} inspector record contained '${text}'.`);
+};
+
 test("composes the offline 1BRS sequence, neutral MVS, profiles, navigation, and inspector", async ({
   page,
 }) => {
@@ -175,7 +190,7 @@ test("uses actual sequence contact input, retains both endpoint roles, and remou
 
   const previousHost = await page.getByTestId("complex-structure-host").elementHandle();
   if (previousHost === null) throw new Error("Expected the mounted Mol* host.");
-  await page.getByRole("link", { name: "Renderer portability" }).click();
+  await page.getByRole("link", { name: "Renderer comparison" }).click();
   await expect(page.getByTestId("case-renderer-portability")).toBeVisible();
   await expect
     .poll(() =>
@@ -192,4 +207,86 @@ test("uses actual sequence contact input, retains both endpoint roles, and remou
   ).toHaveCount(1);
   await expect(page.getByTestId("complex-structure-host").locator("canvas").first()).toBeVisible();
   expect(errors).toEqual([]);
+});
+
+test("renders the Nightingale contact endpoint fallback with both semantic roles offline", async ({
+  page,
+}) => {
+  const external: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (url.protocol !== "data:" && !["127.0.0.1", "localhost"].includes(url.hostname))
+      external.push(request.url());
+  });
+  await page.goto("/#/complex?renderer=nightingale");
+  await expect(page.getByTestId("p50-harness-status")).toContainText("ready");
+  const sequence = page.getByTestId("complex-sequence-host");
+  const contacts = sequence.locator(
+    '[data-seqstar-track="contacts"][data-seqstar-layer="contact-links"]',
+  );
+  await expect(contacts).toBeVisible();
+  const markerIds = await contacts
+    .locator("[data-seqstar-feature-id]")
+    .evaluateAll((markers) =>
+      markers.map((marker) => marker.getAttribute("data-seqstar-feature-id") ?? ""),
+    );
+  expect(markerIds).toHaveLength(86);
+  const barnaseMarker = markerIds.find((id) => id.includes("endpoint-role:7:barnase"));
+  const barstarMarker = markerIds.find((id) => id.includes("endpoint-role:7:barstar"));
+  expect(barnaseMarker).toBeDefined();
+  expect(barstarMarker).toBeDefined();
+
+  const fallbackLifecycle = await inspectMessageContaining(
+    page,
+    "lifecycle.visualization",
+    "wrapper.nightingale.fallback.links-endpoints",
+  );
+  expect(fallbackLifecycle).toContain('"status": "degraded"');
+  expect(fallbackLifecycle).toContain('"componentId": "complex-sequence"');
+
+  await contacts.evaluate(
+    (element, featureId) =>
+      (
+        element as unknown as {
+          emitSeqstarInteraction(value: unknown): void;
+        }
+      ).emitSeqstarInteraction({
+        kind: "hover",
+        phase: "set",
+        featureId,
+        regions: [{ start: 1, end: 1 }],
+      }),
+    barnaseMarker,
+  );
+  const barnaseNative = await inspectLatestMessageWithoutPointerMove(page, "interaction.native");
+  expect(barnaseNative).toContain('"endpointRole": "barnase"');
+  expect(barnaseNative).toContain('"id": "uniprot-P00648-sequence"');
+  expect(barnaseNative).toContain('"id": "uniprot-P11540-sequence"');
+
+  await contacts.evaluate(
+    (element, featureId) =>
+      (
+        element as unknown as {
+          emitSeqstarInteraction(value: unknown): void;
+        }
+      ).emitSeqstarInteraction({
+        kind: "select",
+        phase: "set",
+        featureId,
+        regions: [{ start: 1, end: 1 }],
+      }),
+    barstarMarker,
+  );
+  const barstarNative = await inspectLatestMessageWithoutPointerMove(page, "interaction.native");
+  expect(barstarNative).toContain('"endpointRole": "barstar"');
+  expect(barstarNative).toContain('"id": "uniprot-P00648-sequence"');
+  expect(barstarNative).toContain('"id": "uniprot-P11540-sequence"');
+  const selected = await inspectLatestMessageWithoutPointerMove(
+    page,
+    "interaction.selection.apply",
+  );
+  expect(selected).toContain('"label-asym": "A"');
+  expect(selected).toContain('"label-asym": "D"');
+  await expect(page.getByTestId("inspect-profile-summary")).toContainText("Profile contact");
+  expect(external).toEqual([]);
 });

@@ -30,6 +30,7 @@ import {
   type RendererMode,
   rendererSearch,
 } from "../components/case-renderer-chooser";
+import { ViewerPanel } from "../components/presentation";
 
 const alignmentComponent = "pf00042-alignment";
 const structureComponent = "p69905-structure";
@@ -193,30 +194,6 @@ const createPageHarness = (
     },
   );
 
-function ViewerPanel({
-  id,
-  title,
-  detail,
-}: {
-  readonly id: string;
-  readonly title: string;
-  readonly detail: string;
-}) {
-  const host = useHarnessHost(id);
-  return (
-    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-      <h2 className="font-semibold text-slate-950 text-xl">{title}</h2>
-      <p className="mt-1 text-slate-600 text-sm">{detail}</p>
-      <section
-        aria-label={`${title} visualizer`}
-        className="relative mt-3 h-96 overflow-auto rounded border border-slate-200"
-        data-testid={`${id}-host`}
-        ref={host}
-      />
-    </section>
-  );
-}
-
 type ReadySummary = {
   readonly documentId: string;
   readonly alignmentId: string;
@@ -247,6 +224,8 @@ function AlignmentStructureContent({
   readonly onModeChange: (mode: RendererMode) => void;
 }) {
   const { harness, status } = useHarness();
+  const alignmentHost = useHarnessHost(alignmentComponent);
+  const structureHost = useHarnessHost(structureComponent);
   const [ready, setReady] = useState<ReadySummary>();
   const [paths, setPaths] = useState<readonly string[]>([]);
   const [action, setAction] = useState<ActionSummary>();
@@ -328,14 +307,17 @@ function AlignmentStructureContent({
       </section>
       <div className="grid gap-5 xl:grid-cols-2">
         <ViewerPanel
+          hostRef={alignmentHost}
           id={alignmentComponent}
           title="PF00042.29 virtualized alignment"
-          detail="32 stable rows · 118 columns · query P69905 positions 27–137"
+          description="32 stable rows · 118 columns · query P69905 positions 27–137"
         />
         <ViewerPanel
+          hostRef={structureHost}
           id={structureComponent}
           title="Mol* comparative structure view"
-          detail="Experimental 1A3N plus clearly labeled local AlphaFold DB v6 predictions"
+          description="Experimental 1A3N plus clearly labeled local AlphaFold DB v6 predictions"
+          kind="structure"
         />
       </div>
       <section

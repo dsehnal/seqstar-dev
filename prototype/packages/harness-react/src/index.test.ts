@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateRendererChooserConfiguration } from "./index.js";
+import { matchesRendererTransitionFailure, validateRendererChooserConfiguration } from "./index.js";
 
 const descriptor = {
   caseId: "complex",
@@ -72,5 +72,45 @@ describe("renderer chooser configuration", () => {
         ],
       }),
     ).toThrow();
+  });
+});
+
+describe("renderer chooser failure lineage", () => {
+  const expected = {
+    messageId: "replay-message",
+    requestId: "request-7",
+    correlationId: "correlation-7",
+  } as const;
+  const accepted = { ...expected, generation: 4 } as const;
+  const matching = {
+    componentId: "nightingale",
+    sourceComponent: "nightingale",
+    requestId: expected.requestId,
+    correlationId: expected.correlationId,
+    causationId: expected.messageId,
+    generation: accepted.generation,
+    status: "failed" as const,
+  };
+
+  it("accepts only a genuinely accepted terminal failure for the active replay", () => {
+    expect(matchesRendererTransitionFailure(expected, accepted, matching)).toBe(true);
+  });
+
+  it.each([
+    ["request", { requestId: "stale-request" }],
+    ["correlation", { correlationId: "other-correlation" }],
+    ["causation", { causationId: "other-message" }],
+    ["source", { sourceComponent: "other-wrapper" }],
+    ["generation", { generation: 5 }],
+  ])("keeps a transition pending for a stale or wrong %s failure", (_name, override) => {
+    expect(matchesRendererTransitionFailure(expected, accepted, { ...matching, ...override })).toBe(
+      false,
+    );
+  });
+
+  it("does not fail a transition from an unaccepted replay generation", () => {
+    expect(
+      matchesRendererTransitionFailure(expected, { ...accepted, generation: 3 }, matching),
+    ).toBe(false);
   });
 });

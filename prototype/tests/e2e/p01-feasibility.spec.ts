@@ -84,6 +84,29 @@ test("keeps P01 interaction evidence bounded at narrow and wide layouts", async 
     await expect(nightingale).toHaveCSS("overflow-y", "auto");
     await expect(molstar).toHaveCSS("overflow-y", "auto");
     await expect(molstar).toHaveCSS("overflow-wrap", "break-word");
+    const host = page.getByTestId("p01b-canvas-host");
+    await expect(host).toHaveCSS("overflow-y", "auto");
+    await expect(host).not.toHaveCSS("overflow-y", "hidden");
+    expect(
+      await host.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        scrollWidth: element.scrollWidth,
+        clientHeight: element.clientHeight,
+        scrollHeight: element.scrollHeight,
+      })),
+    ).toEqual(
+      expect.objectContaining({
+        clientWidth: expect.any(Number),
+        clientHeight: 420,
+      }),
+    );
+    expect(
+      await host.evaluate(
+        (element) =>
+          element.scrollWidth <= element.clientWidth + 1 &&
+          element.scrollHeight <= element.clientHeight + 1,
+      ),
+    ).toBe(true);
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
     ).toBe(true);

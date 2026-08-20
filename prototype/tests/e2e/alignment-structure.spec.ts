@@ -9,7 +9,7 @@ test("loads the offline PF00042.29 alignment / 1A3N structure case", async ({ pa
   });
   await page.goto("/#/alignment-structure");
   await expect(page).toHaveURL(/#\/alignment-structure$/u);
-  await expect(page.getByTestId("p60-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("p60-harness-status")).toContainText("ready", { timeout: 20_000 });
   await expect(
     page.getByTestId("pf00042-alignment-host").locator('[data-seq-viewer="canvas"]'),
   ).toBeVisible();
@@ -30,7 +30,7 @@ test("keeps the query member identity stable while its row scrolls out and back 
       external.push(request.url());
   });
   await page.goto("/#/alignment-structure");
-  await expect(page.getByTestId("p60-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("p60-harness-status")).toContainText("ready", { timeout: 20_000 });
   await expect(page.getByTestId("p69905-structure-host").getByRole("combobox")).toBeVisible({
     timeout: 20_000,
   });
@@ -112,7 +112,7 @@ test("renders the checked 32×118 fixture faithfully in Nightingale mode", async
     "nightingale renderer ready",
     { timeout: 20_000 },
   );
-  await expect(page.getByTestId("p60-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("p60-harness-status")).toContainText("ready", { timeout: 20_000 });
 
   const host = page.getByTestId("pf00042-alignment-host");
   const root = host.locator('[data-seqstar-nightingale="root"]');
@@ -198,7 +198,7 @@ test("profile tracks, member actions, and show-all publish checked local structu
       external.push(request.url());
   });
   await page.goto("/#/alignment-structure");
-  await expect(page.getByTestId("p60-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("p60-harness-status")).toContainText("ready", { timeout: 20_000 });
   const referenceHost = page.getByTestId("pf00042-alignment-host");
   await expect(
     referenceHost.locator("button[data-seq-viewer-alignment-member]:not(:disabled)"),

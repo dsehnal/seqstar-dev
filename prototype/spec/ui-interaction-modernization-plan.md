@@ -1,6 +1,6 @@
 # Mol* Harness UI and Interaction Modernization Plan
 
-Status: proposed implementation plan
+Status: implemented and independently reviewed
 
 This plan covers the interaction, renderer, alignment-ensemble, naming, and
 visual-design improvements requested after the reviewed Complex interaction

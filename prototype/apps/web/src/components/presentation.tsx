@@ -82,6 +82,7 @@ export function VisualizationCard({
 export function ViewerPanel({
   id,
   title,
+  description,
   kind = "sequence",
   hidden = false,
   children,
@@ -89,6 +90,7 @@ export function ViewerPanel({
 }: {
   readonly id: string;
   readonly title: string;
+  readonly description?: ReactNode;
   readonly kind?: "sequence" | "structure";
   readonly hidden?: boolean;
   readonly children?: ReactNode;
@@ -106,6 +108,7 @@ export function ViewerPanel({
       data-testid={`visualizer-panel-${panelTestId}`}
       hidden={hidden}
       title={title}
+      description={description}
       toolbar={<Icon aria-hidden="true" size={16} strokeWidth={1.8} />}
     >
       <section

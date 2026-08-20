@@ -244,7 +244,7 @@ function P01FeasibilityPage() {
             </button>
           </div>
           <div
-            className="relative mt-4 h-[420px] min-w-0 max-w-full overflow-hidden rounded border border-slate-200"
+            className="relative mt-4 h-[420px] min-w-0 max-w-full overflow-auto"
             data-testid="p01b-canvas-host"
             ref={molstarTarget}
           />

@@ -452,16 +452,52 @@ const lifecycle = (
   };
 };
 
-type VisibleRequest = {
+export type RendererRequestLineage = {
   readonly messageId: string;
   readonly requestId: string;
+  readonly correlationId: string;
   readonly generation: number;
 };
+type VisibleRequest = RendererRequestLineage;
+export type RendererTransitionExpectation = Omit<RendererRequestLineage, "generation">;
+export type RendererFailureLifecycle = {
+  readonly componentId: string;
+  readonly requestId: string;
+  readonly generation: number;
+  readonly sourceComponent: string;
+  readonly correlationId: string;
+  readonly causationId?: string;
+  readonly status: "accepted" | "rendered" | "degraded" | "failed" | "superseded";
+};
+
+/**
+ * A native wrapper can reject its first render before publishing a normal
+ * terminal result.  Treat that as terminal only when it is the request that
+ * this replacement explicitly replayed and accepted; never infer failure
+ * from a component id while another request is in flight.
+ */
+export const matchesRendererTransitionFailure = (
+  expected: RendererTransitionExpectation | undefined,
+  accepted: RendererRequestLineage | undefined,
+  result: RendererFailureLifecycle,
+): boolean =>
+  expected !== undefined &&
+  accepted !== undefined &&
+  result.status === "failed" &&
+  result.sourceComponent === result.componentId &&
+  result.requestId === expected.requestId &&
+  result.correlationId === expected.correlationId &&
+  result.causationId === expected.messageId &&
+  accepted.messageId === expected.messageId &&
+  accepted.requestId === expected.requestId &&
+  accepted.correlationId === expected.correlationId &&
+  accepted.generation === result.generation;
+
 type ActiveTransition = {
   readonly id: string;
   readonly from: RendererMode;
   readonly to: RendererMode;
-  readonly expected: Map<string, string>;
+  readonly expected: Map<string, RendererTransitionExpectation>;
 };
 
 /**
@@ -512,6 +548,23 @@ export function RendererChooserHost({
         if (request !== undefined) pendingRequests.current.set(request.targetComponent, request);
         const result = lifecycle(message);
         if (result === undefined) return;
+        const active = transition.current;
+        const expected = active?.expected.get(result.componentId);
+        if (
+          active !== undefined &&
+          result.status === "failed" &&
+          matchesRendererTransitionFailure(
+            expected,
+            accepted.current.get(result.componentId),
+            result,
+          )
+        ) {
+          transition.current = undefined;
+          setMode(active.to);
+          setError(new Error(`Renderer request ${result.status}.`));
+          setState("failed");
+          return;
+        }
         const pending = pendingRequests.current.get(result.componentId);
         if (
           pending === undefined ||
@@ -525,6 +578,7 @@ export function RendererChooserHost({
           accepted.current.set(result.componentId, {
             messageId: pending.message.id,
             requestId: pending.requestId,
+            correlationId: pending.message.correlationId,
             generation: result.generation,
           });
           return;
@@ -536,13 +590,13 @@ export function RendererChooserHost({
           attribution.generation !== result.generation
         )
           return;
-        const active = transition.current;
-        const belongsToTransition = active?.expected.get(result.componentId) === pending.message.id;
+        const belongsToTransition = expected?.messageId === pending.message.id;
         if (result.status === "rendered" || result.status === "degraded") {
           if (result.visibleRequestId !== result.requestId) return;
           const shown = {
             messageId: pending.message.id,
             requestId: result.requestId,
+            correlationId: pending.message.correlationId,
             generation: result.generation,
           };
           visible.current.set(result.componentId, shown);
@@ -551,8 +605,8 @@ export function RendererChooserHost({
             belongsToTransition &&
             active !== undefined &&
             [...active.expected].every(
-              ([componentId, messageId]) =>
-                visible.current.get(componentId)?.messageId === messageId,
+              ([componentId, expectation]) =>
+                visible.current.get(componentId)?.messageId === expectation.messageId,
             )
           ) {
             transition.current = undefined;
@@ -583,11 +637,12 @@ export function RendererChooserHost({
   );
 
   useEffect(() => {
+    if (state === "failed" && mode === descriptor.initialMode) return;
     if (modes.has(descriptor.initialMode) && descriptor.initialMode !== requestedMode) {
       setRequestedMode(descriptor.initialMode);
       setState("pending");
     }
-  }, [descriptor.initialMode, modes, requestedMode]);
+  }, [descriptor.initialMode, mode, modes, requestedMode, state]);
 
   useEffect(() => {
     if (harnessStatus !== "ready" || mode !== undefined) return;
@@ -671,7 +726,11 @@ export function RendererChooserHost({
           targetComponent: entry.targetComponent,
           requestId: entry.requestId,
         });
-        active.expected.set(entry.targetComponent, envelope.id);
+        active.expected.set(entry.targetComponent, {
+          messageId: envelope.id,
+          requestId: entry.requestId,
+          correlationId: envelope.correlationId,
+        });
         harness.fabric.publish(envelope);
       }
     };

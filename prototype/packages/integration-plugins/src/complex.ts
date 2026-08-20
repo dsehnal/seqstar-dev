@@ -678,6 +678,10 @@ export const createComplexSeqViewSpec = (options: {
                     id: "contact-links",
                     representation: "links",
                     annotation: "barnase-barstar-contacts",
+                    // Nightingale has no relationship-arc primitive. Its
+                    // declared endpoint-marker fallback retains both named
+                    // contact roles without pretending that arcs rendered.
+                    fallback: { representation: "markers" },
                     color: {
                       kind: "continuous",
                       field: "value",

@@ -440,6 +440,10 @@ select {
     animation-duration: 0.01ms;
     animation-iteration-count: 1;
   }
+  .app-nav a,
+  .icon-button {
+    transition-duration: 0.01ms;
+  }
 }
 @media (prefers-reduced-transparency: reduce) {
   .app-shell-header,
