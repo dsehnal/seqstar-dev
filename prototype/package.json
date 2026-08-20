@@ -11,6 +11,7 @@
   "scripts": {
     "install:frozen": "pnpm install --frozen-lockfile",
     "install:browser": "playwright install chromium",
+    "inspect:mvs-story": "pnpm --filter @seq-star/integration-plugins run inspect:mvs-story",
     "dev": "pnpm --filter @seq-star/prototype-web dev",
     "check": "pnpm run check:biome && pnpm run check:types && pnpm run check:schema && pnpm run check:fixtures && pnpm run check:dependencies",
     "check:biome": "biome check .",

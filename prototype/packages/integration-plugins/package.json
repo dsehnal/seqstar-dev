@@ -13,7 +13,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -b"
+    "build": "tsc -b",
+    "inspect:mvs-story": "node scripts/read-mvs-story.mjs"
   },
   "dependencies": {
     "@seq-star/harness-core": "workspace:*",
