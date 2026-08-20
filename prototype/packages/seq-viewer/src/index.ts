@@ -250,6 +250,7 @@ class CanvasSeqViewer implements SeqViewer {
   private zoom = 1;
   private pan = 0;
   private nativeHover: SeqViewerInteraction | undefined;
+  private nativeSelection: SeqViewerInteraction | undefined;
 
   constructor(privateOptions: CreateSeqViewerOptions) {
     this.options = privateOptions;
@@ -471,8 +472,9 @@ class CanvasSeqViewer implements SeqViewer {
     const next = this.buildActive(checked.value, view, resolvedById);
     this.disposeAll(this.instances.splice(0), diagnostics);
     this.instances.push(...instances);
+    this.clearNativeHover();
+    this.clearNativeSelection();
     this.active = next;
-    this.nativeHover = undefined;
     this.zoom = 1;
     this.pan = 0;
     this.root.scrollTop = 0;
@@ -560,6 +562,8 @@ class CanvasSeqViewer implements SeqViewer {
 
   dispose(): void {
     if (this.disposed) return;
+    this.clearNativeHover();
+    this.clearNativeSelection();
     this.disposed = true;
     ++this.generation;
     try {
@@ -597,7 +601,6 @@ class CanvasSeqViewer implements SeqViewer {
       /* cleanup continues */
     }
     this.active = undefined;
-    this.nativeHover = undefined;
     this.highlights.clear();
     this.selections.clear();
   }
@@ -749,7 +752,11 @@ class CanvasSeqViewer implements SeqViewer {
           Math.abs(markerX - x) <= Math.max(3, Math.min(7, this.cell() / 4))
         ) {
           const space = active.spaces.get(item.locus.space);
-          if (space)
+          if (space) {
+            const relationship =
+              annotation.kind === "relationships"
+                ? annotation.items.find((relationship) => relationship.id === item.id)
+                : undefined;
             return {
               layer: resolved,
               annotation,
@@ -758,8 +765,11 @@ class CanvasSeqViewer implements SeqViewer {
                 ? { endpointRole: item.endpointRole }
                 : {}),
               locusIndex: item.locusIndex,
-              loci: [boundary(space, item.locus.position)],
+              loci: relationship
+                ? this.relationshipLoci(active, relationship)
+                : [boundary(space, item.locus.position)],
             };
+          }
         }
       }
     }
@@ -813,9 +823,23 @@ class CanvasSeqViewer implements SeqViewer {
                 itemId: item.id,
                 endpointRole: endpoint.role,
                 locusIndex,
-                loci: [this.convertLocus(space, locus)],
+                loci: this.relationshipLoci(active, item),
               };
     return undefined;
+  }
+
+  private relationshipLoci(
+    active: Active,
+    relationship: Extract<Annotation, { kind: "relationships" }>["items"][number],
+  ): readonly CoordinateLocus[] {
+    return Object.freeze(
+      relationship.endpoints.flatMap((endpoint) =>
+        endpoint.loci.flatMap((locus) => {
+          const space = active.spaces.get(locus.space);
+          return space ? [this.convertLocus(space, locus)] : [];
+        }),
+      ),
+    );
   }
 
   private convertLocus(space: CoordinateSpace, locus: Locus): CoordinateLocus {
@@ -1242,6 +1266,10 @@ class CanvasSeqViewer implements SeqViewer {
       this.drawCommand(context, active, command, "rgb(250 204 21 / 35%)");
     for (const command of this.selections.values())
       this.drawCommand(context, active, command, "rgb(59 130 246 / 25%)");
+    if (this.nativeHover)
+      this.drawLoci(context, active, this.nativeHover.loci, "rgb(250 204 21 / 55%)");
+    if (this.nativeSelection)
+      this.drawLoci(context, active, this.nativeSelection.loci, "rgb(37 99 235 / 45%)");
   }
   private drawCommand(
     context: CanvasRenderingContext2D,
@@ -1249,11 +1277,20 @@ class CanvasSeqViewer implements SeqViewer {
     command: SequenceHighlight | SequenceSelection,
     color: string,
   ): void {
+    this.drawLoci(context, active, command.loci, color, command.trackId);
+  }
+  private drawLoci(
+    context: CanvasRenderingContext2D,
+    active: Active,
+    loci: readonly CoordinateLocus[],
+    color: string,
+    trackId?: string,
+  ): void {
     context.fillStyle = color;
     for (const row of active.rows) {
-      if (command.trackId && command.trackId !== row.track.id) continue;
+      if (trackId && trackId !== row.track.id) continue;
       const y = row.top - this.root.scrollTop;
-      for (const locus of command.loci)
+      for (const locus of loci)
         active.view.axis.segments.forEach((segment, index) => {
           if (segment.space !== locus.space.id) return;
           if (
@@ -1328,24 +1365,77 @@ class CanvasSeqViewer implements SeqViewer {
   }
   private readonly hover = (event: PointerEvent): void => {
     const hit = this.hitTest(event.clientX, event.clientY);
-    if (hit) {
-      this.nativeHover = { ...hit, kind: "hover", phase: "set" };
-      this.subject.next({ ...this.nativeHover, nativeEvent: event });
-    } else this.clearNativeHover(event);
+    if (hit) this.setNativeHover(hit, event);
+    else this.clearNativeHover(event);
   };
   private readonly leave = (event: PointerEvent): void => {
     this.clearNativeHover(event);
   };
-  private clearNativeHover(event: PointerEvent): void {
+  private setNativeHover(hit: SeqViewerInteraction, event: PointerEvent): void {
+    const next = { ...hit, kind: "hover" as const, phase: "set" as const };
+    if (this.sameNativeTarget(this.nativeHover, next)) return;
+    this.clearNativeHover(event);
+    this.nativeHover = next;
+    this.draw();
+    this.subject.next({ ...next, nativeEvent: event });
+  }
+  private clearNativeHover(event?: Event): void {
     if (!this.nativeHover) return;
     const previous = this.nativeHover;
     this.nativeHover = undefined;
-    this.subject.next({ ...previous, phase: "clear", nativeEvent: event });
+    this.draw();
+    this.subject.next({
+      ...previous,
+      phase: "clear",
+      ...(event ? { nativeEvent: event } : {}),
+    });
   }
   private readonly select = (event: MouseEvent): void => {
     const hit = this.hitTest(event.clientX, event.clientY);
-    if (hit) this.subject.next({ ...hit, kind: "select", phase: "set", nativeEvent: event });
+    if (hit) this.setNativeSelection(hit, event);
+    else this.clearNativeSelection(event);
   };
+  private setNativeSelection(hit: SeqViewerInteraction, event: MouseEvent): void {
+    const next = { ...hit, kind: "select" as const, phase: "set" as const };
+    if (this.sameNativeTarget(this.nativeSelection, next)) return;
+    this.clearNativeSelection(event);
+    this.nativeSelection = next;
+    this.draw();
+    this.subject.next({ ...next, nativeEvent: event });
+  }
+  private clearNativeSelection(event?: Event): void {
+    if (!this.nativeSelection) return;
+    const previous = this.nativeSelection;
+    this.nativeSelection = undefined;
+    this.draw();
+    this.subject.next({
+      ...previous,
+      phase: "clear",
+      ...(event ? { nativeEvent: event } : {}),
+    });
+  }
+  private sameNativeTarget(
+    current: SeqViewerInteraction | undefined,
+    next: SeqViewerInteraction,
+  ): boolean {
+    if (!current) return false;
+    return (
+      current.kind === next.kind &&
+      current.documentId === next.documentId &&
+      current.viewId === next.viewId &&
+      current.sectionId === next.sectionId &&
+      current.trackId === next.trackId &&
+      current.layerId === next.layerId &&
+      current.sequenceId === next.sequenceId &&
+      current.alignmentId === next.alignmentId &&
+      current.alignmentMemberId === next.alignmentMemberId &&
+      current.annotationId === next.annotationId &&
+      current.itemId === next.itemId &&
+      current.endpointRole === next.endpointRole &&
+      current.locusIndex === next.locusIndex &&
+      JSON.stringify(current.loci) === JSON.stringify(next.loci)
+    );
+  }
   private readonly wheel = (event: WheelEvent): void => {
     if (!this.active || (!event.ctrlKey && !event.shiftKey)) return;
     event.preventDefault();

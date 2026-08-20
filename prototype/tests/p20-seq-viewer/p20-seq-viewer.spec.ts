@@ -77,27 +77,38 @@ test("preserves relationship endpoint and locus identity for boundary links", as
     ).__p20.viewer();
     return [156, 269, 382].map((x) => viewer.hitTest(x, 35));
   });
-  expect(hits[0]).toMatchObject({
-    layerId: "links-layer",
-    itemId: "edge",
-    endpointRole: "from",
-    locusIndex: 2,
-    loci: [{ kind: "boundary", position: 0 }],
-  });
-  expect(hits[1]).toMatchObject({
-    layerId: "links-layer",
-    itemId: "edge",
-    endpointRole: "to",
-    locusIndex: 1,
-    loci: [{ kind: "boundary", position: 2 }],
-  });
-  expect(hits[2]).toMatchObject({
-    layerId: "links-layer",
-    itemId: "edge",
-    endpointRole: "to",
-    locusIndex: 2,
-    loci: [{ kind: "boundary", position: 4 }],
-  });
+  const pointLocus = (value: number) =>
+    expect.objectContaining({
+      kind: "point",
+      space: expect.objectContaining({ id: "sequence-space" }),
+      position: expect.objectContaining({ value }),
+    });
+  const boundaryLocus = (position: number) =>
+    expect.objectContaining({
+      kind: "boundary",
+      space: expect.objectContaining({ id: "sequence-space" }),
+      position,
+    });
+  const allEndpointLoci = [
+    pointLocus(0),
+    pointLocus(1),
+    boundaryLocus(0),
+    pointLocus(3),
+    boundaryLocus(2),
+    boundaryLocus(4),
+  ];
+  const targets = [
+    { endpointRole: "from", locusIndex: 2 },
+    { endpointRole: "to", locusIndex: 1 },
+    { endpointRole: "to", locusIndex: 2 },
+  ];
+  for (const [index, target] of targets.entries()) {
+    expect(hits[index]).toMatchObject({ layerId: "links-layer", itemId: "edge", ...target });
+    expect((hits[index] as { loci: unknown[] }).loci).toHaveLength(6);
+    expect((hits[index] as { loci: unknown[] }).loci).toEqual(
+      expect.arrayContaining(allEndpointLoci),
+    );
+  }
 });
 
 test("keeps stacked block lanes stable over whole intervals", async ({ page }) => {
@@ -157,22 +168,41 @@ test("adapts numeric heatmap data to declared bars fallback and rejects omission
         itemId: "edge",
         endpointRole: "from",
         locusIndex: 2,
-        loci: [{ kind: "boundary", position: 0 }],
+        loci: expect.any(Array),
       },
       {
         itemId: "edge",
         endpointRole: "to",
         locusIndex: 1,
-        loci: [{ kind: "boundary", position: 2 }],
+        loci: expect.any(Array),
       },
       {
         itemId: "edge",
         endpointRole: "to",
         locusIndex: 2,
-        loci: [{ kind: "boundary", position: 4 }],
+        loci: expect.any(Array),
       },
     ],
   });
+  expect((evidence as { relationshipHits: Array<{ loci: unknown[] }> }).relationshipHits).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        loci: expect.arrayContaining([
+          expect.objectContaining({ position: expect.objectContaining({ value: 0 }) }),
+        ]),
+      }),
+      expect.objectContaining({
+        loci: expect.arrayContaining([
+          expect.objectContaining({ position: expect.objectContaining({ value: 3 }) }),
+        ]),
+      }),
+    ]),
+  );
+  expect(
+    (evidence as { relationshipHits: Array<{ loci: unknown[] }> }).relationshipHits.every(
+      (hit) => hit.loci.length === 6,
+    ),
+  ).toBe(true);
 });
 
 test("emits one attributed native hover clear when entering a display gap", async ({ page }) => {
@@ -199,6 +229,85 @@ test("emits one attributed native hover clear when entering a display gap", asyn
   expect(events.map((event) => event.phase)).toEqual(["set", "clear", "set", "clear"]);
   expect(events[1]).toMatchObject({ itemId: "edge", loci: expect.any(Array) });
   expect(events[3]).toMatchObject({ itemId: "edge", loci: expect.any(Array) });
+});
+
+test("renders and leases complete relationship state locally with replace semantics", async ({
+  page,
+}) => {
+  await page.goto("/");
+  await page.mouse.move(184, 35);
+  const hoverPixels = await page.evaluate(() => {
+    const canvas = document.querySelector<HTMLCanvasElement>("[data-seq-viewer=canvas]");
+    const context = canvas?.getContext("2d");
+    if (!context) throw new Error("canvas missing");
+    return [184, 350, 269, 382].map((x) => [...context.getImageData(x, 35, 1, 1).data]);
+  });
+  await page.mouse.move(350, 35);
+  await page.mouse.move(390, 35);
+  const hover = await page.evaluate(() =>
+    (
+      window as typeof window & {
+        __p20: {
+          events: Array<{ kind: string; phase?: string; endpointRole?: string; loci: unknown[] }>;
+        };
+      }
+    ).__p20.events.filter((event) => event.kind === "hover"),
+  );
+  await page.mouse.click(184, 35);
+  await page.mouse.click(350, 35);
+  await page.mouse.click(390, 35);
+  const events = await page.evaluate(
+    () =>
+      (
+        window as typeof window & {
+          __p20: {
+            events: Array<{
+              kind: string;
+              phase?: string;
+              endpointRole?: string;
+              loci: unknown[];
+            }>;
+          };
+        }
+      ).__p20.events,
+  );
+  const selection = events.filter((event) => event.kind === "select");
+  expect(hover.map((event) => event.phase)).toEqual(["set", "clear", "set", "clear"]);
+  expect(hover.map((event) => event.endpointRole)).toEqual(["from", "from", "to", "to"]);
+  expect(selection.map((event) => event.phase)).toEqual(["set", "clear", "set", "clear"]);
+  expect(selection.map((event) => event.endpointRole)).toEqual(["from", "from", "to", "to"]);
+  expect([...hover, ...selection].every((event) => event.loci.length === 6)).toBe(true);
+  expect(hoverPixels.every((pixel) => pixel[0] > pixel[2])).toBe(true);
+});
+
+test("clears native hover and selection during replacement and disposal", async ({ page }) => {
+  await page.goto("/");
+  await page.mouse.move(184, 35);
+  await page.mouse.click(184, 35);
+  await page.evaluate(() =>
+    (window as typeof window & { __p20: { loadTall(): Promise<number> } }).__p20.loadTall(),
+  );
+  await page.mouse.move(184, 12);
+  await page.mouse.click(184, 12);
+  const events = await page.evaluate(() => {
+    const fixture = window as typeof window & {
+      __p20: { dispose(): void; events: Array<{ kind: string; phase?: string }> };
+    };
+    fixture.__p20.dispose();
+    return fixture.__p20.events;
+  });
+  expect(events.filter((event) => event.kind === "hover").map((event) => event.phase)).toEqual([
+    "set",
+    "clear",
+    "set",
+    "clear",
+  ]);
+  expect(events.filter((event) => event.kind === "select").map((event) => event.phase)).toEqual([
+    "set",
+    "clear",
+    "set",
+    "clear",
+  ]);
 });
 
 test("external point, interval, boundary and scoped commands do not echo", async ({ page }) => {
