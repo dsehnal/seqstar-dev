@@ -77,17 +77,22 @@ test("keeps every route offline and leaves no stale mounted root across repeated
   ).toHaveCount(2);
 
   await page.goto("/#/uniprot-structure");
-  await expect(page.getByTestId("p41-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");
   const tracks = page.getByTestId("uniprot-tracks-host");
   await tracks.locator('[data-seqstar-track-activate="regions"]').click();
-  const staleRequest = await page.getByTestId("p41-request-id").textContent();
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "dataset-1-P04637-1TUP-regions-",
+  );
+  const staleRequest = await page.getByTestId("inspect-mvs-request-id").textContent();
   await tracks.locator('[data-seqstar-track-activate="variants"]').click();
-  await expect(page.getByTestId("p41-request-id")).toContainText("P41-variants-");
-  await expect(page.getByTestId("p41-mvs-json")).toContainText("Natural variants on 1TUP");
-  await expect(page.getByTestId("p41-generated-lifecycle")).toHaveText(/rendered|degraded/u, {
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "dataset-1-P04637-1TUP-variants-",
+  );
+  await expect(page.getByTestId("inspect-mvs-json")).toContainText("Natural variants on 1TUP");
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
-  expect(await page.getByTestId("p41-request-id").textContent()).not.toBe(staleRequest);
+  expect(await page.getByTestId("inspect-mvs-request-id").textContent()).not.toBe(staleRequest);
 
   await page.goto("/#/renderer-portability");
   await expect(page.getByTestId("nightingale-sequence-lifecycle")).toHaveText("degraded");
@@ -194,17 +199,18 @@ test("uses production Case 1/2 native seams without echo and downloads the valid
   expect(reflectedToNightingale).toBeGreaterThan(0);
 
   await page.goto("/#/uniprot-structure");
-  await expect(page.getByTestId("p41-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");
   await page
     .getByTestId("uniprot-tracks-host")
     .locator('[data-seqstar-track-activate="regions"]')
     .click();
-  await expect(page.getByTestId("p41-generated-lifecycle")).toHaveText(/rendered|degraded/u, {
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
+  await page.getByTestId("inspect-tab-mvs").click();
   const [download] = await Promise.all([
     page.waitForEvent("download"),
-    page.getByRole("button", { name: "Download validated MVSJ" }).click(),
+    page.getByTestId("inspect-download-mvs").click(),
   ]);
   const path = await download.path();
   expect(path).not.toBeNull();

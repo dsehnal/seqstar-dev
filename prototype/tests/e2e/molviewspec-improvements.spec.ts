@@ -6,7 +6,7 @@ type Profile = {
   readonly selectors: number;
 };
 
-const inspectProfile = async (page: Page, testId: "p41-mvs-json" | "p50-mvs-json") =>
+const inspectProfile = async (page: Page, testId: "inspect-mvs-json" | "p50-mvs-json") =>
   page.getByTestId(testId).evaluate((element): Profile => {
     const document = JSON.parse(element.textContent ?? "{}") as {
       readonly root?: unknown;
@@ -64,7 +64,7 @@ test("renders every revised P04637 and 1BRS MVS profile offline without accumula
   page.on("pageerror", (error) => errors.push(error.message));
 
   await page.goto("/#/uniprot-structure");
-  await expect(page.getByTestId("p41-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -76,47 +76,47 @@ test("renders every revised P04637 and 1BRS MVS profile offline without accumula
   for (const profile of [
     {
       track: "missense-score",
-      request: "P41-missense-score-",
+      request: "dataset-1-P04637-1TUP-missense-score-",
       selectors: 196,
       components: 1,
       representations: { cartoon: 1 },
     },
     {
       track: "structure-coverage",
-      request: "P41-structure-coverage-",
+      request: "dataset-1-P04637-1TUP-structure-coverage-",
       selectors: 196,
       components: 1,
       representations: { cartoon: 1 },
     },
     {
       track: "regions",
-      request: "P41-regions-",
+      request: "dataset-1-P04637-1TUP-regions-",
       selectors: 196,
       components: 1,
       representations: { cartoon: 1 },
     },
     {
       track: "sites",
-      request: "P41-sites-",
+      request: "dataset-1-P04637-1TUP-sites-",
       selectors: 2,
       components: 3,
       representations: { ball_and_stick: 2, cartoon: 1 },
     },
     {
       track: "variants",
-      request: "P41-variants-",
+      request: "dataset-1-P04637-1TUP-variants-",
       selectors: 2,
       components: 1,
       representations: { cartoon: 1 },
     },
   ] as const) {
     await tracks.locator(`[data-seqstar-track-activate="${profile.track}"]`).click();
-    await expect(page.getByTestId("p41-request-id")).toContainText(profile.request);
-    await expect(page.getByTestId("p41-generated-lifecycle")).toHaveText(/rendered|degraded/u, {
+    await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(profile.request);
+    await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
       timeout: 20_000,
     });
     await expect
-      .poll(() => inspectProfile(page, "p41-mvs-json"))
+      .poll(() => inspectProfile(page, "inspect-mvs-json"))
       .toEqual({
         components: profile.components,
         representations: profile.representations,

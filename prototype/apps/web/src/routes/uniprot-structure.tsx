@@ -1,42 +1,67 @@
 import { createApplicationHarness, type HarnessMessage } from "@seq-star/harness-core";
+import { HarnessProvider, useHarness, useHarnessHost } from "@seq-star/harness-react";
 import {
-  HarnessProvider,
-  useHarness,
-  useHarnessHost,
-  useHarnessMessages,
-} from "@seq-star/harness-react";
-import {
-  createUniProtStructurePlugin,
-  type UniProtMvsGeneration,
+  createUniProtDatasetsPlugin,
+  type UniProtDatasetAssetBundle,
+  type UniProtDatasetId,
 } from "@seq-star/integration-plugins";
 import { createMolstarWrapperFactory } from "@seq-star/wrapper-molstar";
 import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useState } from "react";
-import structureUrl from "../../../../fixtures/uniprot-structure/input/1TUP.cif?url";
-import mappingTsv from "../../../../fixtures/uniprot-structure/mappings/P04637-1TUP-chain-A.tsv?raw";
+import { useCallback } from "react";
+import alignmentAfa from "../../../../fixtures/alignment-structure/expected/PF00042.29-32rows.query-centric.afa?raw";
+import alignmentStructureUrl from "../../../../fixtures/alignment-structure/input/1A3N.cif?url";
+import p69905Fasta from "../../../../fixtures/alignment-structure/input/P69905.fasta?raw";
+import p69905StructureMapping from "../../../../fixtures/alignment-structure/mappings/P69905-1A3N-chain-A.tsv?raw";
+import p69905AlignmentMapping from "../../../../fixtures/alignment-structure/mappings/P69905-PF00042-1A3N-chain-A.tsv?raw";
+import syntheticConfidence from "../../../../fixtures/complex/expected/synthetic-confidence.tsv?raw";
+import complexStructureUrl from "../../../../fixtures/complex/input/1BRS.cif?url";
+import p00648Fasta from "../../../../fixtures/complex/input/P00648.fasta?raw";
+import complexContacts from "../../../../fixtures/complex/mappings/1BRS-chain-A-D-heavy-atom-contacts.tsv?raw";
+import p00648Mapping from "../../../../fixtures/complex/mappings/P00648-1BRS-chain-A.tsv?raw";
+import p53StructureUrl from "../../../../fixtures/uniprot-structure/input/1TUP.cif?url";
+import p04637Mapping from "../../../../fixtures/uniprot-structure/mappings/P04637-1TUP-chain-A.tsv?raw";
+import { InspectPanel, useInspectPanelState } from "../inspect-panel";
 
 const sequenceComponent = "uniprot-tracks";
 const structureComponent = "structure-view";
 
+const assets: UniProtDatasetAssetBundle = {
+  p04637: { mappingTsv: p04637Mapping, structureUrl: p53StructureUrl },
+  p69905: {
+    alignmentAfa,
+    p69905Fasta,
+    alignmentMappingTsv: p69905AlignmentMapping,
+    structureMappingTsv: p69905StructureMapping,
+    structureUrl: alignmentStructureUrl,
+  },
+  p00648: {
+    p00648Fasta,
+    mappingTsv: p00648Mapping,
+    contactsTsv: complexContacts,
+    confidenceTsv: syntheticConfidence,
+    structureUrl: complexStructureUrl,
+  },
+};
+
 const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElement }) =>
   createApplicationHarness(
     {
-      id: "uniprot-structure",
+      id: "uniprot-structure-datasets",
       components: [
         { id: sequenceComponent, type: "seqstar.nightingale" },
         { id: structureComponent, type: "seqstar.molstar-mvs" },
       ],
-      plugins: [{ id: "uniprot-mvs", plugin: "seqstar.uniprot-mvs" }],
+      plugins: [{ id: "uniprot-datasets", plugin: "seqstar.uniprot-datasets" }],
       synchronization: [
         {
-          id: "P04637-1TUP-hover",
+          id: "uniprot-datasets-hover",
           interaction: "hover",
           between: [sequenceComponent, structureComponent],
           unmapped: "clear",
         },
         {
-          id: "P04637-1TUP-selection",
+          id: "uniprot-datasets-selection",
           interaction: "select",
           between: [sequenceComponent, structureComponent],
           unmapped: "preserve",
@@ -50,14 +75,9 @@ const createPageHarness = (hosts: { readonly require: (id: string) => HTMLElemen
       ],
       pluginFactories: [
         {
-          plugin: "seqstar.uniprot-mvs",
+          plugin: "seqstar.uniprot-datasets",
           create: () =>
-            createUniProtStructurePlugin({
-              sequenceComponent,
-              structureComponent,
-              mappingTsv,
-              structureUrl,
-            }),
+            createUniProtDatasetsPlugin({ sequenceComponent, structureComponent, assets }),
         },
       ],
     },
@@ -79,111 +99,85 @@ function ViewerPanel({ id, title }: { readonly id: string; readonly title: strin
 }
 
 function UniProtStructureContent() {
-  const { status } = useHarness();
-  const [lastGenerated, setLastGenerated] = useState<UniProtMvsGeneration>();
-  const [events, setEvents] = useState<readonly string[]>([]);
-  const [lifecycles, setLifecycles] = useState<Readonly<Record<string, string>>>({});
-  useHarnessMessages(
-    useCallback((message: HarnessMessage) => {
-      if (message.type === "document.generated.mvs")
-        setLastGenerated(message.payload as unknown as UniProtMvsGeneration);
-      if (message.type === "lifecycle.visualization") {
-        const value = message.payload as { requestId?: string; status?: string };
-        if (value.requestId !== undefined && value.status !== undefined)
-          setLifecycles((current) => ({
-            ...current,
-            [value.requestId as string]: value.status as string,
-          }));
-      }
-      if (message.type === "document.generated.mvs" || message.type === "visualization.mvs.request")
-        setEvents((current) => [...current, message.type].slice(-8));
-    }, []),
-  );
-  const download = () => {
-    if (lastGenerated === undefined) return;
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(lastGenerated.document, null, 2)], {
-        type: "application/vnd.molstar.mvsj+json",
-      }),
-    );
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `${lastGenerated.requestId}.mvsj`;
-    anchor.click();
-    URL.revokeObjectURL(url);
+  const { harness, status } = useHarness();
+  const inspect = useInspectPanelState({ sequenceComponent, structureComponent });
+  const currentDatasetId =
+    inspect.datasetStatus?.datasetId ?? inspect.catalog?.initialDatasetId ?? "";
+  const currentDataset = inspect.catalog?.datasets.find((item) => item.id === currentDatasetId);
+  const switching = inspect.datasetStatus?.status === "switching";
+  const selectDataset = (datasetId: string) => {
+    if (inspect.catalog?.datasets.some((dataset) => dataset.id === datasetId) !== true) return;
+    const messageId = crypto.randomUUID();
+    harness.fabric.publish({
+      id: messageId,
+      type: "intent.dataset.select",
+      version: "0.1.0",
+      source: { component: "uniprot-dataset-selector" },
+      target: { plugin: "seqstar.uniprot-datasets" },
+      correlationId: messageId,
+      timestamp: new Date().toISOString(),
+      payload: { datasetId: datasetId as UniProtDatasetId },
+    } satisfies HarnessMessage<"intent.dataset.select">);
   };
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-uniprot-structure">
       <section>
         <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study 2</p>
         <h1 className="mt-2 font-bold text-3xl text-slate-950">
-          UniProt annotations and structure
+          Switchable protein annotations and structure
         </h1>
         <p className="mt-3 max-w-4xl text-lg text-slate-600">
-          The checked P04637 annotation document and local 1TUP mmCIF are connected through the
-          harness translator registry. Activations create complete validated MVS requests; Mol*
-          contains no UniProt-specific code.
+          Three checked offline datasets exercise different sequence tracks and structures. The
+          integration plugin owns every document, mapping, and MolViewSpec generation step.
         </p>
-        <p className="mt-2 text-slate-500 text-sm" data-testid="p41-harness-status">
+        <p className="mt-2 text-slate-500 text-sm" data-testid="inspect-harness-status">
           Harness: {status} · no runtime network required
         </p>
       </section>
+      <section className="flex flex-wrap items-end gap-4 rounded-lg border border-sky-200 bg-sky-50 p-4">
+        <label className="grid gap-1 font-medium text-slate-800 text-sm" htmlFor="dataset-select">
+          Protein and structure dataset
+          <select
+            className="min-w-80 rounded border border-slate-400 bg-white px-3 py-2 text-slate-950 disabled:opacity-60"
+            data-testid="dataset-selector"
+            disabled={switching || inspect.catalog === undefined}
+            id="dataset-select"
+            onChange={(event) => selectDataset(event.currentTarget.value)}
+            value={currentDatasetId}
+          >
+            {inspect.catalog?.datasets.map((dataset) => (
+              <option key={dataset.id} value={dataset.id}>
+                {dataset.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <p aria-live="polite" className="text-slate-600 text-sm" data-testid="dataset-status">
+          {currentDataset?.label ?? "Loading dataset catalog"} ·{" "}
+          {inspect.datasetStatus?.status ?? "pending"}
+        </p>
+      </section>
       <p className="rounded border border-sky-200 bg-sky-50 p-3 text-slate-700 text-sm">
-        Use a Nightingale track-label button to generate the corresponding structure view.
+        Activate any sequence track label to replace the neutral structure with its mapped view.
       </p>
       <div className="grid gap-5 xl:grid-cols-2">
-        <ViewerPanel id={sequenceComponent} title="UniProt P04637 tracks" />
-        <ViewerPanel id={structureComponent} title="Mol* / MolViewSpec" />
+        <ViewerPanel
+          id={sequenceComponent}
+          title={
+            currentDataset === undefined ? "Sequence tracks" : `${currentDataset.label} tracks`
+          }
+        />
+        <ViewerPanel
+          id={structureComponent}
+          title={
+            currentDataset?.structureId === undefined
+              ? "Mol* / MolViewSpec"
+              : `${currentDataset.structureId} / MolViewSpec`
+          }
+        />
       </div>
-      <section
-        className="grid gap-4 rounded-lg bg-slate-950 p-5 text-slate-100"
-        data-testid="p41-mvs-inspector"
-      >
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-semibold text-lg">Generated MVS and mapping summary</h2>
-            <p className="text-slate-300 text-sm" data-testid="p41-request-id">
-              {lastGenerated?.requestId ?? "Activate an annotation track to generate a request."}
-            </p>
-            <p className="text-slate-300 text-sm" data-testid="p41-generated-lifecycle">
-              {lastGenerated === undefined
-                ? "No generated request"
-                : (lifecycles[lastGenerated.requestId] ?? "awaiting lifecycle")}
-            </p>
-          </div>
-          <button
-            className="rounded border border-slate-500 px-3 py-2 text-sm disabled:opacity-50"
-            disabled={lastGenerated === undefined}
-            onClick={download}
-            type="button"
-          >
-            Download validated MVSJ
-          </button>
-        </div>
-        {lastGenerated === undefined ? null : (
-          <>
-            <p className="text-sm" data-testid="p41-mapping-counts">
-              mapped {lastGenerated.counts.mapped} · partial {lastGenerated.counts.partial} ·
-              ambiguous {lastGenerated.counts.ambiguous} · unmapped {lastGenerated.counts.unmapped}
-            </p>
-            <ul className="grid gap-1 text-slate-300 text-xs" data-testid="p41-item-summary">
-              {lastGenerated.mapping.map((item) => (
-                <li key={item.itemId}>
-                  {item.itemId}: {item.status} · {item.selectors.length} residues · {item.color}
-                </li>
-              ))}
-            </ul>
-            <pre
-              className="max-h-80 overflow-auto rounded bg-black/30 p-3 text-xs"
-              data-testid="p41-mvs-json"
-            >
-              {JSON.stringify(lastGenerated.document, null, 2)}
-            </pre>
-          </>
-        )}
-        <p className="text-slate-400 text-xs" data-testid="p41-message-order">
-          {events.join(" → ")}
-        </p>
+      <section data-testid="inspect-panel-container">
+        <InspectPanel state={inspect} />
       </section>
     </main>
   );
@@ -198,7 +192,7 @@ function UniProtStructurePage() {
   return (
     <HarnessProvider
       createHarness={createHarness}
-      fallback={<main className="p-8">Starting offline P04637 / 1TUP case…</main>}
+      fallback={<main className="p-8">Starting checked offline protein datasets…</main>}
     >
       <UniProtStructureContent />
     </HarnessProvider>

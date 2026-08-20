@@ -1,7 +1,8 @@
+import { readFile } from "node:fs/promises";
 import { expect, type Page, test } from "@playwright/test";
 
 const inspectedMvsProfile = async (page: Page) =>
-  page.getByTestId("p41-mvs-json").evaluate((element) => {
+  page.getByTestId("inspect-mvs-json").evaluate((element) => {
     const document = JSON.parse(element.textContent ?? "null") as {
       root?: unknown;
       snapshots?: Array<{ root?: unknown }>;
@@ -55,7 +56,7 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   });
   await page.goto("/#/uniprot-structure");
   await expect(page).toHaveURL(/#\/uniprot-structure$/u);
-  await expect(page.getByTestId("p41-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");
   await expect(
     page.getByTestId("uniprot-tracks-host").locator('[data-seqstar-nightingale="root"]'),
   ).toBeVisible();
@@ -133,8 +134,10 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
     .getByTestId("uniprot-tracks-host")
     .locator('[data-seqstar-track-activate="missense-score"]')
     .click();
-  await expect(page.getByTestId("p41-request-id")).toContainText("P41-missense-score-");
-  await expect(page.getByTestId("p41-generated-lifecycle")).toHaveText(/rendered|degraded/u, {
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "dataset-1-P04637-1TUP-missense-score-",
+  );
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
   const scoreProfile = await inspectedMvsProfile(page);
@@ -153,14 +156,18 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
     .getByTestId("uniprot-tracks-host")
     .locator('[data-seqstar-track-activate="regions"]')
     .click();
-  await expect(page.getByTestId("p41-request-id")).toContainText("P41-regions-");
-  await expect(page.getByTestId("p41-mapping-counts")).toContainText("partial 1");
-  await expect(page.getByTestId("p41-item-summary")).toContainText("dna-binding: partial");
-  await expect(page.getByTestId("p41-item-summary")).toContainText("tetramerization: unmapped");
-  await expect(page.getByTestId("p41-message-order")).toContainText(
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "dataset-1-P04637-1TUP-regions-",
+  );
+  await expect(page.getByTestId("inspect-mapping-counts")).toContainText("partial 1");
+  await expect(page.getByTestId("inspect-mapping-items")).toContainText("dna-binding: partial");
+  await expect(page.getByTestId("inspect-mapping-items")).toContainText(
+    "tetramerization: unmapped",
+  );
+  await expect(page.getByTestId("inspect-message-order")).toContainText(
     "document.generated.mvs → visualization.mvs.request",
   );
-  await expect(page.getByTestId("p41-generated-lifecycle")).toHaveText(/rendered|degraded/u, {
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
   const regionProfile = await inspectedMvsProfile(page);
@@ -176,7 +183,9 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   const molstarCanvas = page.getByTestId("structure-view-host").locator("canvas").first();
   await expect(molstarCanvas).toBeVisible();
   expect((await molstarCanvas.boundingBox())?.height).toBeGreaterThan(0);
-  const document = JSON.parse((await page.getByTestId("p41-mvs-json").textContent()) ?? "null") as {
+  const document = JSON.parse(
+    (await page.getByTestId("inspect-mvs-json").textContent()) ?? "null",
+  ) as {
     metadata?: { title?: string };
   };
   expect(document.metadata?.title).toContain("Regions and domains");
@@ -187,14 +196,149 @@ test("rapid normalized activations leave the latest complete request inspected",
   page,
 }) => {
   await page.goto("/#/uniprot-structure");
-  await expect(page.getByTestId("p41-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");
   const tracks = page.getByTestId("uniprot-tracks-host");
   await tracks.locator('[data-seqstar-track-activate="regions"]').click();
   await tracks.locator('[data-seqstar-track-activate="variants"]').click();
-  await expect(page.getByTestId("p41-request-id")).toContainText("P41-variants-");
-  await expect(page.getByTestId("p41-item-summary")).toContainText("variant-R337H: unmapped");
-  await expect(page.getByTestId("p41-item-summary")).not.toContainText("dna-binding");
-  await expect(page.getByTestId("p41-generated-lifecycle")).toHaveText(/rendered|degraded/u, {
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "dataset-1-P04637-1TUP-variants-",
+  );
+  await expect(page.getByTestId("inspect-mapping-items")).toContainText("variant-R337H: unmapped");
+  await expect(page.getByTestId("inspect-mapping-items")).not.toContainText("dna-binding");
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
     timeout: 20_000,
   });
+});
+
+test("switches three audited datasets and inspects the latest validated documents", async ({
+  page,
+}) => {
+  const external: string[] = [];
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(error.message));
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    if (
+      url.protocol !== "data:" &&
+      url.protocol !== "blob:" &&
+      !["127.0.0.1", "localhost", "::1"].includes(url.hostname)
+    )
+      external.push(url.href);
+  });
+  await page.goto("/#/uniprot-structure");
+  await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");
+  const selector = page.getByTestId("dataset-selector");
+  await expect(selector).toHaveValue("P04637-1TUP");
+  await expect(selector.locator("option")).toHaveCount(3);
+  await expect(page.getByTestId("uniprot-tracks-host")).toContainText("Regions and domains");
+  await expect(
+    page.getByTestId("uniprot-tracks-host").locator("[data-seqstar-track-activate]"),
+  ).toHaveCount(6);
+  await expect(page.getByTestId("inspect-seqviewspec-json")).toContainText(
+    '"id": "P04637-1TUP-uniprot-structure"',
+  );
+
+  await selector.selectOption("P69905-1A3N");
+  await expect(page.getByTestId("dataset-status")).toContainText("P69905");
+  await expect(page.getByTestId("dataset-status")).toContainText("active");
+  await expect(page.getByTestId("uniprot-tracks-host")).toContainText("PF00042.29 conservation");
+  await expect(
+    page.getByTestId("uniprot-tracks-host").locator("[data-seqstar-track-activate]"),
+  ).toHaveCount(4);
+  await expect(page.getByTestId("inspect-seqviewspec-json")).toContainText(
+    '"id": "P69905-1A3N-sequence-structure"',
+  );
+  await page
+    .getByTestId("uniprot-tracks-host")
+    .locator('[data-seqstar-track-activate="alignment-conservation"]')
+    .click();
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "P69905-1A3N-alignment-conservation",
+  );
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
+    timeout: 20_000,
+  });
+  await expect(page.getByTestId("inspect-mvs-json")).toContainText("PF00042.29 conservation");
+
+  await selector.selectOption("P00648-1BRS-A");
+  await expect(page.getByTestId("dataset-status")).toContainText("P00648");
+  await expect(page.getByTestId("dataset-status")).toContainText("active");
+  await expect(page.getByTestId("uniprot-tracks-host")).toContainText("Signal peptide");
+  await expect(
+    page.getByTestId("uniprot-tracks-host").locator("[data-seqstar-track-activate]"),
+  ).toHaveCount(5);
+  await expect(page.getByTestId("inspect-seqviewspec-json")).toContainText(
+    '"id": "P00648-1BRS-chain-A-sequence-structure"',
+  );
+  await page
+    .getByTestId("uniprot-tracks-host")
+    .locator('[data-seqstar-track-activate="interface-residues"]')
+    .click();
+  await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
+    "P00648-1BRS-A-interface-residues",
+  );
+  await expect(page.getByTestId("inspect-mvs-lifecycle")).toHaveText(/rendered|degraded/u, {
+    timeout: 20_000,
+  });
+  await expect(page.getByTestId("inspect-mapping-counts")).toContainText("mapped 19");
+
+  await selector.evaluate((element) => {
+    const select = element as HTMLSelectElement;
+    select.value = "P69905-1A3N";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+    select.value = "P00648-1BRS-A";
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+  });
+  await expect(page.getByTestId("dataset-status")).toContainText("P00648");
+  await expect(page.getByTestId("dataset-status")).toContainText("active");
+  await expect(page.getByTestId("inspect-seqviewspec-json")).toContainText(
+    '"id": "P00648-1BRS-chain-A-sequence-structure"',
+  );
+
+  const inspector = page.getByTestId("inspect-panel");
+  await expect(inspector).toHaveCSS("overflow-y", "auto");
+  expect(await inspector.evaluate((element) => getComputedStyle(element).maxHeight)).toBe("576px");
+
+  await page.getByTestId("inspect-tab-seqviewspec").click();
+  const seqDownloadButton = page.getByTestId("inspect-download-seqviewspec");
+  await expect(seqDownloadButton).toBeEnabled();
+  const [seqDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    seqDownloadButton.click(),
+  ]);
+  const seqPath = await seqDownload.path();
+  expect(seqPath).not.toBeNull();
+  expect(JSON.parse(await readFile(seqPath as string, "utf8"))).toMatchObject({
+    kind: "seq-view-spec",
+    id: "P00648-1BRS-chain-A-sequence-structure",
+  });
+  await page.getByTestId("inspect-copy-seqviewspec").click();
+  await expect(page.getByTestId("inspect-copy-status-seqviewspec")).toHaveText("Copied");
+
+  await page.getByTestId("inspect-tab-mvs").click();
+  const mvsDownloadButton = page.getByTestId("inspect-download-mvs");
+  await expect(mvsDownloadButton).toBeEnabled();
+  const [mvsDownload] = await Promise.all([
+    page.waitForEvent("download"),
+    mvsDownloadButton.click(),
+  ]);
+  const mvsPath = await mvsDownload.path();
+  expect(mvsPath).not.toBeNull();
+  expect(JSON.parse(await readFile(mvsPath as string, "utf8"))).toMatchObject({
+    root: { kind: "root" },
+    metadata: { version: "1" },
+  });
+  await page.goto("/#/");
+  await page.goto("/#/uniprot-structure");
+  await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");
+  await expect(page.getByTestId("dataset-selector")).toHaveValue("P04637-1TUP");
+  await expect
+    .poll(() =>
+      page.evaluate(() =>
+        Number(document.documentElement.dataset.seqstarHarnessTelemetrySubscriptions),
+      ),
+    )
+    .toBe(1);
+  expect(external).toEqual([]);
+  expect(errors).toEqual([]);
 });
