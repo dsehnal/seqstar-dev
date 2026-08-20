@@ -62,6 +62,15 @@ importers:
 
   apps/web:
     dependencies:
+      '@seq-star/harness-core':
+        specifier: workspace:*
+        version: link:../../packages/harness-core
+      '@seq-star/harness-react':
+        specifier: workspace:*
+        version: link:../../packages/harness-react
+      '@seq-star/seq-view-spec':
+        specifier: workspace:*
+        version: link:../../packages/seq-view-spec
       '@seq-star/wrapper-molstar':
         specifier: workspace:*
         version: link:../../packages/wrapper-molstar
@@ -184,6 +193,9 @@ importers:
       '@seq-star/seq-view-spec':
         specifier: workspace:*
         version: link:../seq-view-spec
+      rxjs:
+        specifier: 7.8.2
+        version: 7.8.2
 
   packages/wrapper-molstar:
     dependencies:

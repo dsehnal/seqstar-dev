@@ -14,14 +14,15 @@ function OverviewPage() {
         A modular foundation for interoperable sequence visualization
       </h1>
       <p className="mt-5 max-w-2xl text-lg text-slate-600 leading-8">
-        The toolchain, package boundaries, and browser verification skeleton are in place. Domain
-        behavior will arrive in reviewed implementation packets.
+        This exploration separates sequence models, visualizer contracts, event composition, and
+        visualizer-native state. Case pages expose the same page-scoped harness boundary that later
+        packets will connect to local fixtures and wrappers.
       </p>
       <Link
         className="mt-8 inline-flex rounded bg-sky-700 px-4 py-2 font-semibold text-white"
-        to="/p01-feasibility"
+        to="/renderer-portability"
       >
-        Open P01 feasibility probes
+        Explore case shells
       </Link>
     </main>
   );

@@ -9,6 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@seq-star/harness-core": "workspace:*",
+    "@seq-star/harness-react": "workspace:*",
+    "@seq-star/seq-view-spec": "workspace:*",
     "@seq-star/wrapper-molstar": "workspace:*",
     "@seq-star/wrapper-nightingale": "workspace:*",
     "@tanstack/react-router": "catalog:",
