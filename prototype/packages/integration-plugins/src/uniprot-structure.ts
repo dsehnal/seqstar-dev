@@ -100,6 +100,7 @@ const structurePattern: CoordinateSpacePattern = {
   context: { entry: "1TUP", entity: "3", "label-asym": "C", "auth-asym": "A" },
 };
 const sequencePattern: CoordinateSpacePattern = {
+  id: uniprotSequenceSpace.id,
   kind: "sequence",
 };
 const isP04637SequenceSpace = (space: CoordinateSpace): boolean =>

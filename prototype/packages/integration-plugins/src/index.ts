@@ -6,6 +6,8 @@ import {
 import { type CoordinateSpace, createIdentityTranslator } from "@seq-star/seq-coords";
 import { type SeqViewSpec, validateSeqViewSpec } from "@seq-star/seq-view-spec";
 
+export * from "./uniprot-datasets.js";
+
 type FixtureValue =
   | string
   | number
