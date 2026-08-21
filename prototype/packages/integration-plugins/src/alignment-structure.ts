@@ -424,25 +424,6 @@ const parseData = (options: {
         },
         sections: [
           {
-            id: "alignment-rows",
-            label: "32 stable alignment rows",
-            tracks: [
-              {
-                id: "alignment",
-                label: "PF00042.29 members",
-                height: 20,
-                layers: [
-                  {
-                    id: "aligned-residues",
-                    representation: "alignment",
-                    alignment: "PF00042.29",
-                    showLetters: true,
-                  },
-                ],
-              },
-            ],
-          },
-          {
             id: "alignment-annotations",
             tracks: [
               {
@@ -496,6 +477,25 @@ const parseData = (options: {
                       colors: { '"query-subgroup"': "#7C3AED", '"gap-edge"': "#D97706" },
                       fallback: "#64748B",
                     },
+                  },
+                ],
+              },
+            ],
+          },
+          {
+            id: "alignment-rows",
+            label: "32 stable alignment rows",
+            tracks: [
+              {
+                id: "alignment",
+                label: "PF00042.29 members",
+                height: 20,
+                layers: [
+                  {
+                    id: "aligned-residues",
+                    representation: "alignment",
+                    alignment: "PF00042.29",
+                    showLetters: true,
                   },
                 ],
               },

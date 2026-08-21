@@ -178,6 +178,15 @@ describe("P60 PF00042.29 / P69905 / 1A3N integration", () => {
     expect(alignment?.members[0]?.positions.filter((value) => value !== null)).toHaveLength(111);
     expect(normalized.value.alignment.members).toHaveLength(32);
     expect(normalized.value.alignment.length).toBe(118);
+    expect(document.views[0]?.sections.map((section) => section.id)).toEqual([
+      "alignment-annotations",
+      "alignment-rows",
+    ]);
+    expect(document.views[0]?.sections[0]?.tracks.map((track) => track.id)).toEqual([
+      "consensus",
+      "conservation",
+      "subgroups",
+    ]);
   });
 
   it("computes actual deterministic consensus and conservation from the normalized rows", () => {

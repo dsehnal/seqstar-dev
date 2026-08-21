@@ -17,6 +17,18 @@ test("loads the offline PF00042.29 alignment / 1A3N structure case", async ({ pa
     timeout: 20_000,
   });
   const alignmentHost = page.getByTestId("pf00042-alignment-host");
+  const consensus = alignmentHost.getByRole("button", { name: "Activate track Consensus" });
+  const firstMember = alignmentHost.getByRole("button", {
+    name: "Activate track PF00042.29 members · HBA_HUMAN-27-137:member",
+  });
+  await expect
+    .poll(async () => {
+      const consensusBox = await consensus.boundingBox();
+      const memberBox = await firstMember.boundingBox();
+      if (consensusBox === null || memberBox === null) return false;
+      return consensusBox.y < memberBox.y;
+    })
+    .toBe(true);
   const root = alignmentHost.locator('[data-seq-viewer="root"]');
   await root.evaluate((element) => {
     element.scrollTop = element.scrollHeight;
@@ -70,16 +82,24 @@ test("keeps the query member identity stable while its row scrolls out and back 
   await expect(queryMember).toBeInViewport();
   const stableLabel = await queryMember.getAttribute("aria-label");
 
-  await canvas.evaluate((element) => {
-    const box = element.getBoundingClientRect();
-    element.dispatchEvent(
-      new PointerEvent("pointermove", {
-        bubbles: true,
-        clientX: box.left + 160,
-        clientY: box.top + 34,
-      }),
+  const hoverQueryMember = async () => {
+    const queryBox = await queryMember.boundingBox();
+    if (queryBox === null) throw new Error("Expected the query alignment row to be visible.");
+    await canvas.evaluate(
+      (element, point) => {
+        const box = element.getBoundingClientRect();
+        element.dispatchEvent(
+          new PointerEvent("pointermove", {
+            bubbles: true,
+            clientX: box.left + 160,
+            clientY: point.y,
+          }),
+        );
+      },
+      { y: queryBox.y + queryBox.height / 2 },
     );
-  });
+  };
+  await hoverQueryMember();
   const paths = page.getByTestId("p60-composed-paths");
   await expect(paths).toContainText("PF00042.29 · HBA_HUMAN-27-137:member");
   await expect(paths).toContainText("alignment-to-structure · hover · exact");
@@ -100,16 +120,7 @@ test("keeps the query member identity stable while its row scrolls out and back 
   });
   await expect(queryMember).toBeInViewport();
   await expect(queryMember).toHaveAttribute("aria-label", stableLabel ?? "");
-  await canvas.evaluate((element) => {
-    const box = element.getBoundingClientRect();
-    element.dispatchEvent(
-      new PointerEvent("pointermove", {
-        bubbles: true,
-        clientX: box.left + 160,
-        clientY: box.top + 34,
-      }),
-    );
-  });
+  await hoverQueryMember();
   await expect(
     paths.locator("li").filter({
       hasText: /PF00042\.29 · HBA_HUMAN-27-137:member .* hover · exact/u,
@@ -139,6 +150,15 @@ test("renders the checked 32×118 fixture faithfully in Nightingale mode", async
   const nonQueryId = "A0A010R001_9PEZI-27-134:member";
   const query = root.locator(`section[data-seqstar-alignment-member="${queryId}"]`);
   const nonQuery = root.locator(`section[data-seqstar-alignment-member="${nonQueryId}"]`);
+  const consensus = root.locator('[data-seqstar-track="consensus"]').first();
+  await expect
+    .poll(async () => {
+      const consensusBox = await consensus.boundingBox();
+      const queryBox = await query.boundingBox();
+      if (consensusBox === null || queryBox === null) return false;
+      return consensusBox.y < queryBox.y;
+    })
+    .toBe(true);
   await expect(root.locator("section[data-seqstar-alignment-member]")).toHaveCount(32);
   await expect(query).toHaveCount(1);
   await expect(nonQuery).toHaveCount(1);
