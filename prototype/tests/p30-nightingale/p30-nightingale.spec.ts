@@ -142,6 +142,53 @@ test("keeps native tracks in one pixel-aligned viewport with fixed compact heade
   expect(result.trackActivations).toBe(2);
   expect(result.absentActionDiagnostic).toBe(true);
   expect(Math.max(...result.positions) - Math.min(...result.positions)).toBeLessThanOrEqual(1);
+
+  const overview = page.locator('#viewport [data-seqstar-nightingale-viewport="overview"]');
+  const viewportWindow = page.locator('#viewport [data-seqstar-nightingale-viewport="window"]');
+  const overviewBox = await overview.boundingBox();
+  const windowBefore = await viewportWindow.boundingBox();
+  if (overviewBox === null || windowBefore === null)
+    throw new Error("Missing Nightingale overview geometry.");
+  const dragDistance = Math.min(120, overviewBox.width / 4);
+  await page.mouse.move(
+    windowBefore.x + windowBefore.width / 2,
+    windowBefore.y + windowBefore.height / 2,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    windowBefore.x + windowBefore.width / 2 - dragDistance,
+    windowBefore.y + windowBefore.height / 2,
+    { steps: 8 },
+  );
+  await page.mouse.up();
+  const windowAfter = await viewportWindow.boundingBox();
+  if (windowAfter === null) throw new Error("Nightingale overview window disappeared.");
+  // The biological viewport is integer-valued, so the visual window may round
+  // by at most one residue while otherwise tracking the pointer pixel-for-pixel.
+  expect(Math.abs(windowAfter.x - windowBefore.x + dragDistance)).toBeLessThanOrEqual(2);
+
+  const spacing = await page.locator("#viewport").evaluate((host) => {
+    const rows = [...host.querySelectorAll<HTMLElement>(".seqstar-nightingale-row")];
+    const navigation = host.querySelector<HTMLElement>(
+      '[data-seqstar-nightingale-viewport="root"]',
+    );
+    const rowGaps = rows.slice(1).map((row, index) => {
+      const previous = rows[index]?.getBoundingClientRect();
+      return previous === undefined
+        ? Number.POSITIVE_INFINITY
+        : row.getBoundingClientRect().top - previous.bottom;
+    });
+    const finalRow = rows.at(-1)?.getBoundingClientRect();
+    return {
+      maximumRowGap: Math.max(0, ...rowGaps),
+      navigationGap:
+        finalRow === undefined || navigation === null
+          ? Number.POSITIVE_INFINITY
+          : navigation.getBoundingClientRect().top - finalRow.bottom,
+    };
+  });
+  expect(spacing.maximumRowGap).toBeLessThanOrEqual(3);
+  expect(spacing.navigationGap).toBeLessThanOrEqual(3);
 });
 
 test("resolves complete semantic loci and toggle leases from native Nightingale identities", async ({

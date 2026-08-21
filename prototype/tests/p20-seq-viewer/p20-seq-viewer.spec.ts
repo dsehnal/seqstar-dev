@@ -384,12 +384,11 @@ test("navigates with bounded viewport descriptors and keeps gap hits empty", asy
       ],
     },
   });
-  await page.getByRole("button", { name: "Zoom in" }).click();
-  await page.getByRole("button", { name: "Pan right" }).click();
-  await page.getByRole("button", { name: "Pan right" }).click();
   const window = page.locator("[data-seq-viewer-navigation=window]");
-  await window.focus();
-  await page.keyboard.press("ArrowRight");
+  await window.press("ArrowUp");
+  await window.press("ArrowRight");
+  await window.press("ArrowRight");
+  await window.press("ArrowRight");
   const afterPan = (await viewportEvents()).at(-1) as {
     viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
   };
@@ -419,7 +418,7 @@ test("navigates with bounded viewport descriptors and keeps gap hits empty", asy
     viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
   };
   expect(reset.viewport).toMatchObject({ offsetStart: 0, offsetEnd: 8, totalColumns: 8 });
-  await page.getByRole("button", { name: "Zoom in" }).click();
+  await window.press("ArrowUp");
   const rightHandle = page.locator('[data-seq-viewer-navigation-handle="right"]');
   const rightBox = await rightHandle.boundingBox();
   if (!rightBox) throw new Error("right navigation handle missing");
@@ -433,16 +432,18 @@ test("navigates with bounded viewport descriptors and keeps gap hits empty", asy
   expect(afterHandle.viewport.offsetEnd - afterHandle.viewport.offsetStart).toBeLessThan(6);
   const windowBox = await window.boundingBox();
   if (!windowBox) throw new Error("navigation window missing");
+  const axisBox = await page.locator("[data-seq-viewer-navigation=axis]").boundingBox();
+  if (!axisBox) throw new Error("navigation axis missing");
   await page.mouse.move(windowBox.x + windowBox.width / 2, windowBox.y + windowBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(windowBox.x + 220, windowBox.y + windowBox.height / 2);
+  await page.mouse.move(axisBox.x + axisBox.width + 100, windowBox.y + windowBox.height / 2);
   await page.mouse.up();
   const afterDrag = (await viewportEvents()).at(-1) as {
     viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
   };
   expect(afterDrag.viewport.offsetEnd).toBe(8);
   await page.getByRole("button", { name: "Reset navigation" }).click();
-  await page.getByRole("button", { name: "Zoom in" }).click();
+  await window.press("ArrowUp");
   await page.mouse.move(200, 35);
   await page.keyboard.down("Shift");
   await page.mouse.wheel(0, 100);
@@ -480,11 +481,28 @@ test("keeps the measured navigation overview before controls from 390px through 
       };
     });
     expect(boxes.axis.width).toBeGreaterThan(0);
+    expect(await page.getByRole("button", { name: "Reset navigation" }).count()).toBe(1);
+    expect(await page.locator("[data-seq-viewer-navigation=controls] button svg").count()).toBe(1);
+    expect(await page.locator("[data-seq-viewer-navigation=controls] button").count()).toBe(1);
     expect(boxes.axis.right).toBeLessThanOrEqual(boxes.controls.left);
     expect(boxes.window.left).toBeGreaterThanOrEqual(boxes.axis.left);
     // Sub-pixel grid rounding may differ by a fraction of a CSS pixel.
     expect(boxes.window.right).toBeLessThanOrEqual(boxes.axis.right + 1);
     expect(boxes.root.right).toBeLessThanOrEqual(width);
+
+    const viewportWindow = page.getByRole("slider", { name: "Viewport window; drag to pan" });
+    for (let index = 0; index < 10; index += 1) await viewportWindow.press("ArrowUp");
+    await viewportWindow.press("End");
+    const rightEdge = await page.evaluate(() => {
+      const axis = document.querySelector<HTMLElement>("[data-seq-viewer-navigation=axis]");
+      const window = document.querySelector<HTMLElement>("[data-seq-viewer-navigation=window]");
+      if (axis === null || window === null) throw new Error("Missing navigation geometry.");
+      return {
+        axis: axis.getBoundingClientRect().right,
+        window: window.getBoundingClientRect().right,
+      };
+    });
+    expect(rightEdge.window).toBeLessThanOrEqual(rightEdge.axis + 0.5);
   }
 });
 
@@ -492,8 +510,8 @@ test("cancels an old navigation drag before replacement installs its viewport", 
   page,
 }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "Zoom in" }).click();
   const window = page.locator("[data-seq-viewer-navigation=window]");
+  await window.press("ArrowUp");
   const box = await window.boundingBox();
   if (!box) throw new Error("navigation window missing");
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);

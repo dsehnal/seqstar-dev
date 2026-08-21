@@ -125,8 +125,11 @@ test("composes the offline 1BRS sequence, neutral MVS, profiles, navigation, and
 
   const navigation = sequence.locator('[data-seq-viewer-navigation="root"]');
   await expect(navigation).toBeVisible();
-  await navigation.getByRole("button", { name: "Zoom in" }).click();
-  await navigation.getByRole("slider", { name: "Viewport window; drag to pan" }).press("End");
+  const viewportWindow = navigation.getByRole("slider", {
+    name: "Viewport window; drag to pan",
+  });
+  await viewportWindow.press("ArrowUp");
+  await viewportWindow.press("End");
   await expect(
     navigation.getByRole("slider", { name: "Viewport window; drag to pan" }),
   ).toHaveAttribute("aria-valuetext", /Columns \d+ to 247 of 247/u);

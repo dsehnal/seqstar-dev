@@ -60,8 +60,11 @@ test("shows native local events, relationship endpoints, external owner commands
   await expect(host).toHaveAttribute("data-seqstar-applied-highlights", "0");
 
   const navigation = host.locator('[data-seq-viewer-navigation="root"]');
-  await navigation.getByRole("button", { name: "Zoom in" }).click();
-  await navigation.getByRole("slider", { name: "Viewport window; drag to pan" }).press("End");
+  const viewportWindow = navigation.getByRole("slider", {
+    name: "Viewport window; drag to pan",
+  });
+  await viewportWindow.press("ArrowUp");
+  await viewportWindow.press("End");
   await expect(page.getByTestId("reference-viewer-viewport")).toContainText('"totalColumns":37');
   await expect(page.getByTestId("reference-viewer-viewport")).toContainText('"diagnostic-axis"');
   expect(external).toEqual([]);

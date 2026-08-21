@@ -360,7 +360,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     const root = document.createElement("div");
     root.dataset.seqstarNightingaleStaging = String(generation);
     root.style.display = "grid";
-    root.style.gap = "0.45rem";
+    root.style.gap = "0.125rem";
     root.style.minWidth = "0";
     root.style.position = "absolute";
     root.style.visibility = "hidden";
@@ -451,7 +451,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       [data-seqstar-nightingale="root"], [data-seqstar-nightingale-staging] {
         --seqstar-nightingale-label-width: 10rem;
         display: grid;
-        gap: 0.25rem;
+        gap: 0.125rem;
         min-width: 0;
         overflow: clip;
       }
@@ -459,12 +459,12 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         display: grid;
         grid-template-columns: var(--seqstar-nightingale-label-width) minmax(0, 1fr);
         align-items: center;
-        column-gap: 0.5rem;
+        column-gap: 0.375rem;
         min-width: 0;
       }
       .seqstar-nightingale-alignment-rows {
         display: grid;
-        gap: 0.25rem;
+        gap: 0.125rem;
         min-width: 0;
         max-block-size: min(44rem, 70vh);
         overflow: auto;
@@ -477,8 +477,8 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         display: flex;
         align-items: center;
         min-width: 0;
-        gap: 0.25rem;
-        padding: 0.125rem 0.25rem;
+        gap: 0.1875rem;
+        padding: 0.0625rem 0.1875rem;
         border-inline-start: 3px solid transparent;
         background: #f8fafc;
         transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
@@ -544,9 +544,9 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       .seqstar-nightingale-viewport {
         display: grid;
         grid-template-columns: var(--seqstar-nightingale-label-width) minmax(0, 1fr);
-        column-gap: 0.5rem;
+        column-gap: 0.375rem;
         min-width: 0;
-        margin-block-start: 0.125rem;
+        margin-block-start: 0;
       }
       .seqstar-nightingale-viewport-overview {
         position: relative;
@@ -556,6 +556,8 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         border-radius: 0;
         background: repeating-linear-gradient(90deg, #f8fafc 0 0.25rem, #e2e8f0 0.25rem 0.5rem);
         cursor: ew-resize;
+        touch-action: none;
+        user-select: none;
       }
       .seqstar-nightingale-viewport-window {
         position: absolute;
@@ -575,6 +577,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         block-size: 100%;
         margin: 0;
         opacity: 0;
+        pointer-events: none;
         cursor: ew-resize;
       }
       @media (max-width: 480px) {
@@ -708,7 +711,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       const stack = document.createElement("div");
       stack.className = "seqstar-nightingale-plot";
       stack.style.display = "grid";
-      stack.style.gap = "0.2rem";
+      stack.style.gap = "0.0625rem";
       row.append(header, stack);
       const activate = (): void => {
         markHeaderActive(headerKey);

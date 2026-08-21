@@ -6,7 +6,7 @@ import {
   type SeqViewSpec,
   validateSeqViewSpec,
 } from "@seq-star/seq-view-spec";
-import { Box, createElement as createLucideElement, Layers } from "lucide";
+import { Box, createElement as createLucideElement, Layers, RotateCcw } from "lucide";
 import { type Observable, Subject } from "rxjs";
 
 export interface InteractionOwner {
@@ -422,6 +422,7 @@ class CanvasSeqViewer implements SeqViewer {
       border: "1px solid #cbd5e1",
       borderRadius: "4px",
       boxShadow: "0 1px 2px rgb(15 23 42 / 16%)",
+      overflow: "hidden",
     });
     this.navigationAxis.dataset.seqViewerNavigation = "axis";
     this.navigationAxis.title =
@@ -469,7 +470,9 @@ class CanvasSeqViewer implements SeqViewer {
         background: "#1d4ed8",
         borderRadius: "2px",
       });
-      handle.style[side] = "-3px";
+      // Handles stay inside the measured window so neither edge can be
+      // clipped when the viewport reaches the beginning or end of the axis.
+      handle.style[side] = "0";
     }
     this.navigationWindow.append(this.navigationLeftHandle, this.navigationRightHandle);
     const controls = document.createElement("div");
@@ -480,31 +483,32 @@ class CanvasSeqViewer implements SeqViewer {
       alignItems: "center",
       flex: "0 0 auto",
     });
-    for (const [control, text, label] of [
-      ["pan-left", "◀", "Pan left"],
-      ["pan-right", "▶", "Pan right"],
-      ["zoom-out", "−", "Zoom out"],
-      ["zoom-in", "+", "Zoom in"],
-      ["reset", "Reset", "Reset navigation"],
-    ] as const) {
-      const button = document.createElement("button");
-      button.type = "button";
-      button.dataset.seqViewerNavigationControl = control;
-      button.textContent = text;
-      button.setAttribute("aria-label", label);
-      button.title = label;
-      Object.assign(button.style, {
-        height: "22px",
-        minWidth: control === "reset" ? "39px" : "17px",
-        padding: control === "reset" ? "0 3px" : "0",
-        border: "1px solid #94a3b8",
-        borderRadius: "2px",
-        background: "#fff",
-        color: "#0f172a",
-        font: "11px/1 ui-monospace, monospace",
-      });
-      controls.append(button);
-    }
+    const reset = document.createElement("button");
+    reset.type = "button";
+    reset.dataset.seqViewerNavigationControl = "reset";
+    reset.setAttribute("aria-label", "Reset navigation");
+    reset.title = "Reset navigation";
+    reset.append(
+      createLucideElement(RotateCcw, {
+        "aria-hidden": "true",
+        focusable: "false",
+        height: 15,
+        width: 15,
+      }),
+    );
+    Object.assign(reset.style, {
+      display: "inline-grid",
+      placeItems: "center",
+      height: "22px",
+      width: "22px",
+      padding: "0",
+      border: "1px solid #94a3b8",
+      borderRadius: "2px",
+      background: "#fff",
+      color: "#0f172a",
+      cursor: "pointer",
+    });
+    controls.append(reset);
     this.navigationAxis.append(this.navigationWindow);
     this.navigation.append(this.navigationAxis, controls);
   }
@@ -1279,10 +1283,12 @@ class CanvasSeqViewer implements SeqViewer {
       });
       this.navigationAxis.append(element);
     }
-    const left = this.navigationX(active, viewport.offsetStart, "start", width),
-      right = this.navigationX(active, viewport.offsetEnd, "end", width);
+    const rawLeft = this.navigationX(active, viewport.offsetStart, "start", width),
+      rawRight = this.navigationX(active, viewport.offsetEnd, "end", width),
+      windowWidth = Math.min(width, Math.max(8, rawRight - rawLeft)),
+      left = Math.max(0, Math.min(width - windowWidth, rawLeft));
     this.navigationWindow.style.left = `${left}px`;
-    this.navigationWindow.style.width = `${Math.max(8, right - left)}px`;
+    this.navigationWindow.style.width = `${windowWidth}px`;
     this.navigationWindow.setAttribute("aria-valuemin", "0");
     this.navigationWindow.setAttribute("aria-valuemax", String(active.units));
     this.navigationWindow.setAttribute("aria-valuenow", String(viewport.offsetStart));

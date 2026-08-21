@@ -361,6 +361,12 @@ export class NightingaleViewportController {
   private plot: HTMLElement | undefined;
   private disposed = false;
   private applying = false;
+  private drag:
+    | {
+        readonly pointerId: number;
+        readonly offset: number;
+      }
+    | undefined;
   private readonly root: HTMLElement;
 
   constructor(root: HTMLElement, length: number, initial?: NightingaleInitialViewport) {
@@ -401,6 +407,10 @@ export class NightingaleViewportController {
     root.addEventListener("wheel", this.onWheel, { capture: true, passive: false });
     this.slider.addEventListener("input", this.onSlider);
     this.overview.addEventListener("pointerdown", this.onOverviewPointer);
+    this.overview.addEventListener("pointermove", this.onOverviewPointerMove);
+    this.overview.addEventListener("pointerup", this.onOverviewPointerEnd);
+    this.overview.addEventListener("pointercancel", this.onOverviewPointerEnd);
+    this.overview.addEventListener("lostpointercapture", this.onOverviewPointerEnd);
     this.publish();
   }
 
@@ -432,6 +442,11 @@ export class NightingaleViewportController {
     this.root.removeEventListener("wheel", this.onWheel, true);
     this.slider.removeEventListener("input", this.onSlider);
     this.overview.removeEventListener("pointerdown", this.onOverviewPointer);
+    this.overview.removeEventListener("pointermove", this.onOverviewPointerMove);
+    this.overview.removeEventListener("pointerup", this.onOverviewPointerEnd);
+    this.overview.removeEventListener("pointercancel", this.onOverviewPointerEnd);
+    this.overview.removeEventListener("lostpointercapture", this.onOverviewPointerEnd);
+    this.drag = undefined;
     this.elements.clear();
     this.navigation.remove();
   }
@@ -471,13 +486,44 @@ export class NightingaleViewportController {
   };
 
   private readonly onOverviewPointer = (event: PointerEvent): void => {
-    if (event.target === this.slider) return;
     const box = this.overview.getBoundingClientRect();
     if (box.width <= 0) return;
-    const fraction = clamp((event.clientX - box.left) / box.width, 0, 1);
-    const start = 1 + Math.round(fraction * Math.max(0, this.descriptor.length - this.span()));
-    this.setRange(start, start + this.span() - 1);
+    event.preventDefault();
+    const windowBox = this.window.getBoundingClientRect();
+    const insideWindow = event.clientX >= windowBox.left && event.clientX <= windowBox.right;
+    this.drag = {
+      pointerId: event.pointerId,
+      offset: insideWindow ? event.clientX - windowBox.left : windowBox.width / 2,
+    };
+    this.overview.setPointerCapture(event.pointerId);
+    this.panOverviewTo(event.clientX);
   };
+
+  private readonly onOverviewPointerMove = (event: PointerEvent): void => {
+    if (this.drag?.pointerId !== event.pointerId) return;
+    event.preventDefault();
+    this.panOverviewTo(event.clientX);
+  };
+
+  private readonly onOverviewPointerEnd = (event: PointerEvent): void => {
+    if (this.drag?.pointerId !== event.pointerId) return;
+    this.drag = undefined;
+    if (this.overview.hasPointerCapture(event.pointerId))
+      this.overview.releasePointerCapture(event.pointerId);
+  };
+
+  /** Keep the rendered window under the pointer for the whole drag. */
+  private panOverviewTo(clientX: number): void {
+    const drag = this.drag;
+    if (drag === undefined) return;
+    const box = this.overview.getBoundingClientRect();
+    const windowWidth = this.window.getBoundingClientRect().width;
+    const travel = Math.max(0, box.width - windowWidth);
+    const startRange = Math.max(0, this.descriptor.length - this.span());
+    const left = clamp(clientX - box.left - drag.offset, 0, travel);
+    const start = 1 + (travel === 0 ? 0 : Math.round((left / travel) * startRange));
+    this.setRange(start, start + this.span() - 1);
+  }
 
   private pan(delta: number): void {
     if (delta === 0) return;
@@ -542,7 +588,7 @@ export class NightingaleViewportController {
     this.slider.value = String(clamp(this.descriptor.start, 1, maximum));
     const left = ((this.descriptor.start - 1) / this.descriptor.length) * 100;
     const width = (span / this.descriptor.length) * 100;
-    this.window.style.transform = `translateX(${left}%)`;
+    this.window.style.insetInlineStart = `${left}%`;
     this.window.style.width = `${width}%`;
     this.root.dataset.seqstarViewportStart = String(this.descriptor.start);
     this.root.dataset.seqstarViewportEnd = String(this.descriptor.end);

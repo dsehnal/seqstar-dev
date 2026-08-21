@@ -234,6 +234,33 @@ test("makes Reference track labels readable and their 3D action state explicit",
   await regions.click();
   await expect(regions).toHaveAttribute("aria-pressed", "true");
   await expect(variants).toHaveAttribute("aria-pressed", "false");
+
+  const navigation = host.locator('[data-seq-viewer-navigation="root"]');
+  await expect(navigation.getByRole("button", { name: "Reset navigation" })).toBeVisible();
+  await expect(navigation.locator("button")).toHaveCount(1);
+  const viewportWindow = navigation.getByRole("slider", {
+    name: "Viewport window; drag to pan",
+  });
+  for (let index = 0; index < 10; index += 1) await viewportWindow.press("ArrowUp");
+  await viewportWindow.press("End");
+  const geometry = await navigation.evaluate((root) => {
+    const axis = root.querySelector<HTMLElement>('[data-seq-viewer-navigation="axis"]');
+    const window = root.querySelector<HTMLElement>('[data-seq-viewer-navigation="window"]');
+    if (axis === null || window === null) throw new Error("Missing reference navigation geometry.");
+    const rootBox = root.getBoundingClientRect();
+    const axisBox = axis.getBoundingClientRect();
+    const windowBox = window.getBoundingClientRect();
+    return {
+      rootRight: rootBox.right,
+      axisLeft: axisBox.left,
+      axisRight: axisBox.right,
+      windowLeft: windowBox.left,
+      windowRight: windowBox.right,
+    };
+  });
+  expect(geometry.windowLeft).toBeGreaterThanOrEqual(geometry.axisLeft - 0.5);
+  expect(geometry.windowRight).toBeLessThanOrEqual(geometry.axisRight + 0.5);
+  expect(geometry.axisRight).toBeLessThanOrEqual(geometry.rootRight + 0.5);
 });
 
 test("rapid normalized activations leave the latest complete request inspected", async ({
