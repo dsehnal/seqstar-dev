@@ -1,4 +1,54 @@
+import { readFile } from "node:fs/promises";
+import { extname } from "node:path";
 import { expect, test } from "@playwright/test";
+
+const distRoot = new URL("../../apps/web/dist/", import.meta.url);
+const contentTypes: Readonly<Record<string, string>> = {
+  ".bcif": "application/octet-stream",
+  ".cif": "text/plain; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".jpg": "image/jpeg",
+  ".js": "text/javascript; charset=utf-8",
+};
+
+test("loads the relative production bundle from an extensionless nested mount", async ({
+  page,
+}) => {
+  const mount = "/apps/web/dist";
+  await page.route("http://relative-host.test/**", async (route) => {
+    const { pathname } = new URL(route.request().url());
+    const relative =
+      pathname === mount || pathname === `${mount}/`
+        ? "index.html"
+        : pathname.startsWith(`${mount}/`)
+          ? decodeURIComponent(pathname.slice(mount.length + 1))
+          : undefined;
+    if (relative === undefined || relative.split("/").includes("..")) {
+      await route.fulfill({ status: 404, body: "Not found" });
+      return;
+    }
+    try {
+      const body = await readFile(new URL(relative, distRoot));
+      await route.fulfill({
+        status: 200,
+        body,
+        contentType: contentTypes[extname(relative)] ?? "application/octet-stream",
+      });
+    } catch {
+      await route.fulfill({ status: 404, body: "Not found" });
+    }
+  });
+
+  await page.goto("http://relative-host.test/apps/web/dist");
+  await expect.poll(() => page.evaluate(() => window.location.pathname)).toBe(mount);
+  await expect
+    .poll(() => page.evaluate(() => document.baseURI))
+    .toBe("http://relative-host.test/apps/web/dist/");
+  await expect(page.getByTestId("prototype-shell")).toBeVisible();
+  await page.getByRole("link", { name: "Protein complex" }).click();
+  await expect(page.getByTestId("case-complex")).toBeVisible();
+});
 
 test("uses hash deep links, accessible navigation, and a responsive case shell", async ({
   page,

@@ -3,8 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Mol* Harness Prototype for interoperable sequence visualization" />
+    <meta name="description" content="Mol* Harness Prototype" />
     <title>Mol* Harness Prototype</title>
+    <script>
+      // Resolve Vite's relative production assets from the directory that
+      // contains this index, without requiring a deployment prefix or redirect.
+      (() => {
+        const url = new URL(window.location.href);
+        const leaf = url.pathname.slice(url.pathname.lastIndexOf("/") + 1);
+        if (!url.pathname.endsWith("/"))
+          url.pathname = leaf.includes(".")
+            ? url.pathname.slice(0, url.pathname.lastIndexOf("/") + 1)
+            : `${url.pathname}/`;
+        url.search = "";
+        url.hash = "";
+        const base = document.createElement("base");
+        base.href = url.href;
+        document.head.append(base);
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
