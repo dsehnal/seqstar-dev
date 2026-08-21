@@ -90,6 +90,8 @@ export type AlignmentMemberPresentationAction = Readonly<{
   readonly kind?: "structure" | "layers";
 }>;
 export type SequenceWrapperPresentationConfig = Readonly<{
+  /** Presentation fallback for every non-member track in dynamic documents. */
+  readonly defaultTrackAction?: TrackPresentationAction;
   readonly tracks?: readonly TrackPresentation[];
   /** When present, this is the authoritative availability list for alignment members. */
   readonly alignmentMemberActions?: readonly AlignmentMemberPresentationAction[];
@@ -310,6 +312,7 @@ class CanvasSeqViewer implements SeqViewer {
   private nativeHover: SeqViewerInteraction | undefined;
   private nativeSelection: SeqViewerInteraction | undefined;
   private navigationDrag: NavigationDrag | undefined;
+  private activeHeaderKey: string | undefined;
 
   constructor(privateOptions: CreateSeqViewerOptions) {
     this.options = privateOptions;
@@ -668,6 +671,7 @@ class CanvasSeqViewer implements SeqViewer {
     this.clearNativeSelection();
     this.cancelNavigationDrag();
     this.active = next;
+    this.activeHeaderKey = undefined;
     this.zoom = 1;
     this.pan = 0;
     this.root.scrollTop = 0;
@@ -1560,7 +1564,7 @@ class CanvasSeqViewer implements SeqViewer {
             layer.representation === "markers" ? (layer.shape ?? "circle") : "circle",
             x + cell / 2,
             y + row.height / 2,
-            Math.min(7, cell / 2),
+            Math.min(7, Math.max(4, cell / 2)),
           );
         else if (rep === "blocks") {
           const stacked = layer.representation === "blocks" && layer.laneMode === "stack",
@@ -1773,10 +1777,13 @@ class CanvasSeqViewer implements SeqViewer {
         configuredMemberActions !== undefined;
       const action =
         row.alignmentMemberId === undefined || configuredMemberActions === undefined
-          ? trackPresentation?.action
+          ? (trackPresentation?.action ?? this.options.presentation?.defaultTrackAction)
           : memberPresentation;
       const actionVisible = action !== undefined || memberAvailabilityKnown;
       const header = document.createElement("div");
+      const headerKey = this.headerKey(row);
+      header.dataset.seqViewerTrackHeader = headerKey;
+      header.dataset.seqViewerTrackActive = String(this.activeHeaderKey === headerKey);
       Object.assign(header.style, {
         position: "absolute",
         top: `${row.top}px`,
@@ -1788,26 +1795,32 @@ class CanvasSeqViewer implements SeqViewer {
         gap: actionVisible ? "2px" : "0",
         boxSizing: "border-box",
         borderBottom: "1px solid #dbeafe",
+        borderLeft: "3px solid transparent",
         background: "#f8fafc",
         pointerEvents: "auto",
       });
       const button = document.createElement("button");
       button.type = "button";
       button.textContent = row.label;
+      button.title = row.label;
       button.dataset.seqViewerTrack = row.track.id;
       button.dataset.seqstarTrackActivate = row.track.id;
       button.setAttribute("aria-label", `Activate track ${row.label}`);
+      button.setAttribute("aria-pressed", String(this.activeHeaderKey === headerKey));
       Object.assign(button.style, {
         width: "100%",
         height: `${row.height - 1}px`,
         border: "0",
         minWidth: "0",
-        background: "#f8fafc",
+        background: "transparent",
         color: "#102a43",
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
         textAlign: "left",
+        padding: "0 6px",
+        cursor: "pointer",
+        font: "600 12px/1.25 system-ui, -apple-system, BlinkMacSystemFont, sans-serif",
         pointerEvents: "auto",
       });
       button.addEventListener("click", (event) => this.activateHeader(active, row, event), {
@@ -1847,7 +1860,9 @@ class CanvasSeqViewer implements SeqViewer {
               ? action.accessibleName
               : action.label;
         actionButton.setAttribute("aria-label", availableLabel);
-        actionButton.title = availableLabel;
+        actionButton.title =
+          action !== undefined && "tooltip" in action ? action.tooltip : availableLabel;
+        actionButton.setAttribute("aria-pressed", String(this.activeHeaderKey === headerKey));
         if (action === undefined) actionButton.disabled = true;
         Object.assign(actionButton.style, {
           width: "20px",
@@ -1872,9 +1887,35 @@ class CanvasSeqViewer implements SeqViewer {
         header.append(actionButton);
       }
       this.headers.append(header);
+      this.paintHeader(header, this.activeHeaderKey === headerKey);
     }
   }
+  private headerKey(row: Row): string {
+    return [row.sectionId, row.track.id, row.alignmentId ?? "", row.alignmentMemberId ?? ""]
+      .map(encodeURIComponent)
+      .join(":");
+  }
+  private paintHeader(header: HTMLElement, active: boolean): void {
+    header.dataset.seqViewerTrackActive = String(active);
+    header.style.background = active ? "#dbeafe" : "#f8fafc";
+    header.style.borderLeftColor = active ? "#2563eb" : "transparent";
+    header.style.boxShadow = active ? "inset 0 0 0 1px rgb(37 99 235 / 28%)" : "none";
+    for (const button of header.querySelectorAll<HTMLButtonElement>("button")) {
+      button.setAttribute("aria-pressed", String(active && !button.disabled));
+      button.style.color = active ? "#1d4ed8" : "#102a43";
+      if (button.dataset.seqViewerTrackAction !== undefined)
+        button.style.background = active ? "#eff6ff" : "#fff";
+    }
+  }
+  private setActiveHeader(row: Row): void {
+    this.activeHeaderKey = this.headerKey(row);
+    for (const header of this.headers.querySelectorAll<HTMLElement>(
+      "[data-seq-viewer-track-header]",
+    ))
+      this.paintHeader(header, header.dataset.seqViewerTrackHeader === this.activeHeaderKey);
+  }
   private activateHeader(active: Active, row: Row, event: Event): void {
+    this.setActiveHeader(row);
     let alignmentLayerId: string | undefined;
     if (row.alignmentId !== undefined && row.alignmentMemberId !== undefined)
       for (const { layer } of row.layers)

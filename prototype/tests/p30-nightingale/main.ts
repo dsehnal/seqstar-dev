@@ -569,6 +569,8 @@ Object.assign(window, {
         '[data-seqstar-track="feature-track"] [data-seqstar-track-activate]',
       );
       if (label === null) throw new Error("Missing interactive feature label.");
+      const activeHeader = label.closest<HTMLElement>("[data-seqstar-track-header]");
+      if (activeHeader === null) throw new Error("Missing interactive feature header.");
       const activationsBefore = nativeMessages(viewport).length;
       label.click();
       action.click();
@@ -625,7 +627,11 @@ Object.assign(window, {
         action: {
           radius: getComputedStyle(action).borderRadius,
           hasSvg: action.querySelector("svg") !== null,
+          pressed: action.getAttribute("aria-pressed"),
         },
+        labelTitle: label.title,
+        labelPressed: label.getAttribute("aria-pressed"),
+        headerActive: activeHeader.dataset.seqstarTrackActive,
         navigationWidth: navigation.getBoundingClientRect().width,
         rootWidth: root.getBoundingClientRect().width,
         lettersVisible: /[A-Z]{2}/u.test(sequence?.textContent ?? ""),

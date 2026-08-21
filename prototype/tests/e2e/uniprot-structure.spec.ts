@@ -76,6 +76,16 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   expect(await longHeader.evaluate((element) => element.scrollWidth > element.clientWidth)).toBe(
     true,
   );
+  const variantFeatures = tracksHost.locator(
+    '[data-seqstar-layer="variant-markers"] [data-seqstar-feature-id]',
+  );
+  const variantHeader = tracksHost.locator('[data-seqstar-track="variants"]');
+  await expect(variantHeader.getByRole("button", { name: "Show this track in 3D" })).toBeVisible();
+  await expect(variantHeader.locator(".seqstar-nightingale-track-action svg")).toHaveCount(1);
+  await expect(variantFeatures).toHaveCount(3);
+  const variantBounds = await variantFeatures.first().boundingBox();
+  expect(variantBounds?.width).toBeGreaterThanOrEqual(6);
+  expect(variantBounds?.height).toBeGreaterThanOrEqual(6);
 
   await page.evaluate(() => {
     const interactions: unknown[] = [];
@@ -139,6 +149,8 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
     .getByTestId("uniprot-tracks-host")
     .locator('[data-seqstar-track-activate="missense-score"]')
     .click();
+  await expect(longHeader).toHaveAttribute("aria-pressed", "true");
+  await expect(longHeader.locator("..")).toHaveAttribute("data-seqstar-track-active", "true");
   await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
     "dataset-1-P04637-1TUP-missense-score-",
   );
@@ -161,6 +173,11 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
     .getByTestId("uniprot-tracks-host")
     .locator('[data-seqstar-track-activate="regions"]')
     .click();
+  await expect(longHeader).toHaveAttribute("aria-pressed", "false");
+  await expect(tracksHost.locator('[data-seqstar-track-activate="regions"]')).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
   await expect(page.getByTestId("inspect-mvs-request-id")).toContainText(
     "dataset-1-P04637-1TUP-regions-",
   );
@@ -195,6 +212,28 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   };
   expect(document.metadata?.title).toContain("Regions and domains");
   expect(external).toEqual([]);
+});
+
+test("makes Reference track labels readable and their 3D action state explicit", async ({
+  page,
+}) => {
+  await page.goto("/#/uniprot-structure?renderer=reference");
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText(
+    "reference renderer ready",
+    { timeout: 20_000 },
+  );
+  const host = page.getByTestId("uniprot-tracks-host");
+  const variants = host.getByRole("button", { name: "Activate track Natural variants" });
+  const regions = host.getByRole("button", { name: "Activate track Regions and domains" });
+  await expect(variants).toHaveAttribute("title", "Natural variants");
+  const variantsHeader = variants.locator("..");
+  await expect(variantsHeader.getByRole("button", { name: "Show this track in 3D" })).toBeVisible();
+  await variants.click();
+  await expect(variants).toHaveAttribute("aria-pressed", "true");
+  await expect(variantsHeader).toHaveAttribute("data-seq-viewer-track-active", "true");
+  await regions.click();
+  await expect(regions).toHaveAttribute("aria-pressed", "true");
+  await expect(variants).toHaveAttribute("aria-pressed", "false");
 });
 
 test("rapid normalized activations leave the latest complete request inspected", async ({

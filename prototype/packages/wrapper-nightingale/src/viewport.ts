@@ -19,6 +19,11 @@ export interface NightingaleTrackAction extends JsonObject {
   readonly kind?: "structure" | "layers";
 }
 
+export interface NightingaleDefaultTrackAction extends JsonObject {
+  readonly label: string;
+  readonly kind?: "structure" | "layers";
+}
+
 /**
  * A member action is deliberately presentation-only.  It identifies a frozen
  * alignment member, but contains neither a structure identifier nor a mapping
@@ -38,6 +43,8 @@ export interface NightingaleInitialViewport extends JsonObject {
 
 export interface NightingalePresentation extends JsonObject {
   readonly initialViewport?: NightingaleInitialViewport;
+  /** Presentation fallback for every non-member track in dynamic documents. */
+  readonly defaultTrackAction?: NightingaleDefaultTrackAction;
   readonly trackActions?: readonly NightingaleTrackAction[];
   readonly alignmentMemberActions?: readonly NightingaleAlignmentMemberAction[];
 }
@@ -167,7 +174,7 @@ export const snapshotNightingalePresentation = (value: unknown): NightingalePres
   const presentation = value as Record<string, unknown>;
   allowedKeys(
     presentation,
-    ["initialViewport", "trackActions", "alignmentMemberActions"],
+    ["initialViewport", "defaultTrackAction", "trackActions", "alignmentMemberActions"],
     "presentation",
   );
   let initialViewport: NightingaleInitialViewport | undefined;
@@ -200,6 +207,28 @@ export const snapshotNightingalePresentation = (value: unknown): NightingalePres
       ...(start === undefined ? {} : { start }),
       ...(end === undefined ? {} : { end }),
     });
+  }
+  let defaultTrackAction: NightingaleDefaultTrackAction | undefined;
+  if (presentation.defaultTrackAction !== undefined) {
+    const action = presentation.defaultTrackAction;
+    if (action === null || typeof action !== "object" || Array.isArray(action))
+      presentationError(
+        "wrapper.nightingale.presentation.shape",
+        "presentation.defaultTrackAction must be a plain object.",
+      );
+    const record = action as Record<string, unknown>;
+    allowedKeys(record, ["label", "kind"], "presentation.defaultTrackAction");
+    const label = stringValue(record.label, "presentation.defaultTrackAction.label");
+    const kind =
+      record.kind === undefined
+        ? undefined
+        : record.kind === "structure" || record.kind === "layers"
+          ? record.kind
+          : presentationError(
+              "wrapper.nightingale.presentation.shape",
+              "presentation.defaultTrackAction.kind must be structure or layers.",
+            );
+    defaultTrackAction = Object.freeze({ label, ...(kind === undefined ? {} : { kind }) });
   }
   let trackActions: readonly NightingaleTrackAction[] | undefined;
   const configuredActions = presentation.trackActions;
@@ -295,6 +324,7 @@ export const snapshotNightingalePresentation = (value: unknown): NightingalePres
   }
   return Object.freeze({
     ...(initialViewport === undefined ? {} : { initialViewport }),
+    ...(defaultTrackAction === undefined ? {} : { defaultTrackAction }),
     ...(trackActions === undefined ? {} : { trackActions }),
     ...(alignmentMemberActions === undefined ? {} : { alignmentMemberActions }),
   });

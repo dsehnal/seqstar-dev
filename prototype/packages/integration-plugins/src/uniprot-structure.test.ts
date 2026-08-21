@@ -214,6 +214,14 @@ describe("P41 P04637 / 1TUP integration", () => {
 
   it("maps every authored P04637 semantic region, site, variant, and score locus", async () => {
     const document = createUniProtStructureSeqViewSpec(rows);
+    const variantTrack = document.views[0]?.sections
+      .flatMap((section) => section.tracks)
+      .find((track) => track.id === "variants");
+    expect(variantTrack).toMatchObject({
+      label: "Natural variants",
+      height: 28,
+      layers: [{ id: "variant-markers", representation: "markers", shape: "diamond" }],
+    });
     const [forward] = createP04637MappingTranslators(rows);
     const signal = new AbortController().signal;
     const loci = (annotationId: string): readonly CoordinateLocus[] => {

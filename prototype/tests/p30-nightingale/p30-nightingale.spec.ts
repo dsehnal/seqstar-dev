@@ -117,7 +117,10 @@ test("keeps native tracks in one pixel-aligned viewport with fixed compact heade
     headerBefore: number;
     headerAfter: number;
     headerPosition: string;
-    action: { radius: string; hasSvg: boolean };
+    action: { radius: string; hasSvg: boolean; pressed: string | null };
+    labelTitle: string;
+    labelPressed: string | null;
+    headerActive?: string;
     navigationWidth: number;
     rootWidth: number;
     lettersVisible: boolean;
@@ -130,7 +133,10 @@ test("keeps native tracks in one pixel-aligned viewport with fixed compact heade
   expect(result.wrapperViewport).toEqual({ start: 239, end: 240, length: 240 });
   expect(result.headerAfter).toBeCloseTo(result.headerBefore, 1);
   expect(result.headerPosition).toBe("sticky");
-  expect(result.action).toEqual({ radius: "0px", hasSvg: true });
+  expect(result.action).toEqual({ radius: "0px", hasSvg: true, pressed: "true" });
+  expect(result.labelTitle).toBe("An intentionally long feature label that must truncate");
+  expect(result.labelPressed).toBe("true");
+  expect(result.headerActive).toBe("true");
   expect(result.navigationWidth).toBeLessThanOrEqual(result.rootWidth + 0.5);
   expect(result.lettersVisible).toBe(true);
   expect(result.trackActivations).toBe(2);

@@ -38,6 +38,7 @@ import {
 
 export type {
   NightingaleAlignmentMemberAction,
+  NightingaleDefaultTrackAction,
   NightingalePresentation,
   NightingaleTrackAction,
   NightingaleViewportDescriptor,
@@ -478,7 +479,15 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         min-width: 0;
         gap: 0.25rem;
         padding: 0.125rem 0.25rem;
-        background: #fff;
+        border-inline-start: 3px solid transparent;
+        background: #f8fafc;
+        transition: background-color 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
+      }
+      .seqstar-nightingale-track-header:hover { background: #eff6ff; }
+      .seqstar-nightingale-track-header[data-seqstar-track-active="true"] {
+        border-inline-start-color: #2563eb;
+        background: #dbeafe;
+        box-shadow: inset 0 0 0 1px rgb(37 99 235 / 28%);
       }
       .seqstar-nightingale-track-label {
         box-sizing: border-box;
@@ -499,6 +508,8 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       }
       button.seqstar-nightingale-track-label { cursor: pointer; }
       button.seqstar-nightingale-track-label:hover { color: #0369a1; }
+      .seqstar-nightingale-track-header[data-seqstar-track-active="true"]
+        .seqstar-nightingale-track-label { color: #1d4ed8; }
       .seqstar-nightingale-track-action {
         display: inline-grid;
         place-items: center;
@@ -516,6 +527,12 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         border-color: #38bdf8;
         background: #e0f2fe;
         color: #0369a1;
+      }
+      .seqstar-nightingale-track-header[data-seqstar-track-active="true"]
+        .seqstar-nightingale-track-action {
+        border-color: #2563eb;
+        background: #eff6ff;
+        color: #1d4ed8;
       }
       .seqstar-nightingale-track-label:focus-visible,
       .seqstar-nightingale-track-action:focus-visible,
@@ -638,6 +655,18 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
     this.cleanups.push(() =>
       interactionRoot.removeEventListener("nightingale-interaction", normalized),
     );
+    let activeHeaderKey: string | undefined;
+    const markHeaderActive = (key: string): void => {
+      activeHeaderKey = key;
+      for (const candidate of this.root.querySelectorAll<HTMLElement>(
+        "[data-seqstar-track-header]",
+      )) {
+        const active = candidate.dataset.seqstarTrackHeader === activeHeaderKey;
+        candidate.dataset.seqstarTrackActive = String(active);
+        for (const button of candidate.querySelectorAll<HTMLButtonElement>("button"))
+          button.setAttribute("aria-pressed", String(active));
+      }
+    };
     const appendTrackRow = (
       section: (typeof view.sections)[number],
       track: (typeof section.tracks)[number],
@@ -652,9 +681,17 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       row.className = "seqstar-nightingale-row";
       const header = document.createElement("div");
       header.className = "seqstar-nightingale-track-header";
+      const headerKey = composeNightingaleNativeId(
+        ["section", section.id],
+        ["track", track.id],
+        ...(member === undefined ? [] : ([["member", member.id]] as const)),
+      );
+      header.dataset.seqstarTrackHeader = headerKey;
+      header.dataset.seqstarTrackActive = String(activeHeaderKey === headerKey);
       const configuredAction =
         member === undefined
-          ? this.presentation.trackActions?.find((action) => action.trackId === track.id)
+          ? (this.presentation.trackActions?.find((action) => action.trackId === track.id) ??
+            this.presentation.defaultTrackAction)
           : this.presentation.alignmentMemberActions?.find(
               (action) => action.alignmentId === alignmentId && action.memberId === member.id,
             );
@@ -665,6 +702,7 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       label.title = trackLabel;
       label.className = "seqstar-nightingale-track-label";
       label.setAttribute("aria-label", `Activate ${trackLabel}`);
+      label.setAttribute("aria-pressed", String(activeHeaderKey === headerKey));
       label.dataset.seqstarTrackActivate = track.id;
       header.append(label);
       const stack = document.createElement("div");
@@ -672,8 +710,10 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
       stack.style.display = "grid";
       stack.style.gap = "0.2rem";
       row.append(header, stack);
-      const activate = (): void =>
+      const activate = (): void => {
+        markHeaderActive(headerKey);
         stack.querySelector<NativeElement>("[data-seqstar-native-id]")?.activateSeqstarTrack();
+      };
       label.addEventListener("click", activate);
       this.cleanups.push(() => label.removeEventListener("click", activate));
       let memberIdentity: NightingaleIdentity | undefined;
@@ -784,11 +824,13 @@ export class NativeNightingaleDriver implements NightingaleNativeDriver {
         const action = document.createElement("button");
         action.type = "button";
         action.className = "seqstar-nightingale-track-action";
-        action.dataset.seqstarTrackActivate = track.id;
+        action.dataset.seqstarTrackAction = track.id;
         action.setAttribute("aria-label", configuredAction.label);
         action.title = configuredAction.label;
+        action.setAttribute("aria-pressed", String(activeHeaderKey === headerKey));
         action.append(createNightingaleTrackActionIcon(configuredAction.kind));
         const activateConfigured = (): void => {
+          markHeaderActive(headerKey);
           if (memberIdentity !== undefined)
             this.emit({
               interaction: "track-activate",

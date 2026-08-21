@@ -174,6 +174,12 @@ runWrapperConformance({
 describe("reference viewer wrapper common contract", () => {
   it("fails closed and detaches the JSON-safe reference presentation snapshot", () => {
     const presentation = {
+      defaultTrackAction: {
+        kind: "structure-profile",
+        accessibleName: "Show this track in 3D",
+        tooltip: "Show this annotation in 3D",
+        icon: "box",
+      },
       tracks: [
         {
           trackId: "track",
@@ -195,8 +201,10 @@ describe("reference viewer wrapper common contract", () => {
       ],
     };
     const snapshot = snapshotReferenceViewerPresentation(presentation);
+    presentation.defaultTrackAction.tooltip = "mutated default";
     presentation.tracks[0].action.tooltip = "mutated";
     expect(snapshot).toMatchObject({
+      defaultTrackAction: { tooltip: "Show this annotation in 3D" },
       tracks: [
         expect.objectContaining({
           trackId: "track",
@@ -217,6 +225,7 @@ describe("reference viewer wrapper common contract", () => {
       accessor,
       { tracks: [{ trackId: "track", action: () => undefined }] },
       { tracks: [{ trackId: "track", action: { kind: "bad" } }] },
+      { defaultTrackAction: { kind: "bad" } },
       { tracks: [{ trackId: "track" }, { trackId: "track" }] },
       {
         alignmentMemberActions: [

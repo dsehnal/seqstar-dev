@@ -88,6 +88,27 @@ const text = (value: unknown, path: string): string => {
     fail("wrapper.seq-viewer.presentation.shape", `${path} must be a non-empty string.`);
   return value as string;
 };
+const trackAction = (
+  value: unknown,
+  path: string,
+): NonNullable<SequenceWrapperPresentationConfig["defaultTrackAction"]> => {
+  const action = record(value, path);
+  keys(action, ["kind", "accessibleName", "tooltip", "icon"], path);
+  const kind =
+    action.kind === "structure-profile" || action.kind === "layer-inspection"
+      ? action.kind
+      : fail("wrapper.seq-viewer.presentation.shape", `${path}.kind is invalid.`);
+  const icon =
+    action.icon === "box" || action.icon === "layers"
+      ? action.icon
+      : fail("wrapper.seq-viewer.presentation.shape", `${path}.icon is invalid.`);
+  return Object.freeze({
+    kind,
+    icon,
+    accessibleName: text(action.accessibleName, `${path}.accessibleName`),
+    tooltip: text(action.tooltip, `${path}.tooltip`),
+  });
+};
 
 export const snapshotReferenceViewerPresentation = (
   value: unknown,
@@ -95,7 +116,11 @@ export const snapshotReferenceViewerPresentation = (
   if (value === undefined) return Object.freeze({});
   assertJson(value);
   const presentation = record(value, "presentation");
-  keys(presentation, ["tracks", "alignmentMemberActions"], "presentation");
+  keys(presentation, ["defaultTrackAction", "tracks", "alignmentMemberActions"], "presentation");
+  const defaultTrackAction =
+    presentation.defaultTrackAction === undefined
+      ? undefined
+      : trackAction(presentation.defaultTrackAction, "presentation.defaultTrackAction");
   let tracks: SequenceWrapperPresentationConfig["tracks"];
   if (presentation.tracks !== undefined) {
     const trackValues = presentation.tracks;
@@ -115,35 +140,9 @@ export const snapshotReferenceViewerPresentation = (
           );
         ids.add(trackId);
         if (track.action === undefined) return Object.freeze({ trackId });
-        const action = record(track.action, `presentation.tracks[${index}].action`);
-        keys(
-          action,
-          ["kind", "accessibleName", "tooltip", "icon"],
-          `presentation.tracks[${index}].action`,
-        );
-        const kind = action.kind;
-        const icon = action.icon;
-        if (kind !== "structure-profile" && kind !== "layer-inspection")
-          fail(
-            "wrapper.seq-viewer.presentation.shape",
-            `presentation.tracks[${index}].action.kind is invalid.`,
-          );
-        if (icon !== "box" && icon !== "layers")
-          fail(
-            "wrapper.seq-viewer.presentation.shape",
-            `presentation.tracks[${index}].action.icon is invalid.`,
-          );
         return Object.freeze({
           trackId,
-          action: Object.freeze({
-            kind,
-            icon,
-            accessibleName: text(
-              action.accessibleName,
-              `presentation.tracks[${index}].action.accessibleName`,
-            ),
-            tooltip: text(action.tooltip, `presentation.tracks[${index}].action.tooltip`),
-          }),
+          action: trackAction(track.action, `presentation.tracks[${index}].action`),
         });
       }),
     );
@@ -187,6 +186,7 @@ export const snapshotReferenceViewerPresentation = (
     );
   }
   return Object.freeze({
+    ...(defaultTrackAction === undefined ? {} : { defaultTrackAction }),
     ...(tracks === undefined ? {} : { tracks }),
     ...(alignmentMemberActions === undefined ? {} : { alignmentMemberActions }),
   });

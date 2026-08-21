@@ -91,12 +91,21 @@ test("publishes a real pointer event for a non-first track", async ({ page }) =>
 test("keeps a truncated label separate from its square presentation action", async ({ page }) => {
   await page.goto("/");
   const action = page.getByRole("button", { name: "Show Core track in 3D" });
+  const label = page.getByRole("button", { name: "Activate track Core track · member" });
+  const header = label.locator("..");
+  await expect(label).toHaveAttribute("title", "Core track · member");
+  await expect(label).toHaveAttribute("aria-pressed", "false");
+  await expect(action).toHaveAttribute("title", "Show Core track in 3D");
   await expect(action).toBeVisible();
   await expect(action).toHaveCSS("border-radius", "0px");
   const box = await action.boundingBox();
   if (!box) throw new Error("Missing configured track action.");
   expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);
   await action.click();
+  await expect(label).toHaveAttribute("aria-pressed", "true");
+  await expect(action).toHaveAttribute("aria-pressed", "true");
+  await expect(header).toHaveAttribute("data-seq-viewer-track-active", "true");
+  await expect(header).toHaveCSS("border-left-color", "rgb(37, 99, 235)");
   await expect
     .poll(() =>
       page.evaluate(() =>
@@ -108,6 +117,10 @@ test("keeps a truncated label separate from its square presentation action", asy
       ),
     )
     .toMatchObject({ kind: "track-activate", trackId: "track" });
+  const marker = page.getByRole("button", { name: "Activate track Boundary track" });
+  await marker.click();
+  await expect(marker).toHaveAttribute("aria-pressed", "true");
+  await expect(label).toHaveAttribute("aria-pressed", "false");
 });
 
 test("keeps member actions exact, unavailable members disabled, and actions stable after scrolling", async ({

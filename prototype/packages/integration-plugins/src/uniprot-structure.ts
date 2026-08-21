@@ -411,12 +411,13 @@ export const createUniProtStructureSeqViewSpec = (
               {
                 id: "variants",
                 label: "Natural variants",
+                height: 28,
                 layers: [
                   {
                     id: "variant-markers",
                     representation: "markers",
                     annotation: "p53-variants",
-                    shape: "line",
+                    shape: "diamond",
                     color: { kind: "fixed", color: "#E11D48" },
                   },
                 ],

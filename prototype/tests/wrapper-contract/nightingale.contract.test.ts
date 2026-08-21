@@ -495,6 +495,7 @@ describe("Nightingale wrapper boundaries", () => {
   it("fails closed and detaches the wrapper presentation snapshot", () => {
     const presentation = {
       initialViewport: { start: 2, end: 4 },
+      defaultTrackAction: { label: "Show this track in 3D", kind: "structure" },
       trackActions: [{ trackId: "track", label: "Show track in 3D", kind: "structure" }],
       alignmentMemberActions: [
         { alignmentId: "alignment", memberId: "member", label: "Show member structure" },
@@ -504,12 +505,14 @@ describe("Nightingale wrapper boundaries", () => {
     presentation.trackActions[0].label = "mutated";
     expect(snapshot).toEqual({
       initialViewport: { start: 2, end: 4 },
+      defaultTrackAction: { label: "Show this track in 3D", kind: "structure" },
       trackActions: [{ trackId: "track", label: "Show track in 3D", kind: "structure" }],
       alignmentMemberActions: [
         { alignmentId: "alignment", memberId: "member", label: "Show member structure" },
       ],
     });
     expect(Object.isFrozen(snapshot)).toBe(true);
+    expect(Object.isFrozen(snapshot.defaultTrackAction)).toBe(true);
     expect(Object.isFrozen(snapshot.trackActions)).toBe(true);
     expect(Object.isFrozen(snapshot.trackActions?.[0])).toBe(true);
     expect(Object.isFrozen(snapshot.alignmentMemberActions)).toBe(true);
@@ -537,6 +540,11 @@ describe("Nightingale wrapper boundaries", () => {
     expect(() =>
       snapshotNightingalePresentation({
         trackActions: [{ trackId: "a", label: "A", kind: "dynamic" }],
+      }),
+    ).toThrow("must be structure or layers");
+    expect(() =>
+      snapshotNightingalePresentation({
+        defaultTrackAction: { label: "All", kind: "dynamic" },
       }),
     ).toThrow("must be structure or layers");
     expect(() =>
