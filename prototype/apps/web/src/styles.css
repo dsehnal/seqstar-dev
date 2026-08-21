@@ -119,11 +119,10 @@ select {
   background: rgba(255, 255, 255, 0.74);
 }
 .app-nav a[aria-current="page"] {
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
-  border-color: rgba(67, 123, 170, 0.3);
+  border-color: transparent;
+  border-radius: 0;
   color: var(--shell-accent-strong);
-  background: rgba(221, 237, 249, 0.92);
+  background: transparent;
   box-shadow: inset 0 -2px 0 var(--shell-accent);
 }
 .app-nav__more {
@@ -149,15 +148,16 @@ select {
   display: none;
 }
 .app-nav__more > summary:hover,
-.app-nav__more[open] > summary,
-.app-nav__more:has(a[aria-current="page"]) > summary {
+.app-nav__more[open] > summary {
   border-color: rgba(83, 122, 156, 0.24);
   color: var(--shell-ink);
   background: rgba(255, 255, 255, 0.78);
 }
 .app-nav__more:has(a[aria-current="page"]) > summary {
-  border-bottom-right-radius: 0;
-  border-bottom-left-radius: 0;
+  border-color: transparent;
+  border-radius: 0;
+  color: var(--shell-accent-strong);
+  background: transparent;
   box-shadow: inset 0 -2px 0 var(--shell-accent);
 }
 .app-nav__more[open] > summary svg {

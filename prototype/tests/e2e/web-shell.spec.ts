@@ -15,14 +15,11 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
     "aria-current",
     "page",
   );
-  await expect(page.getByRole("link", { name: "Renderer comparison" })).toHaveCSS(
-    "border-bottom-left-radius",
-    "0px",
-  );
-  await expect(page.getByRole("link", { name: "Renderer comparison" })).toHaveCSS(
-    "border-bottom-right-radius",
-    "0px",
-  );
+  const activeRoute = page.getByRole("link", { name: "Renderer comparison" });
+  await expect(activeRoute).toHaveCSS("background-color", "rgba(0, 0, 0, 0)");
+  await expect(activeRoute).toHaveCSS("border-top-color", "rgba(0, 0, 0, 0)");
+  await expect(activeRoute).toHaveCSS("border-radius", "0px");
+  await expect(activeRoute).toHaveCSS("box-shadow", /inset/u);
   await expect(page.getByTestId("visualizer-panel-base-sequence")).toBeVisible();
   await expect(page.getByTestId("visualizer-panel-nightingale")).toBeVisible();
 
