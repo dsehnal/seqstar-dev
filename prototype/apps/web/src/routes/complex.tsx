@@ -26,9 +26,31 @@ const structureComponent = "complex-structure";
 const fasta = (source: string) => source.split(/\r?\n/u).slice(1).join("").trim();
 
 const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
+const referenceDefaultTrackAction = {
+  kind: "structure-profile",
+  icon: "box",
+  accessibleName: "Show this track in 3D",
+  tooltip: "Show this track as an annotated 3D structure",
+} as const;
+const nightingaleDefaultTrackAction = {
+  label: "Show this track in 3D",
+  kind: "structure",
+} as const;
 const rendererComponents = {
-  reference: [{ id: sequenceComponent, type: "seqstar.reference-viewer" }],
-  nightingale: [{ id: sequenceComponent, type: "seqstar.nightingale" }],
+  reference: [
+    {
+      id: sequenceComponent,
+      type: "seqstar.reference-viewer",
+      config: { presentation: { defaultTrackAction: referenceDefaultTrackAction } },
+    },
+  ],
+  nightingale: [
+    {
+      id: sequenceComponent,
+      type: "seqstar.nightingale",
+      config: { presentation: { defaultTrackAction: nightingaleDefaultTrackAction } },
+    },
+  ],
 } as const;
 const createPageHarness = (
   hosts: { readonly require: (id: string) => HTMLElement },
@@ -123,12 +145,16 @@ function ComplexContent({
         Synthetic confidence — deterministic prototype values, not a biological prediction.
       </p>
       <div className="grid gap-5 xl:grid-cols-2">
-        <ViewerPanel hostRef={sequenceHost} id={sequenceComponent} title="Complex" />
+        <ViewerPanel
+          hostRef={sequenceHost}
+          id={sequenceComponent}
+          title="Barnase–barstar sequence tracks"
+        />
         <ViewerPanel
           hostRef={structureHost}
           id={structureComponent}
           kind="structure"
-          title="Mol* / generated MVS"
+          title="1BRS annotated assembly"
         />
       </div>
       <section data-testid="inspect-panel-container">

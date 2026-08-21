@@ -51,6 +51,8 @@ export function VisualizationCard({
   description,
   children,
   toolbar,
+  eyebrow,
+  headingIcon,
   className = "",
   ...props
 }: {
@@ -58,16 +60,26 @@ export function VisualizationCard({
   readonly description?: ReactNode;
   readonly children: ReactNode;
   readonly toolbar?: ReactNode;
+  readonly eyebrow?: string;
+  readonly headingIcon?: ReactNode;
   readonly className?: string;
 } & Omit<ComponentProps<"section">, "children" | "title">) {
   return (
     <section className={`visualization-card ${className}`.trim()} {...props}>
       <div className="visualization-card__header">
         <div className="visualization-card__heading">
-          <h2 className="visualization-card__title">{title}</h2>
-          {description === undefined ? null : (
-            <p className="visualization-card__description">{description}</p>
+          {headingIcon === undefined ? null : (
+            <span className="visualization-card__heading-icon">{headingIcon}</span>
           )}
+          <div className="visualization-card__heading-copy">
+            {eyebrow === undefined ? null : (
+              <p className="visualization-card__eyebrow">{eyebrow}</p>
+            )}
+            <h2 className="visualization-card__title">{title}</h2>
+            {description === undefined ? null : (
+              <p className="visualization-card__description">{description}</p>
+            )}
+          </div>
         </div>
         {toolbar === undefined ? null : (
           <div className="visualization-card__toolbar">{toolbar}</div>
@@ -109,7 +121,8 @@ export function ViewerPanel({
       hidden={hidden}
       title={title}
       description={description}
-      toolbar={<Icon aria-hidden="true" size={16} strokeWidth={1.8} />}
+      eyebrow={kind === "structure" ? "3D visualization" : "Sequence view"}
+      headingIcon={<Icon aria-hidden="true" size={17} strokeWidth={1.8} />}
     >
       <section
         aria-label={`${title} visualizer`}

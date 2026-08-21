@@ -1866,6 +1866,16 @@ class CanvasSeqViewer implements SeqViewer {
         signal: this.abort.signal,
       });
       header.append(button);
+      header.addEventListener(
+        "pointerenter",
+        () => this.paintHeader(header, this.activeHeaderKey === headerKey, true),
+        { signal: this.abort.signal },
+      );
+      header.addEventListener(
+        "pointerleave",
+        () => this.paintHeader(header, this.activeHeaderKey === headerKey),
+        { signal: this.abort.signal },
+      );
       if (actionVisible) {
         const actionButton = document.createElement("button");
         actionButton.type = "button";
@@ -1934,16 +1944,16 @@ class CanvasSeqViewer implements SeqViewer {
       .map(encodeURIComponent)
       .join(":");
   }
-  private paintHeader(header: HTMLElement, active: boolean): void {
+  private paintHeader(header: HTMLElement, active: boolean, hovered = false): void {
     header.dataset.seqViewerTrackActive = String(active);
-    header.style.background = active ? "#dbeafe" : "#f8fafc";
+    header.style.background = active ? "#dbeafe" : hovered ? "#eff6ff" : "#f8fafc";
     header.style.borderLeftColor = active ? "#2563eb" : "transparent";
     header.style.boxShadow = active ? "inset 0 0 0 1px rgb(37 99 235 / 28%)" : "none";
     for (const button of header.querySelectorAll<HTMLButtonElement>("button")) {
       button.setAttribute("aria-pressed", String(active && !button.disabled));
-      button.style.color = active ? "#1d4ed8" : "#102a43";
+      button.style.color = active ? "#1d4ed8" : hovered ? "#0369a1" : "#102a43";
       if (button.dataset.seqViewerTrackAction !== undefined)
-        button.style.background = active ? "#eff6ff" : "#fff";
+        button.style.background = active ? "#eff6ff" : hovered ? "#e0f2fe" : "#fff";
     }
   }
   private setActiveHeader(row: Row): void {

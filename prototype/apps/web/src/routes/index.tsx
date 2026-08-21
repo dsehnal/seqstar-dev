@@ -24,6 +24,10 @@ function OverviewPage() {
         local fixture pipelines, and presentation ideas—not for production use or scientific
         decision-making.
       </p>
+      <p className="mt-6 max-w-2xl text-lg text-slate-600 leading-8">
+        It also introduces <strong className="text-slate-900">Seq*</strong>: a renderer-neutral
+        framework for sequence and annotation views—essentially the Mol* idea, but for sequences.
+      </p>
     </main>
   );
 }

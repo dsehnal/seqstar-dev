@@ -142,7 +142,7 @@ test("links a live-shaped tomogram particle to density, representative structure
 
   await page.goto("/#/cryoet-tomogram");
   await expect(
-    page.getByRole("heading", { name: "Cryo-ET particle → density → structure → protein" }),
+    page.getByRole("heading", { name: "Tomogram particle → density → molecular structure" }),
   ).toBeVisible();
   const tomogram = page.getByTestId("cryoet-tomogram-host");
   await expect(tomogram.locator(".tomogram-particle")).toHaveCount(128);
@@ -168,13 +168,14 @@ test("links a live-shaped tomogram particle to density, representative structure
   await expect(tomogram.getByRole("link", { name: /Open full Neuroglancer/u })).toBeVisible();
 
   await page.getByRole("button", { name: "1DWN", exact: true }).click();
-  await expect(
-    page.getByRole("heading", { name: "Representative atomic structure" }),
-  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "1DWN representative structure" })).toBeVisible();
   await expect(page.getByText(/MolViewSpec: cryoet-structure-\d+ · rendered/u)).toBeVisible({
     timeout: 20_000,
   });
   await expect(page.getByTestId("cryoet-sequence-host").locator("canvas")).toBeVisible();
+  await expect(
+    page.getByTestId("cryoet-sequence-host").locator("[data-seq-viewer-track-action]"),
+  ).toHaveCount(5);
   await expect(page.getByTestId("cryoet-structure-host").locator("canvas")).toBeVisible();
 
   const sequenceCanvas = page
@@ -222,7 +223,7 @@ test("links a live-shaped tomogram particle to density, representative structure
   expect(sequenceHover).toContain('"kind": "index"');
 
   await page.getByRole("button", { name: "EMD-77085", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Subtomogram average density" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "EMD-77085 subtomogram average" })).toBeVisible();
   // The offline seam deliberately returns 503 for the large live BCIF. The
   // production MVS is structurally checked in unit coverage; here the click
   // must still issue the density request and move the viewport to Mol*.
@@ -268,6 +269,9 @@ test("links a live-shaped tomogram particle to density, representative structure
   await expect(
     page.getByTestId("cryoet-sequence-host").locator('[data-seqstar-nightingale="root"]'),
   ).toBeVisible();
+  await expect(
+    page.getByTestId("cryoet-sequence-host").locator("[data-seqstar-track-action]"),
+  ).toHaveCount(5);
   await page.getByTestId("cryoet-dataset-selector").selectOption("points");
   await expect(page.getByTestId("cryoet-tomogram-host").locator(".tomogram-particle")).toHaveCount(
     140,

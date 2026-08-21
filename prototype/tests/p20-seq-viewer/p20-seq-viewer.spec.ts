@@ -98,6 +98,9 @@ test("keeps a truncated label separate from its square presentation action", asy
   await expect(action).toHaveAttribute("title", "Show Core track in 3D");
   await expect(action).toBeVisible();
   await expect(action).toHaveCSS("border-radius", "0px");
+  await label.hover();
+  await expect(header).toHaveCSS("background-color", "rgb(239, 246, 255)");
+  await expect(label).toHaveCSS("color", "rgb(3, 105, 161)");
   const box = await action.boundingBox();
   if (!box) throw new Error("Missing configured track action.");
   expect(Math.abs(box.width - box.height)).toBeLessThanOrEqual(1);

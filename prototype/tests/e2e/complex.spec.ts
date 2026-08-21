@@ -91,9 +91,14 @@ test("composes the offline 1BRS sequence, neutral MVS, profiles, navigation, and
     "not a biological prediction",
   );
   const sequence = page.getByTestId("complex-sequence-host");
-  await expect(page.getByRole("heading", { name: "Complex", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Barnase–barstar sequence tracks", exact: true }),
+  ).toBeVisible();
   await expect(page.getByRole("heading", { name: "Track profiles and navigation" })).toHaveCount(0);
   await expect(sequence.locator("[data-seq-viewer-track]")).toHaveCount(5);
+  await expect(sequence.locator("[data-seq-viewer-track-action]")).toHaveCount(5);
+  await expect(page.getByText("Sequence view", { exact: true })).toBeVisible();
+  await expect(page.getByText("3D visualization", { exact: true })).toBeVisible();
   await expect(page.getByTestId("complex-structure-host").locator("canvas").first()).toBeVisible();
   await expect(page.getByTestId("inspect-seq-request-id")).toContainText("P50-sequence-initial");
   await expect(page.getByTestId("inspect-mvs-request-id")).toContainText("P50-neutral-initial");
@@ -144,6 +149,7 @@ test("uses actual sequence contact input, retains both endpoint roles, and remou
   await page.goto("/#/complex");
   await expect(page.getByTestId("p50-harness-status")).toContainText("ready");
   const sequence = page.getByTestId("complex-sequence-host");
+  await expect(sequence.locator("[data-seq-viewer-track-action]")).toHaveCount(5);
   const canvas = sequence.locator('[data-seq-viewer="canvas"]');
   await expect(canvas).toBeVisible();
   const box = await canvas.boundingBox();
@@ -227,6 +233,7 @@ test("renders the Nightingale contact endpoint fallback with both semantic roles
   await page.goto("/#/complex?renderer=nightingale");
   await expect(page.getByTestId("p50-harness-status")).toContainText("ready");
   const sequence = page.getByTestId("complex-sequence-host");
+  await expect(sequence.locator("[data-seqstar-track-action]")).toHaveCount(5);
   const contacts = sequence.locator(
     '[data-seqstar-track="contacts"][data-seqstar-layer="contact-links"]',
   );

@@ -24,9 +24,11 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
   await page.getByRole("link", { name: "Mol* Harness Prototype" }).click();
   await expect(page.getByText("Vibe-coded research prototype")).toBeVisible();
   await expect(page.getByText("This is a vibe-coded prototype, not a product.")).toBeVisible();
+  await expect(page.getByText(/introduces Seq\*/u)).toBeVisible();
+  await expect(page.getByText(/Mol\* idea, but for sequences/u)).toBeVisible();
   await expect(page.getByRole("link", { name: "Explore case shells" })).toHaveCount(0);
   await expect(page.locator(".app-nav > a")).toHaveCount(5);
-  await expect(page.getByRole("link", { name: "Cryo-ET story" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "Tomogram to molecule" })).toBeVisible();
   await expect(page.locator(".app-nav__menu > a")).toHaveCount(3);
 
   await page.setViewportSize({ width: 480, height: 900 });

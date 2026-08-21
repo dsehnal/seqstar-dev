@@ -9,6 +9,7 @@ import { createMolstarWrapperFactory } from "@seq-star/wrapper-molstar";
 import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
+import { ChevronDown } from "lucide-react";
 import { useCallback, useRef } from "react";
 import alignmentAfa from "../../../../fixtures/alignment-structure/expected/PF00042.29-32rows.query-centric.afa?raw";
 import alignmentStructureUrl from "../../../../fixtures/alignment-structure/input/1A3N.cif?url";
@@ -160,6 +161,7 @@ function UniProtStructureContent({
       payload: { datasetId: datasetId as UniProtDatasetId },
     } satisfies HarnessMessage<"intent.dataset.select">);
   };
+  const displayedProteinLabel = displayedDataset?.label.replace(/\s*\/.*$/u, "");
   return (
     <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-uniprot-structure">
       <section>
@@ -186,22 +188,29 @@ function UniProtStructureContent({
         <div className="case-control-panel__dataset">
           <label className="grid gap-1 font-medium text-slate-800 text-sm" htmlFor="dataset-select">
             Protein and structure dataset
-            <select
-              className="min-w-80 rounded border border-slate-400 bg-white px-3 py-2 text-slate-950 disabled:opacity-60"
-              data-testid="dataset-selector"
-              disabled={switching || inspect.catalog === undefined}
-              id="dataset-select"
-              onChange={(event) => selectDataset(event.currentTarget.value)}
-              value={requestedDatasetId}
-            >
-              {inspect.catalog?.datasets.map((dataset) => (
-                <option key={dataset.id} value={dataset.id}>
-                  {dataset.label}
-                </option>
-              ))}
-            </select>
+            <span className="case-dataset-select-wrap">
+              <select
+                className="case-dataset-select"
+                data-testid="dataset-selector"
+                disabled={switching || inspect.catalog === undefined}
+                id="dataset-select"
+                onChange={(event) => selectDataset(event.currentTarget.value)}
+                value={requestedDatasetId}
+              >
+                {inspect.catalog?.datasets.map((dataset) => (
+                  <option key={dataset.id} value={dataset.id}>
+                    {dataset.label}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown aria-hidden="true" className="case-dataset-select-icon" size={16} />
+            </span>
           </label>
-          <p aria-live="polite" className="text-slate-600 text-sm" data-testid="dataset-status">
+          <p
+            aria-live="polite"
+            className="case-control-panel__status text-slate-600 text-sm"
+            data-testid="dataset-status"
+          >
             {requestedDataset?.label ?? "Loading dataset catalog"} ·{" "}
             {transition?.status ?? "pending"}
             {transition?.status === "switching" && displayedDataset !== undefined
@@ -218,7 +227,7 @@ function UniProtStructureContent({
           id={sequenceComponent}
           title={
             transition?.status === "active" && displayedDataset !== undefined
-              ? `${displayedDataset.label} tracks`
+              ? `${displayedProteinLabel} sequence annotations`
               : `Sequence tracks — ${transitionLabel}`
           }
           hostRef={sequenceHost}
@@ -227,7 +236,7 @@ function UniProtStructureContent({
           id={structureComponent}
           title={
             transition?.status === "active" && displayedDataset?.structureId !== undefined
-              ? `${displayedDataset.structureId} / MolViewSpec`
+              ? `${displayedDataset.structureId} annotated structure`
               : `Mol* / MolViewSpec — ${transitionLabel}`
           }
           hostRef={structureHost}

@@ -17,7 +17,7 @@ import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createTomogramWrapperFactory } from "@seq-star/wrapper-tomogram";
 import { createFileRoute } from "@tanstack/react-router";
-import { Database, ExternalLink, Microscope, ScanSearch } from "lucide-react";
+import { ChevronDown, Database, ExternalLink, Microscope, ScanSearch } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
 import {
   CaseRendererChooser,
@@ -36,9 +36,31 @@ const tomogramComponent = "cryoet-tomogram";
 const sequenceComponent = "cryoet-sequence";
 const structureComponent = "cryoet-structure";
 const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
+const referenceDefaultTrackAction = {
+  kind: "structure-profile",
+  icon: "box",
+  accessibleName: "Show this track in 3D",
+  tooltip: "Show this track as an annotated 3D structure",
+} as const;
+const nightingaleDefaultTrackAction = {
+  label: "Show this track in 3D",
+  kind: "structure",
+} as const;
 const rendererComponents = {
-  reference: [{ id: sequenceComponent, type: "seqstar.reference-viewer" }],
-  nightingale: [{ id: sequenceComponent, type: "seqstar.nightingale" }],
+  reference: [
+    {
+      id: sequenceComponent,
+      type: "seqstar.reference-viewer",
+      config: { presentation: { defaultTrackAction: referenceDefaultTrackAction } },
+    },
+  ],
+  nightingale: [
+    {
+      id: sequenceComponent,
+      type: "seqstar.nightingale",
+      config: { presentation: { defaultTrackAction: nightingaleDefaultTrackAction } },
+    },
+  ],
 } as const;
 
 const createPageHarness = (
@@ -169,7 +191,7 @@ function CryoEtContent({
     >
       <PageIntro
         eyebrow="Live-data case study"
-        title="Cryo-ET particle → density → structure → protein"
+        title="Tomogram particle → density → molecular structure"
         description={
           <>
             Select a live PP7 particle from CryoET Data Portal run RN-34483, inspect the EMD-77085
@@ -193,26 +215,29 @@ function CryoEtContent({
             htmlFor="cryoet-dataset-select"
           >
             Live dataset and particle class
-            <select
-              className="min-w-80 rounded border border-slate-400 bg-white px-3 py-2 text-slate-950"
-              data-testid="cryoet-dataset-selector"
-              id="cryoet-dataset-select"
-              value={particleSetId}
-              onChange={(event) =>
-                onParticleSetChange(event.currentTarget.value as CryoEtPp7ParticleSetId)
-              }
-            >
-              {Object.values(CRYOET_PP7_PARTICLE_SETS).map((particleSet) => (
-                <option key={particleSet.id} value={particleSet.id}>
-                  {particleSet.label}
+            <span className="case-dataset-select-wrap">
+              <select
+                className="case-dataset-select"
+                data-testid="cryoet-dataset-selector"
+                id="cryoet-dataset-select"
+                value={particleSetId}
+                onChange={(event) =>
+                  onParticleSetChange(event.currentTarget.value as CryoEtPp7ParticleSetId)
+                }
+              >
+                {Object.values(CRYOET_PP7_PARTICLE_SETS).map((particleSet) => (
+                  <option key={particleSet.id} value={particleSet.id}>
+                    {particleSet.label}
+                  </option>
+                ))}
+                <option disabled value="groel">
+                  DS-10493 · GroEL · no class-linked average
                 </option>
-              ))}
-              <option disabled value="groel">
-                DS-10493 · GroEL · no class-linked average
-              </option>
-            </select>
+              </select>
+              <ChevronDown aria-hidden="true" className="case-dataset-select-icon" size={16} />
+            </span>
           </label>
-          <p className="text-slate-600 text-sm">
+          <p className="case-control-panel__status text-slate-600 text-sm">
             Switch between two live PP7 annotation sets. This run also contains GroEL, but its
             Portal record does not provide the class-linked deposited average required here.
           </p>
@@ -358,7 +383,7 @@ function CryoEtContent({
           description="Live P03630 sequence and UniProt features, plus an explicitly synthetic structure-fit quality track."
           hostRef={sequenceHost}
           id={sequenceComponent}
-          title="Protein annotations"
+          title="PP7 capsid sequence annotations"
         />
         <ViewerPanel
           description={
@@ -371,8 +396,8 @@ function CryoEtContent({
           kind="structure"
           title={
             presentation === "density"
-              ? "Subtomogram average density"
-              : "Representative atomic structure"
+              ? "EMD-77085 subtomogram average"
+              : "1DWN representative structure"
           }
         />
       </div>

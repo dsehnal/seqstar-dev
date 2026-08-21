@@ -268,7 +268,36 @@ select {
   background: rgba(250, 253, 255, 0.66);
 }
 .visualization-card__heading {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
   min-width: 0;
+}
+.visualization-card__heading-copy {
+  min-width: 0;
+}
+.visualization-card__heading-copy:only-child {
+  grid-column: 1 / -1;
+}
+.visualization-card__heading-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid rgba(67, 123, 170, 0.28);
+  border-radius: 8px;
+  color: var(--shell-accent-strong);
+  background: rgba(226, 240, 250, 0.78);
+}
+.visualization-card__eyebrow {
+  margin: 0 0 1px;
+  color: var(--shell-faint);
+  font-size: 0.64rem;
+  font-weight: 720;
+  letter-spacing: 0.09em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 .visualization-card__title {
   margin: 0;
@@ -431,12 +460,44 @@ select {
   background: transparent;
 }
 .case-control-panel__dataset {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: minmax(18rem, 0.9fr) minmax(0, 1.1fr);
   align-items: end;
   gap: 12px 24px;
   padding: 12px;
   border-left: 1px solid var(--shell-line);
+}
+.case-control-panel__status {
+  align-self: center;
+  justify-self: stretch;
+  margin: 0;
+  text-align: center;
+}
+.case-dataset-select-wrap {
+  position: relative;
+  display: block;
+  min-width: 0;
+}
+.case-dataset-select {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 36px 7px 12px;
+  border: 1px solid var(--shell-line-strong);
+  border-radius: 7px;
+  color: var(--shell-ink);
+  background: rgba(255, 255, 255, 0.82);
+  appearance: none;
+}
+.case-dataset-select:disabled {
+  opacity: 0.6;
+}
+.case-dataset-select-icon {
+  position: absolute;
+  top: 50%;
+  right: 11px;
+  pointer-events: none;
+  color: var(--shell-faint);
+  transform: translateY(-50%);
 }
 .renderer-chooser__label {
   white-space: nowrap;
@@ -486,6 +547,7 @@ select {
     grid-template-columns: minmax(0, 1fr);
   }
   .case-control-panel__dataset {
+    grid-template-columns: minmax(0, 1fr);
     border-top: 1px solid var(--shell-line);
     border-left: 0;
   }

@@ -68,7 +68,7 @@ function RootLayout() {
               search={{ renderer: undefined, particleSet: undefined }}
               to="/cryoet-tomogram"
             >
-              Cryo-ET story
+              Tomogram to molecule
             </Link>
             <details className="app-nav__more">
               <summary>

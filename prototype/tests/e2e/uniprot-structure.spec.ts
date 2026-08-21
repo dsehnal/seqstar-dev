@@ -61,6 +61,17 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   await expect(controls).toBeVisible();
   await expect(controls.locator(".case-renderer-controls")).toHaveCount(1);
   await expect(controls.getByTestId("dataset-selector")).toHaveCount(1);
+  await expect(page.getByTestId("dataset-status")).toHaveCSS("text-align", "center");
+  const datasetSelect = page.getByTestId("dataset-selector");
+  const datasetChevron = controls.locator(".case-dataset-select-icon");
+  const [selectBox, chevronBox] = await Promise.all([
+    datasetSelect.boundingBox(),
+    datasetChevron.boundingBox(),
+  ]);
+  if (selectBox === null || chevronBox === null)
+    throw new Error("Missing dataset select geometry.");
+  expect(chevronBox.x + chevronBox.width).toBeLessThan(selectBox.x + selectBox.width);
+  expect(chevronBox.y + chevronBox.height / 2).toBeCloseTo(selectBox.y + selectBox.height / 2, 0);
   await expect(page.locator("p:visible").filter({ hasText: /^Harness:/u })).toHaveCount(0);
   await expect(
     page.getByTestId("uniprot-tracks-host").locator('[data-seqstar-nightingale="root"]'),
@@ -145,6 +156,14 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   await expect(hoverColumn).toBeHidden();
 
   await expect(page.getByTestId("structure-view-host")).toHaveCSS("height", "384px");
+  await expect(
+    page.getByTestId("visualizer-panel-uniprot-tracks").getByText("Sequence view", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByTestId("visualizer-panel-structure-view").getByText("3D visualization", {
+      exact: true,
+    }),
+  ).toBeVisible();
   await page
     .getByTestId("uniprot-tracks-host")
     .locator('[data-seqstar-track-activate="missense-score"]')
@@ -370,8 +389,10 @@ test("switches three audited datasets and inspects the latest validated document
     ]),
   });
   await expect(selector).toBeEnabled();
-  await expect(page.getByRole("heading", { name: /Hemoglobin alpha.*tracks/u })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "1A3N / MolViewSpec" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: /Hemoglobin alpha.*sequence annotations/u }),
+  ).toBeVisible();
+  await expect(page.getByRole("heading", { name: "1A3N annotated structure" })).toBeVisible();
   await expect(page.getByTestId("uniprot-tracks-host")).toContainText("PF00042.29 conservation");
   await expect(
     page.getByTestId("uniprot-tracks-host").locator("[data-seqstar-track-activate]"),
@@ -395,8 +416,8 @@ test("switches three audited datasets and inspects the latest validated document
   await expect(page.getByTestId("dataset-status")).toContainText("P00648");
   await expect(page.getByTestId("dataset-status")).toContainText("active");
   await expect(selector).toBeEnabled();
-  await expect(page.getByRole("heading", { name: /Barnase.*tracks/u })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "1BRS / MolViewSpec" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Barnase.*sequence annotations/u })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "1BRS annotated structure" })).toBeVisible();
   await expect(page.getByTestId("uniprot-tracks-host")).toContainText("Signal peptide");
   await expect(
     page.getByTestId("uniprot-tracks-host").locator("[data-seqstar-track-activate]"),
