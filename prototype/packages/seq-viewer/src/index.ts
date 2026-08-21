@@ -313,6 +313,7 @@ class CanvasSeqViewer implements SeqViewer {
   private nativeHover: SeqViewerInteraction | undefined;
   private nativeSelection: SeqViewerInteraction | undefined;
   private navigationDrag: NavigationDrag | undefined;
+  private suppressNavigationClick = false;
   private activeHeaderKey: string | undefined;
 
   constructor(privateOptions: CreateSeqViewerOptions) {
@@ -385,6 +386,9 @@ class CanvasSeqViewer implements SeqViewer {
     this.navigationAxis.addEventListener("dblclick", this.navigationDoubleClick, {
       signal: this.abort.signal,
     });
+    this.navigationAxis.addEventListener("click", this.navigationClick, {
+      signal: this.abort.signal,
+    });
     this.navigationAxis.addEventListener("wheel", this.wheel, {
       signal: this.abort.signal,
       passive: false,
@@ -430,7 +434,7 @@ class CanvasSeqViewer implements SeqViewer {
     });
     this.navigationAxis.dataset.seqViewerNavigation = "axis";
     this.navigationAxis.title =
-      "Drag the window to pan. Drag handles to zoom. Double-click to focus or reset. Shift-wheel pans; Ctrl-wheel zooms.";
+      "Click to center. Drag the window to pan. Drag handles to zoom. Double-click to focus or reset. Shift-wheel pans; Ctrl-wheel zooms.";
     Object.assign(this.navigationAxis.style, {
       position: "relative",
       minWidth: "0",
@@ -2086,6 +2090,7 @@ class CanvasSeqViewer implements SeqViewer {
     const viewport = this.viewportDescriptor();
     if (!mode || !viewport) return;
     event.preventDefault();
+    this.suppressNavigationClick = false;
     this.navigationDrag = {
       mode,
       pointerId: event.pointerId,
@@ -2118,7 +2123,25 @@ class CanvasSeqViewer implements SeqViewer {
     } catch {
       /* pointer capture may already be released */
     }
-    if (drag.changed) this.emitViewport(event);
+    if (drag.changed) {
+      this.suppressNavigationClick = true;
+      window.setTimeout(() => {
+        this.suppressNavigationClick = false;
+      });
+      this.emitViewport(event);
+    }
+  };
+  private readonly navigationClick = (event: MouseEvent): void => {
+    if (this.suppressNavigationClick) {
+      this.suppressNavigationClick = false;
+      return;
+    }
+    const active = this.active,
+      center = this.navigationOffsetAtClientX(event.clientX);
+    if (!active || center === undefined) return;
+    const width = this.visibleColumnCount(active),
+      start = center - Math.floor(width / 2);
+    if (this.setViewport(start, start + width)) this.emitViewport(event);
   };
   private readonly navigationDoubleClick = (event: MouseEvent): void => {
     const active = this.active,

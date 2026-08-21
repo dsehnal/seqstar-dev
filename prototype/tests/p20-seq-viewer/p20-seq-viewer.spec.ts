@@ -422,6 +422,13 @@ test("navigates with bounded viewport descriptors and keeps gap hits empty", asy
   };
   expect(reset.viewport).toMatchObject({ offsetStart: 0, offsetEnd: 8, totalColumns: 8 });
   await window.press("ArrowUp");
+  const axisBox = await page.locator("[data-seq-viewer-navigation=axis]").boundingBox();
+  if (!axisBox) throw new Error("navigation axis missing");
+  await page.mouse.click(axisBox.x + axisBox.width * 0.96, axisBox.y + axisBox.height / 2);
+  const afterClick = (await viewportEvents()).at(-1) as {
+    viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
+  };
+  expect(afterClick.viewport).toMatchObject({ offsetStart: 2, offsetEnd: 8, totalColumns: 8 });
   const rightHandle = page.locator('[data-seq-viewer-navigation-handle="right"]');
   const rightBox = await rightHandle.boundingBox();
   if (!rightBox) throw new Error("right navigation handle missing");
@@ -435,8 +442,7 @@ test("navigates with bounded viewport descriptors and keeps gap hits empty", asy
   expect(afterHandle.viewport.offsetEnd - afterHandle.viewport.offsetStart).toBeLessThan(6);
   const windowBox = await window.boundingBox();
   if (!windowBox) throw new Error("navigation window missing");
-  const axisBox = await page.locator("[data-seq-viewer-navigation=axis]").boundingBox();
-  if (!axisBox) throw new Error("navigation axis missing");
+  const eventCountBeforeDrag = (await viewportEvents()).length;
   await page.mouse.move(windowBox.x + windowBox.width / 2, windowBox.y + windowBox.height / 2);
   await page.mouse.down();
   await page.mouse.move(axisBox.x + axisBox.width + 100, windowBox.y + windowBox.height / 2);
@@ -444,6 +450,7 @@ test("navigates with bounded viewport descriptors and keeps gap hits empty", asy
   const afterDrag = (await viewportEvents()).at(-1) as {
     viewport: { offsetStart: number; offsetEnd: number; totalColumns: number };
   };
+  expect(await viewportEvents()).toHaveLength(eventCountBeforeDrag + 1);
   expect(afterDrag.viewport.offsetEnd).toBe(8);
   await page.getByRole("button", { name: "Reset navigation" }).click();
   await window.press("ArrowUp");
