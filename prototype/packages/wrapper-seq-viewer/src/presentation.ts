@@ -1,0 +1,193 @@
+import type { SequenceWrapperPresentationConfig } from "@seq-star/seq-viewer";
+
+export class ReferencePresentationError extends Error {
+  readonly code: string;
+
+  constructor(code: string, message: string) {
+    super(message);
+    this.name = "ReferencePresentationError";
+    this.code = code;
+  }
+}
+
+const fail = (code: string, message: string): never => {
+  throw new ReferencePresentationError(code, message);
+};
+const arrayIndex = (key: string): boolean => /^(?:0|[1-9][0-9]*)$/u.test(key);
+
+/** Validate without invoking host getters, then detach every accepted value. */
+const assertJson = (value: unknown, seen = new WeakSet<object>()): void => {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (typeof value === "number" && Number.isFinite(value))
+  )
+    return;
+  if (typeof value !== "object")
+    fail(
+      "wrapper.seq-viewer.presentation.json",
+      "Reference presentation must contain JSON-safe values only.",
+    );
+  const object = value as object;
+  if (seen.has(object))
+    fail("wrapper.seq-viewer.presentation.json", "Reference presentation cannot contain cycles.");
+  seen.add(object);
+  if (Array.isArray(value)) {
+    if (Object.getPrototypeOf(value) !== Array.prototype)
+      fail(
+        "wrapper.seq-viewer.presentation.json",
+        "Reference presentation arrays must be plain arrays.",
+      );
+    for (const [key, descriptor] of Object.entries(Object.getOwnPropertyDescriptors(value))) {
+      if (key === "length") continue;
+      if (!arrayIndex(key) || !("value" in descriptor) || !descriptor.enumerable)
+        fail(
+          "wrapper.seq-viewer.presentation.json",
+          "Reference presentation arrays cannot contain accessors or extra properties.",
+        );
+      assertJson(descriptor.value, seen);
+    }
+    for (let index = 0; index < value.length; index += 1)
+      if (!Object.hasOwn(value, index))
+        fail(
+          "wrapper.seq-viewer.presentation.json",
+          "Reference presentation arrays cannot contain holes.",
+        );
+    return;
+  }
+  if (
+    Object.getPrototypeOf(object) !== Object.prototype ||
+    Reflect.ownKeys(object).some((key) => typeof key !== "string")
+  )
+    fail(
+      "wrapper.seq-viewer.presentation.json",
+      "Reference presentation objects must be plain objects without symbol keys.",
+    );
+  for (const descriptor of Object.values(Object.getOwnPropertyDescriptors(object))) {
+    if (!("value" in descriptor) || !descriptor.enumerable)
+      fail(
+        "wrapper.seq-viewer.presentation.json",
+        "Reference presentation cannot contain accessors or hidden properties.",
+      );
+    assertJson(descriptor.value, seen);
+  }
+};
+const record = (value: unknown, path: string): Record<string, unknown> => {
+  if (value === null || typeof value !== "object" || Array.isArray(value))
+    fail("wrapper.seq-viewer.presentation.shape", `${path} must be a plain object.`);
+  return value as Record<string, unknown>;
+};
+const keys = (value: Record<string, unknown>, allowed: readonly string[], path: string): void => {
+  for (const key of Object.keys(value))
+    if (!allowed.includes(key))
+      fail("wrapper.seq-viewer.presentation.shape", `${path}.${key} is not supported.`);
+};
+const text = (value: unknown, path: string): string => {
+  if (typeof value !== "string" || value.trim() === "")
+    fail("wrapper.seq-viewer.presentation.shape", `${path} must be a non-empty string.`);
+  return value as string;
+};
+const trackAction = (
+  value: unknown,
+  path: string,
+): NonNullable<SequenceWrapperPresentationConfig["defaultTrackAction"]> => {
+  const action = record(value, path);
+  keys(action, ["kind", "accessibleName", "tooltip", "icon"], path);
+  const kind =
+    action.kind === "structure-profile" || action.kind === "layer-inspection"
+      ? action.kind
+      : fail("wrapper.seq-viewer.presentation.shape", `${path}.kind is invalid.`);
+  const icon =
+    action.icon === "box" || action.icon === "layers"
+      ? action.icon
+      : fail("wrapper.seq-viewer.presentation.shape", `${path}.icon is invalid.`);
+  return Object.freeze({
+    kind,
+    icon,
+    accessibleName: text(action.accessibleName, `${path}.accessibleName`),
+    tooltip: text(action.tooltip, `${path}.tooltip`),
+  });
+};
+
+export const snapshotReferenceViewerPresentation = (
+  value: unknown,
+): SequenceWrapperPresentationConfig => {
+  if (value === undefined) return Object.freeze({});
+  assertJson(value);
+  const presentation = record(value, "presentation");
+  keys(presentation, ["defaultTrackAction", "tracks", "alignmentMemberActions"], "presentation");
+  const defaultTrackAction =
+    presentation.defaultTrackAction === undefined
+      ? undefined
+      : trackAction(presentation.defaultTrackAction, "presentation.defaultTrackAction");
+  let tracks: SequenceWrapperPresentationConfig["tracks"];
+  if (presentation.tracks !== undefined) {
+    const trackValues = presentation.tracks;
+    if (!Array.isArray(trackValues))
+      fail("wrapper.seq-viewer.presentation.shape", "presentation.tracks must be an array.");
+    const actionValues = trackValues as unknown[];
+    const ids = new Set<string>();
+    tracks = Object.freeze(
+      actionValues.map((candidate, index) => {
+        const track = record(candidate, `presentation.tracks[${index}]`);
+        keys(track, ["trackId", "action"], `presentation.tracks[${index}]`);
+        const trackId = text(track.trackId, `presentation.tracks[${index}].trackId`);
+        if (ids.has(trackId))
+          fail(
+            "wrapper.seq-viewer.presentation.duplicate-track",
+            `presentation.tracks contains duplicate track '${trackId}'.`,
+          );
+        ids.add(trackId);
+        if (track.action === undefined) return Object.freeze({ trackId });
+        return Object.freeze({
+          trackId,
+          action: trackAction(track.action, `presentation.tracks[${index}].action`),
+        });
+      }),
+    );
+  }
+  let alignmentMemberActions: SequenceWrapperPresentationConfig["alignmentMemberActions"];
+  if (presentation.alignmentMemberActions !== undefined) {
+    if (!Array.isArray(presentation.alignmentMemberActions))
+      fail(
+        "wrapper.seq-viewer.presentation.shape",
+        "presentation.alignmentMemberActions must be an array.",
+      );
+    const ids = new Set<string>();
+    alignmentMemberActions = Object.freeze(
+      (presentation.alignmentMemberActions as unknown[]).map((candidate, index) => {
+        const action = record(candidate, `presentation.alignmentMemberActions[${index}]`);
+        const path = `presentation.alignmentMemberActions[${index}]`;
+        keys(action, ["alignmentId", "memberId", "label", "kind"], path);
+        const alignmentId = text(action.alignmentId, `${path}.alignmentId`);
+        const memberId = text(action.memberId, `${path}.memberId`);
+        const label = text(action.label, `${path}.label`);
+        const kind =
+          action.kind === undefined
+            ? undefined
+            : action.kind === "structure" || action.kind === "layers"
+              ? action.kind
+              : fail("wrapper.seq-viewer.presentation.shape", `${path}.kind is invalid.`);
+        const memberKey = `${alignmentId}\u0000${memberId}`;
+        if (ids.has(memberKey))
+          fail(
+            "wrapper.seq-viewer.presentation.duplicate-member",
+            `presentation.alignmentMemberActions contains duplicate member '${alignmentId}/${memberId}'.`,
+          );
+        ids.add(memberKey);
+        return Object.freeze({
+          alignmentId,
+          memberId,
+          label,
+          ...(kind === undefined ? {} : { kind }),
+        });
+      }),
+    );
+  }
+  return Object.freeze({
+    ...(defaultTrackAction === undefined ? {} : { defaultTrackAction }),
+    ...(tracks === undefined ? {} : { tracks }),
+    ...(alignmentMemberActions === undefined ? {} : { alignmentMemberActions }),
+  });
+};

@@ -1,0 +1,43 @@
+{
+  "name": "@seq-star/prototype-workspace",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.22.0",
+  "engines": {
+    "node": "26.7.0",
+    "pnpm": "11.22.0"
+  },
+  "scripts": {
+    "install:frozen": "pnpm install --frozen-lockfile",
+    "install:browser": "playwright install chromium",
+    "inspect:mvs-story": "pnpm --filter @seq-star/integration-plugins run inspect:mvs-story",
+    "dev": "pnpm --filter @seq-star/prototype-web dev",
+    "check": "pnpm run check:biome && pnpm run check:types && pnpm run check:schema && pnpm run check:fixtures && pnpm run check:dependencies",
+    "check:biome": "biome check .",
+    "build:vendor": "pnpm -r --filter './vendor/nightingale/*' run build",
+    "check:types": "pnpm run build:vendor && tsc -b && tsc -p apps/web/tsconfig.app.json --noEmit && tsc -p apps/web/tsconfig.node.json --noEmit",
+    "check:fixtures": "node scripts/verify-fixtures.mjs",
+    "check:schema": "pnpm --filter @seq-star/seq-view-spec run check:schema",
+    "check:dependencies": "node scripts/audit-p01-dependencies.mjs",
+    "check:p80": "node scripts/audit-p80-hardening.mjs",
+    "test": "vitest run --passWithNoTests",
+    "build": "pnpm run build:vendor && tsc -b && pnpm --filter @seq-star/prototype-web build",
+    "test:e2e": "pnpm run test:e2e:app && pnpm run test:e2e:p01b && pnpm run test:e2e:p20 && pnpm run test:e2e:p30 && pnpm run test:e2e:p40",
+    "test:e2e:app": "playwright test",
+    "test:e2e:p01b": "playwright test -c tests/p01b-molstar/playwright.config.ts",
+    "test:e2e:p20": "playwright test -c tests/p20-seq-viewer/playwright.config.ts",
+    "test:e2e:p30": "playwright test -c tests/p30-nightingale/playwright.config.ts",
+    "test:e2e:p40": "playwright test -c tests/p40-molstar/playwright.config.ts",
+    "test:e2e:smoke": "playwright test tests/e2e/smoke.spec.ts",
+    "test:e2e:p01": "playwright test tests/e2e/p01-feasibility.spec.ts",
+    "test:e2e:hardening": "playwright test tests/e2e/hardening.spec.ts"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.9",
+    "@playwright/test": "1.62.1",
+    "typescript": "6.0.3",
+    "vite": "8.2.1",
+    "vitest": "4.1.11"
+  }
+}

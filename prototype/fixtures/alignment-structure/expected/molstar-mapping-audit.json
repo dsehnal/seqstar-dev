@@ -1,0 +1,30 @@
+{
+  "parserPackage": "molstar@5.11.0",
+  "imports": [
+    "molstar/lib/mol-io/reader/cif.js",
+    "molstar/lib/mol-model-formats/structure/mmcif.js",
+    "molstar/lib/mol-model/structure.js"
+  ],
+  "checks": [
+    "CIF.parseText completed without error",
+    "trajectoryFromMmCIF produced a representative model",
+    "Structure.ofModel element locations supplied observed residues and coordinates",
+    "Mol* scheme/model identities agreed with SIFTS for every selected construct row"
+  ],
+  "pdbId": "1A3N",
+  "labelAsymId": "A",
+  "authAsymId": "A",
+  "schemeRows": 141,
+  "observedResidues": 141,
+  "mappingCounts": {
+    "exact": 141,
+    "outside_construct": 1
+  },
+  "alignmentQuery": {
+    "row": "HBA_HUMAN/27-137",
+    "columns": 118,
+    "residues": 111,
+    "gapColumns": 7,
+    "exactStructureMappings": 111
+  }
+}

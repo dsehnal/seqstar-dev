@@ -1,0 +1,39 @@
+packages:
+  - apps/*
+  - packages/*
+  - vendor/nightingale/*
+
+allowBuilds:
+  '@scarf/scarf': false
+
+catalog:
+  '@biomejs/biome': 2.5.9
+  '@playwright/test': 1.62.1
+  '@tailwindcss/vite': 4.3.3
+  '@tanstack/react-router': 1.170.31
+  '@tanstack/router-plugin': 1.168.34
+  '@types/react': 19.2.18
+  '@types/react-dom': 19.2.4
+  '@vitejs/plugin-react': 6.0.5
+  lucide: 1.33.0
+  lucide-react: 1.33.0
+  react: 19.2.8
+  react-dom: 19.2.8
+  tailwindcss: 4.3.3
+  typescript: 6.0.3
+  vite: 8.2.1
+  vitest: 4.1.11
+
+minimumReleaseAgeExclude:
+  - '@tanstack/react-router@1.170.31'
+  - '@tanstack/router-core@1.171.26'
+  - '@tanstack/router-generator@1.167.32'
+  - '@tanstack/router-plugin@1.168.34'
+
+ignoredBuiltDependencies:
+  - '@scarf/scarf'
+
+# `mise run` executes non-interactively. Installation is an explicit locked task,
+# so package scripts must not attempt an implicit interactive module purge.
+confirmModulesPurge: false
+verifyDepsBeforeRun: false

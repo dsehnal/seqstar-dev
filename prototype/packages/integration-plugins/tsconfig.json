@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src"
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../harness-core" },
+    { "path": "../seq-coords" },
+    { "path": "../seq-core" },
+    { "path": "../seq-view-spec" }
+  ]
+}

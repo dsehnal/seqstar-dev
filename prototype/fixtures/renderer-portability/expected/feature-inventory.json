@@ -1,0 +1,28 @@
+{
+  "accession": "P04637",
+  "sequenceLength": 393,
+  "entryVersion": 314,
+  "sequenceVersion": 4,
+  "featureCounts": {
+    "Alternative sequence": 6,
+    "Beta strand": 17,
+    "Binding site": 4,
+    "Chain": 1,
+    "Compositional bias": 3,
+    "Cross-link": 6,
+    "DNA binding": 1,
+    "Helix": 21,
+    "Modified residue": 30,
+    "Motif": 5,
+    "Mutagenesis": 38,
+    "Natural variant": 1363,
+    "Region": 20,
+    "Site": 1,
+    "Turn": 7
+  },
+  "rendererProbeSelection": {
+    "overlappingRanges": ["Region", "Compositional bias", "Motif"],
+    "categoricalResidues": ["Modified residue", "Binding site", "Site"],
+    "numericPerResidue": "count of UniProt Natural variant records covering each residue; derived without imputation"
+  }
+}

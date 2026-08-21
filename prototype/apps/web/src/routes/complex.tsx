@@ -1,0 +1,195 @@
+import { createApplicationHarness } from "@seq-star/harness-core";
+import { HarnessProvider, useHarness, useHarnessHost } from "@seq-star/harness-react";
+import { createComplexPlugin } from "@seq-star/integration-plugins";
+import { createMolstarWrapperFactory } from "@seq-star/wrapper-molstar";
+import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
+import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
+import { createFileRoute } from "@tanstack/react-router";
+import { useCallback, useRef } from "react";
+import confidenceTsv from "../../../../fixtures/complex/expected/synthetic-confidence.tsv?raw";
+import structureUrl from "../../../../fixtures/complex/input/1BRS.cif?url";
+import barnaseFasta from "../../../../fixtures/complex/input/P00648.fasta?raw";
+import barstarFasta from "../../../../fixtures/complex/input/P11540.fasta?raw";
+import contactsTsv from "../../../../fixtures/complex/mappings/1BRS-chain-A-D-heavy-atom-contacts.tsv?raw";
+import barnaseMappingTsv from "../../../../fixtures/complex/mappings/P00648-1BRS-chain-A.tsv?raw";
+import barstarMappingTsv from "../../../../fixtures/complex/mappings/P11540-1BRS-chain-D.tsv?raw";
+import {
+  CaseRendererChooser,
+  type RendererMode,
+  rendererSearch,
+} from "../components/case-renderer-chooser";
+import { ViewerPanel } from "../components/presentation";
+import { InspectPanel, useInspectPanelState } from "../inspect-panel";
+
+const sequenceComponent = "complex-sequence";
+const structureComponent = "complex-structure";
+const fasta = (source: string) => source.split(/\r?\n/u).slice(1).join("").trim();
+
+const rendererModes = ["reference", "nightingale"] as const satisfies readonly RendererMode[];
+const referenceDefaultTrackAction = {
+  kind: "structure-profile",
+  icon: "box",
+  accessibleName: "Show this track in 3D",
+  tooltip: "Show this track as an annotated 3D structure",
+} as const;
+const nightingaleDefaultTrackAction = {
+  label: "Show this track in 3D",
+  kind: "structure",
+} as const;
+const rendererComponents = {
+  reference: [
+    {
+      id: sequenceComponent,
+      type: "seqstar.reference-viewer",
+      config: { presentation: { defaultTrackAction: referenceDefaultTrackAction } },
+    },
+  ],
+  nightingale: [
+    {
+      id: sequenceComponent,
+      type: "seqstar.nightingale",
+      config: { presentation: { defaultTrackAction: nightingaleDefaultTrackAction } },
+    },
+  ],
+} as const;
+const createPageHarness = (
+  hosts: { readonly require: (id: string) => HTMLElement },
+  mode: Exclude<RendererMode, "compare">,
+) =>
+  createApplicationHarness(
+    {
+      id: "complex",
+      components: [
+        ...rendererComponents[mode],
+        { id: structureComponent, type: "seqstar.molstar-mvs" },
+      ],
+      plugins: [{ id: "complex-mvs", plugin: "seqstar.complex-mvs" }],
+      synchronization: [
+        {
+          id: "complex-hover",
+          interaction: "hover",
+          between: [sequenceComponent, structureComponent],
+          unmapped: "clear",
+        },
+        {
+          id: "complex-select",
+          interaction: "select",
+          between: [sequenceComponent, structureComponent],
+          unmapped: "preserve",
+        },
+      ],
+    },
+    {
+      componentFactories: [
+        createReferenceViewerWrapperFactory({ getHost: (id) => hosts.require(id) }),
+        createNightingaleWrapperFactory({ getHost: (id) => hosts.require(id) }),
+        createMolstarWrapperFactory({ getHost: (id) => hosts.require(id) }),
+      ],
+      pluginFactories: [
+        {
+          plugin: "seqstar.complex-mvs",
+          create: () =>
+            createComplexPlugin({
+              sequenceComponent,
+              structureComponent,
+              barnaseMappingTsv,
+              barstarMappingTsv,
+              contactsTsv,
+              confidenceTsv,
+              barnaseResidues: fasta(barnaseFasta),
+              barstarResidues: fasta(barstarFasta),
+              structureUrl,
+            }),
+        },
+      ],
+    },
+  );
+
+function ComplexContent({
+  initialMode,
+  onModeChange,
+}: {
+  readonly initialMode: RendererMode;
+  readonly onModeChange: (mode: RendererMode) => void;
+}) {
+  const { status } = useHarness();
+  const sequenceHost = useHarnessHost(sequenceComponent);
+  const structureHost = useHarnessHost(structureComponent);
+  const inspect = useInspectPanelState({ sequenceComponent, structureComponent });
+  return (
+    <main className="mx-auto grid max-w-7xl gap-6 px-6 py-8" data-testid="case-complex">
+      <section>
+        <p className="font-medium text-sky-700 text-sm uppercase tracking-[0.16em]">Case study</p>
+        <h1 className="mt-2 font-bold text-3xl text-slate-950">Barnase–barstar complex</h1>
+        <p className="mt-3 max-w-4xl text-lg text-slate-600">
+          An explicit two-polymer assembly: barnase P00648 / chain A and barstar P11540 / chain D.
+          The visible gap separates coordinate spaces and cannot select a fabricated biological
+          position. Hover residues to reflect an exact chain locus; select a contact to focus both
+          named endpoints.
+        </p>
+        <p data-testid="p50-harness-status" hidden>
+          Harness: {status} · local 1BRS fixture only
+        </p>
+      </section>
+      <p
+        className="rounded border border-amber-300 bg-amber-50 p-3 text-amber-950 text-sm"
+        data-testid="p50-synthetic-label"
+      >
+        Synthetic confidence — deterministic prototype values, not a biological prediction.
+      </p>
+      <CaseRendererChooser
+        descriptor={{ caseId: "complex", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {(_, rendererControl) => (
+          <div className="grid gap-5 xl:grid-cols-2">
+            <ViewerPanel
+              hostRef={sequenceHost}
+              id={sequenceComponent}
+              title="Barnase–barstar sequence tracks"
+              toolbar={rendererControl}
+            />
+            <ViewerPanel
+              hostRef={structureHost}
+              id={structureComponent}
+              kind="structure"
+              title="1BRS annotated assembly"
+            />
+          </div>
+        )}
+      </CaseRendererChooser>
+      <section data-testid="inspect-panel-container">
+        <InspectPanel state={inspect} />
+      </section>
+    </main>
+  );
+}
+
+function ComplexPage() {
+  const search = Route.useSearch();
+  const navigate = Route.useNavigate();
+  const initialMode = rendererSearch(search.renderer, rendererModes, "reference");
+  const mountedMode = useRef(initialMode).current;
+  const createHarness = useCallback(
+    ({ hosts }: { readonly hosts: { readonly require: (id: string) => HTMLElement } }) =>
+      createPageHarness(hosts, mountedMode as Exclude<RendererMode, "compare">),
+    [mountedMode],
+  );
+  return (
+    <HarnessProvider
+      createHarness={createHarness}
+      fallback={<main className="p-8">Starting offline 1BRS complex…</main>}
+    >
+      <ComplexContent
+        initialMode={initialMode}
+        onModeChange={(renderer) => void navigate({ search: { renderer } })}
+      />
+    </HarnessProvider>
+  );
+}
+
+export const Route = createFileRoute("/complex")({
+  validateSearch: (search: Record<string, unknown>) => ({ renderer: search.renderer }),
+  component: ComplexPage,
+});

@@ -1,0 +1,18 @@
+{
+  "bad-locus.json": [
+    { "code": "seqviewspec.locus.bounds", "path": "/annotations/0/items/0/loci/0" }
+  ],
+  "bad-relationship.json": [
+    {
+      "code": "seqviewspec.relationship.endpoint-role.duplicate",
+      "path": "/annotations/0/items/0/endpoints/1/role"
+    }
+  ],
+  "bad-values.json": [
+    { "code": "seqviewspec.values.dense.length", "path": "/annotations/0/values/data" },
+    { "code": "seqviewspec.values.type", "path": "/annotations/0/values/data/0" }
+  ],
+  "unknown-sequence.json": [
+    { "code": "seqviewspec.assembly.sequence.missing", "path": "/assemblies/0/members/0/sequence" }
+  ]
+}

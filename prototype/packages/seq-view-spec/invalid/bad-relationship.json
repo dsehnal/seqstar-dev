@@ -1,0 +1,41 @@
+{
+  "kind": "seq-view-spec",
+  "version": "0.1.0",
+  "id": "bad-relationship",
+  "sequences": [
+    { "id": "protein", "coordinateSpace": "space", "alphabet": "protein", "residues": "AC" }
+  ],
+  "annotations": [
+    {
+      "id": "edges",
+      "kind": "relationships",
+      "semanticType": "test",
+      "items": [
+        {
+          "id": "edge",
+          "endpoints": [
+            { "role": "same", "loci": [{ "kind": "point", "space": "space", "position": 0 }] },
+            { "role": "same", "loci": [{ "kind": "point", "space": "space", "position": 1 }] }
+          ]
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "view",
+      "axis": { "segments": [{ "id": "axis", "space": "space", "start": 0, "end": 2 }] },
+      "sections": [
+        {
+          "id": "section",
+          "tracks": [
+            {
+              "id": "track",
+              "layers": [{ "id": "layer", "representation": "links", "annotation": "edges" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

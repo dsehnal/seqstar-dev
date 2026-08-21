@@ -1,0 +1,87 @@
+{
+  "parserPackage": "molstar@5.11.0",
+  "independentReview": {
+    "required": true,
+    "state": "approved-for-m50-use",
+    "reviewedDate": "2026-08-20",
+    "downstreamM50UseAllowed": true,
+    "meaning": "An independent reviewer approved the retained fixture packet for downstream M50 use. This approval does not change the experimental-plus-predicted interpretation."
+  },
+  "imports": [
+    "molstar/lib/mol-io/reader/cif.js",
+    "molstar/lib/mol-model-formats/structure/mmcif.js",
+    "molstar/lib/mol-math/linear-algebra/3d/minimize-rmsd.js"
+  ],
+  "checks": [
+    "Mol* CIF.parseText and trajectoryFromMmCIF parse every experimental and predicted mmCIF",
+    "Every predicted model is one entity/chain A with complete observed C-alpha coverage over its exact UniProt sequence",
+    "Every frozen alignment residue maps exactly to the model label_seq_id with gaps recorded explicitly",
+    "Rigid fits use only ordered frozen alignment-column C-alpha pairs and Mol* MinimizeRmsd.compute; no automatic sequence or structure alignment is used",
+    "The checked MVS has exactly one experimental and three AlphaFold DB v6 predicted cartoon roots with local URLs"
+  ],
+  "ensemble": {
+    "alignment": "PF00042.29",
+    "reference": "P69905/1A3N entity 1 label/auth chain A",
+    "biologicalEnsembleClaim": false,
+    "interpretation": "A comparative display of one experimental structure and three theoretical AlphaFold DB predictions, not evidence of a biological ensemble.",
+    "members": [
+      {
+        "accession": "P02197",
+        "accessionVersion": "P02197.4",
+        "modelId": "AF-P02197-F1-model_v6",
+        "modelEntityId": "AF-P02197-F1",
+        "sourceKind": "predicted",
+        "fullObservedCaCoverage": true,
+        "mappingFile": "mappings/PF00042.29-P02197-AF-P02197-F1-model_v6.tsv",
+        "pairFile": "transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+        "pairCount": 108,
+        "transformFile": "transforms/P02197-AF-P02197-F1-to-P69905-1A3N-chain-A.transform.json",
+        "transformSha256": "cbeb38ee8a395262cd685b90866e85054662390454caae0b6a4551f3626772ac",
+        "rmsdAngstrom": 1.685969014466101,
+        "matrixConvention": "column-major 4x4 homogeneous matrix; post-transform mobile coordinates are in the P69905/1A3N chain A frame"
+      },
+      {
+        "accession": "A0A5E4C8D4",
+        "accessionVersion": "A0A5E4C8D4.1",
+        "modelId": "AF-A0A5E4C8D4-F1-model_v6",
+        "modelEntityId": "AF-A0A5E4C8D4-F1",
+        "sourceKind": "predicted",
+        "fullObservedCaCoverage": true,
+        "mappingFile": "mappings/PF00042.29-A0A5E4C8D4-AF-A0A5E4C8D4-F1-model_v6.tsv",
+        "pairFile": "transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+        "pairCount": 111,
+        "transformFile": "transforms/A0A5E4C8D4-AF-A0A5E4C8D4-F1-to-P69905-1A3N-chain-A.transform.json",
+        "transformSha256": "17768f017ba516af15e470380558360c412a312ffe09841b02bc1c444801f8ff",
+        "rmsdAngstrom": 0.33601757542522814,
+        "matrixConvention": "column-major 4x4 homogeneous matrix; post-transform mobile coordinates are in the P69905/1A3N chain A frame"
+      },
+      {
+        "accession": "A0A2Y9DEZ0",
+        "accessionVersion": "A0A2Y9DEZ0.1",
+        "modelId": "AF-A0A2Y9DEZ0-F1-model_v6",
+        "modelEntityId": "AF-A0A2Y9DEZ0-F1",
+        "sourceKind": "predicted",
+        "fullObservedCaCoverage": true,
+        "mappingFile": "mappings/PF00042.29-A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-model_v6.tsv",
+        "pairFile": "transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.pairs.tsv",
+        "pairCount": 110,
+        "transformFile": "transforms/A0A2Y9DEZ0-AF-A0A2Y9DEZ0-F1-to-P69905-1A3N-chain-A.transform.json",
+        "transformSha256": "93925ed1f83cef171badc5728f022a0e965fd2e7faa41ae9c738f4124bcb9ae3",
+        "rmsdAngstrom": 0.5357812930315486,
+        "matrixConvention": "column-major 4x4 homogeneous matrix; post-transform mobile coordinates are in the P69905/1A3N chain A frame"
+      }
+    ],
+    "mvs": {
+      "path": "expected/PF00042.29-4-root-ensemble.mvsj",
+      "sha256": "3e00d3736fb28f2ccd5b78c42c99ab3d8074f3516d41c4471827078264dc50c9",
+      "structureRoots": 4,
+      "colors": {
+        "experimental1A3N": "#2563EB",
+        "predictedP02197": "#F97316",
+        "predictedA0A5E4C8D4": "#10B981",
+        "predictedA0A2Y9DEZ0": "#A855F7"
+      },
+      "focus": "experimental 1A3N chain A"
+    }
+  }
+}

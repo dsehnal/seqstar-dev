@@ -1,0 +1,35 @@
+{
+  "kind": "seq-view-spec",
+  "version": "0.1.0",
+  "id": "bad-values",
+  "sequences": [
+    { "id": "protein", "coordinateSpace": "space", "alphabet": "protein", "residues": "AC" }
+  ],
+  "annotations": [
+    {
+      "id": "values",
+      "kind": "values",
+      "semanticType": "test",
+      "space": "space",
+      "valueType": "number",
+      "values": { "encoding": "dense", "data": ["bad"] }
+    }
+  ],
+  "views": [
+    {
+      "id": "view",
+      "axis": { "segments": [{ "id": "axis", "space": "space", "start": 0, "end": 2 }] },
+      "sections": [
+        {
+          "id": "section",
+          "tracks": [
+            {
+              "id": "track",
+              "layers": [{ "id": "layer", "representation": "bars", "annotation": "values" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

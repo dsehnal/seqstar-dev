@@ -1,0 +1,33 @@
+{
+  "kind": "seq-view-spec",
+  "version": "0.1.0",
+  "id": "bad-locus",
+  "sequences": [
+    { "id": "protein", "coordinateSpace": "space", "alphabet": "protein", "residues": "AC" }
+  ],
+  "annotations": [
+    {
+      "id": "sites",
+      "kind": "loci",
+      "semanticType": "test",
+      "items": [{ "id": "site", "loci": [{ "kind": "point", "space": "space", "position": 2 }] }]
+    }
+  ],
+  "views": [
+    {
+      "id": "view",
+      "axis": { "segments": [{ "id": "axis", "space": "space", "start": 0, "end": 2 }] },
+      "sections": [
+        {
+          "id": "section",
+          "tracks": [
+            {
+              "id": "track",
+              "layers": [{ "id": "layer", "representation": "blocks", "annotation": "sites" }]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

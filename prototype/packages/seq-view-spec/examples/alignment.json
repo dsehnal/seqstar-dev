@@ -1,0 +1,45 @@
+{
+  "kind": "seq-view-spec",
+  "version": "0.1.0",
+  "id": "alignment-document",
+  "sequences": [
+    { "id": "first", "coordinateSpace": "first-space", "alphabet": "protein", "residues": "ACD" },
+    { "id": "second", "coordinateSpace": "second-space", "alphabet": "protein", "residues": "AD" }
+  ],
+  "alignments": [
+    {
+      "id": "msa",
+      "coordinateSpace": "msa-columns",
+      "length": 3,
+      "members": [
+        { "id": "row-first", "sequence": "first", "positions": [0, 1, 2] },
+        { "id": "row-second", "sequence": "second", "positions": [0, null, 1] }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "msa-view",
+      "context": { "alignment": "msa" },
+      "axis": { "segments": [{ "id": "msa-axis", "space": "msa-columns", "start": 0, "end": 3 }] },
+      "sections": [
+        {
+          "id": "msa-section",
+          "tracks": [
+            {
+              "id": "msa-track",
+              "layers": [
+                {
+                  "id": "alignment-layer",
+                  "representation": "alignment",
+                  "alignment": "msa",
+                  "members": ["row-second", "row-first"]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

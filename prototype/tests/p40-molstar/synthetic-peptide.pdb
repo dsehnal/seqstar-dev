@@ -1,0 +1,10 @@
+HEADER    SYNTHETIC PEPTIDE FOR SEQSTAR P40
+TITLE     NON-BIOLOGICAL TWO RESIDUE WRAPPER TEST
+ATOM      1  N   ALA A   1       0.000   0.000   0.000  1.00 10.00           N
+ATOM      2  CA  ALA A   1       1.458   0.000   0.000  1.00 10.00           C
+ATOM      3  C   ALA A   1       2.009   1.421   0.000  1.00 10.00           C
+ATOM      4  O   ALA A   1       1.334   2.406   0.000  1.00 10.00           O
+ATOM      5  N   GLY A   2       3.254   1.524   0.000  1.00 10.00           N
+ATOM      6  CA  GLY A   2       3.891   2.836   0.000  1.00 10.00           C
+TER       7      GLY A   2
+END

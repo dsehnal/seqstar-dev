@@ -1,0 +1,128 @@
+{
+  "kind": "seq-view-spec",
+  "version": "0.1.0",
+  "id": "single-protein",
+  "sequences": [
+    {
+      "id": "protein",
+      "coordinateSpace": "protein-space",
+      "alphabet": "protein",
+      "residues": "MKTAY"
+    }
+  ],
+  "annotations": [
+    {
+      "id": "sites",
+      "kind": "loci",
+      "semanticType": "example:site",
+      "items": [
+        {
+          "id": "site-a",
+          "loci": [{ "kind": "point", "space": "protein-space", "position": 2 }],
+          "value": "active"
+        }
+      ]
+    },
+    {
+      "id": "scores",
+      "kind": "values",
+      "semanticType": "example:score",
+      "space": "protein-space",
+      "valueType": "number",
+      "values": { "encoding": "dense", "data": [0, 0.25, 0.5, 0.75, 1] }
+    },
+    {
+      "id": "classes",
+      "kind": "values",
+      "semanticType": "example:class",
+      "space": "protein-space",
+      "valueType": "category",
+      "values": { "encoding": "sparse", "data": [{ "position": 2, "value": "active" }] }
+    }
+  ],
+  "views": [
+    {
+      "id": "main",
+      "axis": {
+        "segments": [{ "id": "protein-axis", "space": "protein-space", "start": 0, "end": 5 }]
+      },
+      "sections": [
+        {
+          "id": "sequence",
+          "tracks": [
+            {
+              "id": "residues",
+              "layers": [{ "id": "letters", "representation": "sequence", "sequence": "protein" }]
+            },
+            {
+              "id": "features",
+              "layers": [{ "id": "site-blocks", "representation": "blocks", "annotation": "sites" }]
+            },
+            {
+              "id": "site-markers",
+              "layers": [
+                {
+                  "id": "site-markers-layer",
+                  "representation": "markers",
+                  "annotation": "sites",
+                  "color": { "kind": "fixed", "color": "#112233" }
+                }
+              ]
+            },
+            {
+              "id": "score-bars",
+              "layers": [
+                {
+                  "id": "score-bars-layer",
+                  "representation": "bars",
+                  "annotation": "scores",
+                  "scale": { "domain": [0, 1], "clamp": true },
+                  "color": {
+                    "kind": "continuous",
+                    "field": "value",
+                    "domain": [0, 1],
+                    "range": ["#000000", "#FFFFFF"],
+                    "missing": "#888888"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "score-heatmap",
+              "layers": [
+                {
+                  "id": "score-heatmap-layer",
+                  "representation": "heatmap",
+                  "annotation": "scores",
+                  "color": {
+                    "kind": "continuous",
+                    "field": "value",
+                    "domain": [0, 1],
+                    "range": ["#000000", "#FFFFFF"],
+                    "missing": "#888888"
+                  }
+                }
+              ]
+            },
+            {
+              "id": "class-swatch",
+              "layers": [
+                {
+                  "id": "class-swatch-layer",
+                  "representation": "swatch",
+                  "annotation": "classes",
+                  "color": {
+                    "kind": "categorical",
+                    "field": "value",
+                    "colors": { "\"active\"": "#00AA00" },
+                    "fallback": "#777777"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

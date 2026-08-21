@@ -1,0 +1,111 @@
+{
+  "schemaVersion": 1,
+  "caseId": "uniprot-structure",
+  "title": "UniProt TP53 P04637 with PDB 1TUP p53 chain A",
+  "status": "approved",
+  "retrievalDate": "2026-08-19",
+  "identifiers": {
+    "uniprotAccession": "P04637",
+    "uniprotEntryVersion": 314,
+    "uniprotSequenceVersion": 4,
+    "pdbId": "1TUP",
+    "pdbRevision": "1.3",
+    "pdbRevisionDate": "2024-02-14",
+    "siftsDate": "2026-08-17",
+    "siftsUniProtVersion": "2026.03",
+    "selectedAuthAsymId": "A",
+    "selectedLabelAsymId": "C",
+    "selectedEntityId": "3"
+  },
+  "sources": [
+    {
+      "name": "UniProtKB P04637",
+      "url": "https://rest.uniprot.org/uniprotkb/P04637.json",
+      "recordUrl": "https://www.uniprot.org/uniprotkb/P04637/entry",
+      "license": "CC BY 4.0",
+      "licenseUrl": "https://www.uniprot.org/help/license/"
+    },
+    {
+      "name": "wwPDB 1TUP mmCIF",
+      "url": "https://files.rcsb.org/download/1TUP.cif",
+      "recordUrl": "https://www.rcsb.org/structure/1TUP",
+      "license": "CC0 1.0",
+      "licenseUrl": "https://www.wwpdb.org/about/usage-policies"
+    },
+    {
+      "name": "PDBe SIFTS 1TUP residue mappings",
+      "url": "https://ftp.ebi.ac.uk/pub/databases/msd/sifts/xml/1tup.xml.gz",
+      "recordUrl": "https://www.ebi.ac.uk/pdbe/docs/sifts/quick.html",
+      "usageTerms": "The downloaded XML embeds its PDBe-UniProt copyright and licence notice; retain the raw record and cite SIFTS.",
+      "usageTermsUrl": "https://www.ebi.ac.uk/pdbe/docs/sifts/quick.html"
+    }
+  ],
+  "mappingAudit": {
+    "sourceSequenceLength": 393,
+    "constructUniProtRangeInclusive": [94, 312],
+    "observedUniProtRangeInclusive": [94, 289],
+    "missingCoordinateUniProtRangeInclusive": [290, 312],
+    "outsideConstructRangesInclusive": [[1, 93], [313, 393]],
+    "residueConflicts": [],
+    "siftsMappedResidues": 219,
+    "siftsObservedResidues": 196,
+    "siftsMissingCoordinateResidues": 23,
+    "molstarValidation": {
+      "package": "molstar@5.11.0",
+      "schemeRows": 219,
+      "observedResidues": 196,
+      "result": "Every selected Mol* scheme/model row agreed with SIFTS; see expected/molstar-mapping-audit.json."
+    }
+  },
+  "transformations": [
+    {
+      "id": "mapping-table",
+      "classification": "transformed-real",
+      "description": "The complete P04637 forward/reverse mapping was frozen after pinned Mol* parsing validated SIFTS label/auth numbering, residue identity, and coordinate presence."
+    }
+  ],
+  "files": [
+    {
+      "path": "input/P04637.uniprot.json.raw",
+      "bytes": 869335,
+      "sha256": "452b62f11172605b76fc7a8edb9b617fbdff7e52693d04520a3d70d2ccc16839",
+      "classification": "real"
+    },
+    {
+      "path": "input/P04637.fasta",
+      "bytes": 490,
+      "sha256": "59aace7211b64e5918ef6547fc48d6419a134fa91f158415d598d3416882f063",
+      "classification": "real"
+    },
+    {
+      "path": "input/1TUP.cif",
+      "bytes": 698225,
+      "sha256": "cbc6ebdae1444998cf55744339e1a500d8822ac0761841d1eed96f5e8b59cb37",
+      "classification": "real"
+    },
+    {
+      "path": "input/1TUP.sifts.xml.gz",
+      "bytes": 79959,
+      "sha256": "d7170a4eadffba90adce8f48ba729f1c886db0ea6cfe09982cf02453b2094425",
+      "classification": "real"
+    },
+    {
+      "path": "mappings/P04637-1TUP-chain-A.tsv",
+      "bytes": 22795,
+      "sha256": "651b6be3a851ab71d68106b74fafe43c2e69a2771edf1debf7e08c7adffe27a2",
+      "classification": "transformed-real"
+    },
+    {
+      "path": "expected/molstar-mapping-audit.json",
+      "bytes": 705,
+      "sha256": "8bb686d1c53dd4a9d80c253cbdc0637088c5bceb4a5c7a86b17893886935691f",
+      "classification": "verification"
+    }
+  ],
+  "sizeBudget": {
+    "checkedInBytes": 1671509,
+    "browserInputBudgetBytes": 2097152,
+    "withinBudget": true
+  },
+  "syntheticData": false
+}

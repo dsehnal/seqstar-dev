@@ -1,0 +1,62 @@
+{
+  "kind": "seq-view-spec",
+  "version": "0.1.0",
+  "id": "complex",
+  "sequences": [
+    { "id": "a", "coordinateSpace": "a-space", "alphabet": "protein", "residues": "ACDE" },
+    { "id": "b", "coordinateSpace": "b-space", "alphabet": "protein", "residues": "FGHI" }
+  ],
+  "assemblies": [
+    {
+      "id": "assembly",
+      "members": [{ "id": "chain-a", "sequence": "a" }, { "id": "chain-b", "sequence": "b" }]
+    }
+  ],
+  "annotations": [
+    {
+      "id": "contacts",
+      "kind": "relationships",
+      "semanticType": "example:contact",
+      "items": [
+        {
+          "id": "contact-1",
+          "endpoints": [
+            { "role": "source", "loci": [{ "kind": "point", "space": "a-space", "position": 1 }] },
+            { "role": "target", "loci": [{ "kind": "point", "space": "b-space", "position": 2 }] }
+          ]
+        }
+      ]
+    }
+  ],
+  "views": [
+    {
+      "id": "complex-view",
+      "context": { "assembly": "assembly" },
+      "axis": {
+        "segments": [
+          { "id": "a-axis", "space": "a-space", "start": 0, "end": 4 },
+          { "id": "b-axis", "space": "b-space", "start": 0, "end": 4 }
+        ],
+        "gap": 8
+      },
+      "sections": [
+        {
+          "id": "contacts-section",
+          "tracks": [
+            {
+              "id": "contact-track",
+              "layers": [
+                {
+                  "id": "links",
+                  "representation": "links",
+                  "annotation": "contacts",
+                  "fallback": { "representation": "markers" }
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

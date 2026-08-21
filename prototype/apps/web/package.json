@@ -1,0 +1,36 @@
+{
+  "name": "@seq-star/prototype-web",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@seq-star/harness-core": "workspace:*",
+    "@seq-star/harness-react": "workspace:*",
+    "@seq-star/integration-plugins": "workspace:*",
+    "@seq-star/seq-view-spec": "workspace:*",
+    "@seq-star/wrapper-seq-viewer": "workspace:*",
+    "@seq-star/wrapper-molstar": "workspace:*",
+    "@seq-star/wrapper-nightingale": "workspace:*",
+    "@seq-star/wrapper-tomogram": "workspace:*",
+    "@tanstack/react-router": "catalog:",
+    "lucide-react": "catalog:",
+    "molstar": "5.11.0",
+    "react": "catalog:",
+    "react-dom": "catalog:"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "catalog:",
+    "@tanstack/router-plugin": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "tailwindcss": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:"
+  }
+}

@@ -1,0 +1,394 @@
+source_accession	source_position_1based	source_index_0based	source_residue	structure_id	label_asym_id	auth_asym_id	label_seq_id	auth_seq_id	pdb_seq_num	insertion_code	structure_residue	observed	residue_match	status
+P04637	1	0	M	1TUP	C	A						false		outside_construct
+P04637	2	1	E	1TUP	C	A						false		outside_construct
+P04637	3	2	E	1TUP	C	A						false		outside_construct
+P04637	4	3	P	1TUP	C	A						false		outside_construct
+P04637	5	4	Q	1TUP	C	A						false		outside_construct
+P04637	6	5	S	1TUP	C	A						false		outside_construct
+P04637	7	6	D	1TUP	C	A						false		outside_construct
+P04637	8	7	P	1TUP	C	A						false		outside_construct
+P04637	9	8	S	1TUP	C	A						false		outside_construct
+P04637	10	9	V	1TUP	C	A						false		outside_construct
+P04637	11	10	E	1TUP	C	A						false		outside_construct
+P04637	12	11	P	1TUP	C	A						false		outside_construct
+P04637	13	12	P	1TUP	C	A						false		outside_construct
+P04637	14	13	L	1TUP	C	A						false		outside_construct
+P04637	15	14	S	1TUP	C	A						false		outside_construct
+P04637	16	15	Q	1TUP	C	A						false		outside_construct
+P04637	17	16	E	1TUP	C	A						false		outside_construct
+P04637	18	17	T	1TUP	C	A						false		outside_construct
+P04637	19	18	F	1TUP	C	A						false		outside_construct
+P04637	20	19	S	1TUP	C	A						false		outside_construct
+P04637	21	20	D	1TUP	C	A						false		outside_construct
+P04637	22	21	L	1TUP	C	A						false		outside_construct
+P04637	23	22	W	1TUP	C	A						false		outside_construct
+P04637	24	23	K	1TUP	C	A						false		outside_construct
+P04637	25	24	L	1TUP	C	A						false		outside_construct
+P04637	26	25	L	1TUP	C	A						false		outside_construct
+P04637	27	26	P	1TUP	C	A						false		outside_construct
+P04637	28	27	E	1TUP	C	A						false		outside_construct
+P04637	29	28	N	1TUP	C	A						false		outside_construct
+P04637	30	29	N	1TUP	C	A						false		outside_construct
+P04637	31	30	V	1TUP	C	A						false		outside_construct
+P04637	32	31	L	1TUP	C	A						false		outside_construct
+P04637	33	32	S	1TUP	C	A						false		outside_construct
+P04637	34	33	P	1TUP	C	A						false		outside_construct
+P04637	35	34	L	1TUP	C	A						false		outside_construct
+P04637	36	35	P	1TUP	C	A						false		outside_construct
+P04637	37	36	S	1TUP	C	A						false		outside_construct
+P04637	38	37	Q	1TUP	C	A						false		outside_construct
+P04637	39	38	A	1TUP	C	A						false		outside_construct
+P04637	40	39	M	1TUP	C	A						false		outside_construct
+P04637	41	40	D	1TUP	C	A						false		outside_construct
+P04637	42	41	D	1TUP	C	A						false		outside_construct
+P04637	43	42	L	1TUP	C	A						false		outside_construct
+P04637	44	43	M	1TUP	C	A						false		outside_construct
+P04637	45	44	L	1TUP	C	A						false		outside_construct
+P04637	46	45	S	1TUP	C	A						false		outside_construct
+P04637	47	46	P	1TUP	C	A						false		outside_construct
+P04637	48	47	D	1TUP	C	A						false		outside_construct
+P04637	49	48	D	1TUP	C	A						false		outside_construct
+P04637	50	49	I	1TUP	C	A						false		outside_construct
+P04637	51	50	E	1TUP	C	A						false		outside_construct
+P04637	52	51	Q	1TUP	C	A						false		outside_construct
+P04637	53	52	W	1TUP	C	A						false		outside_construct
+P04637	54	53	F	1TUP	C	A						false		outside_construct
+P04637	55	54	T	1TUP	C	A						false		outside_construct
+P04637	56	55	E	1TUP	C	A						false		outside_construct
+P04637	57	56	D	1TUP	C	A						false		outside_construct
+P04637	58	57	P	1TUP	C	A						false		outside_construct
+P04637	59	58	G	1TUP	C	A						false		outside_construct
+P04637	60	59	P	1TUP	C	A						false		outside_construct
+P04637	61	60	D	1TUP	C	A						false		outside_construct
+P04637	62	61	E	1TUP	C	A						false		outside_construct
+P04637	63	62	A	1TUP	C	A						false		outside_construct
+P04637	64	63	P	1TUP	C	A						false		outside_construct
+P04637	65	64	R	1TUP	C	A						false		outside_construct
+P04637	66	65	M	1TUP	C	A						false		outside_construct
+P04637	67	66	P	1TUP	C	A						false		outside_construct
+P04637	68	67	E	1TUP	C	A						false		outside_construct
+P04637	69	68	A	1TUP	C	A						false		outside_construct
+P04637	70	69	A	1TUP	C	A						false		outside_construct
+P04637	71	70	P	1TUP	C	A						false		outside_construct
+P04637	72	71	P	1TUP	C	A						false		outside_construct
+P04637	73	72	V	1TUP	C	A						false		outside_construct
+P04637	74	73	A	1TUP	C	A						false		outside_construct
+P04637	75	74	P	1TUP	C	A						false		outside_construct
+P04637	76	75	A	1TUP	C	A						false		outside_construct
+P04637	77	76	P	1TUP	C	A						false		outside_construct
+P04637	78	77	A	1TUP	C	A						false		outside_construct
+P04637	79	78	A	1TUP	C	A						false		outside_construct
+P04637	80	79	P	1TUP	C	A						false		outside_construct
+P04637	81	80	T	1TUP	C	A						false		outside_construct
+P04637	82	81	P	1TUP	C	A						false		outside_construct
+P04637	83	82	A	1TUP	C	A						false		outside_construct
+P04637	84	83	A	1TUP	C	A						false		outside_construct
+P04637	85	84	P	1TUP	C	A						false		outside_construct
+P04637	86	85	A	1TUP	C	A						false		outside_construct
+P04637	87	86	P	1TUP	C	A						false		outside_construct
+P04637	88	87	A	1TUP	C	A						false		outside_construct
+P04637	89	88	P	1TUP	C	A						false		outside_construct
+P04637	90	89	S	1TUP	C	A						false		outside_construct
+P04637	91	90	W	1TUP	C	A						false		outside_construct
+P04637	92	91	P	1TUP	C	A						false		outside_construct
+P04637	93	92	L	1TUP	C	A						false		outside_construct
+P04637	94	93	S	1TUP	C	A	1	94	94		SER	true	true	exact
+P04637	95	94	S	1TUP	C	A	2	95	95		SER	true	true	exact
+P04637	96	95	S	1TUP	C	A	3	96	96		SER	true	true	exact
+P04637	97	96	V	1TUP	C	A	4	97	97		VAL	true	true	exact
+P04637	98	97	P	1TUP	C	A	5	98	98		PRO	true	true	exact
+P04637	99	98	S	1TUP	C	A	6	99	99		SER	true	true	exact
+P04637	100	99	Q	1TUP	C	A	7	100	100		GLN	true	true	exact
+P04637	101	100	K	1TUP	C	A	8	101	101		LYS	true	true	exact
+P04637	102	101	T	1TUP	C	A	9	102	102		THR	true	true	exact
+P04637	103	102	Y	1TUP	C	A	10	103	103		TYR	true	true	exact
+P04637	104	103	Q	1TUP	C	A	11	104	104		GLN	true	true	exact
+P04637	105	104	G	1TUP	C	A	12	105	105		GLY	true	true	exact
+P04637	106	105	S	1TUP	C	A	13	106	106		SER	true	true	exact
+P04637	107	106	Y	1TUP	C	A	14	107	107		TYR	true	true	exact
+P04637	108	107	G	1TUP	C	A	15	108	108		GLY	true	true	exact
+P04637	109	108	F	1TUP	C	A	16	109	109		PHE	true	true	exact
+P04637	110	109	R	1TUP	C	A	17	110	110		ARG	true	true	exact
+P04637	111	110	L	1TUP	C	A	18	111	111		LEU	true	true	exact
+P04637	112	111	G	1TUP	C	A	19	112	112		GLY	true	true	exact
+P04637	113	112	F	1TUP	C	A	20	113	113		PHE	true	true	exact
+P04637	114	113	L	1TUP	C	A	21	114	114		LEU	true	true	exact
+P04637	115	114	H	1TUP	C	A	22	115	115		HIS	true	true	exact
+P04637	116	115	S	1TUP	C	A	23	116	116		SER	true	true	exact
+P04637	117	116	G	1TUP	C	A	24	117	117		GLY	true	true	exact
+P04637	118	117	T	1TUP	C	A	25	118	118		THR	true	true	exact
+P04637	119	118	A	1TUP	C	A	26	119	119		ALA	true	true	exact
+P04637	120	119	K	1TUP	C	A	27	120	120		LYS	true	true	exact
+P04637	121	120	S	1TUP	C	A	28	121	121		SER	true	true	exact
+P04637	122	121	V	1TUP	C	A	29	122	122		VAL	true	true	exact
+P04637	123	122	T	1TUP	C	A	30	123	123		THR	true	true	exact
+P04637	124	123	C	1TUP	C	A	31	124	124		CYS	true	true	exact
+P04637	125	124	T	1TUP	C	A	32	125	125		THR	true	true	exact
+P04637	126	125	Y	1TUP	C	A	33	126	126		TYR	true	true	exact
+P04637	127	126	S	1TUP	C	A	34	127	127		SER	true	true	exact
+P04637	128	127	P	1TUP	C	A	35	128	128		PRO	true	true	exact
+P04637	129	128	A	1TUP	C	A	36	129	129		ALA	true	true	exact
+P04637	130	129	L	1TUP	C	A	37	130	130		LEU	true	true	exact
+P04637	131	130	N	1TUP	C	A	38	131	131		ASN	true	true	exact
+P04637	132	131	K	1TUP	C	A	39	132	132		LYS	true	true	exact
+P04637	133	132	M	1TUP	C	A	40	133	133		MET	true	true	exact
+P04637	134	133	F	1TUP	C	A	41	134	134		PHE	true	true	exact
+P04637	135	134	C	1TUP	C	A	42	135	135		CYS	true	true	exact
+P04637	136	135	Q	1TUP	C	A	43	136	136		GLN	true	true	exact
+P04637	137	136	L	1TUP	C	A	44	137	137		LEU	true	true	exact
+P04637	138	137	A	1TUP	C	A	45	138	138		ALA	true	true	exact
+P04637	139	138	K	1TUP	C	A	46	139	139		LYS	true	true	exact
+P04637	140	139	T	1TUP	C	A	47	140	140		THR	true	true	exact
+P04637	141	140	C	1TUP	C	A	48	141	141		CYS	true	true	exact
+P04637	142	141	P	1TUP	C	A	49	142	142		PRO	true	true	exact
+P04637	143	142	V	1TUP	C	A	50	143	143		VAL	true	true	exact
+P04637	144	143	Q	1TUP	C	A	51	144	144		GLN	true	true	exact
+P04637	145	144	L	1TUP	C	A	52	145	145		LEU	true	true	exact
+P04637	146	145	W	1TUP	C	A	53	146	146		TRP	true	true	exact
+P04637	147	146	V	1TUP	C	A	54	147	147		VAL	true	true	exact
+P04637	148	147	D	1TUP	C	A	55	148	148		ASP	true	true	exact
+P04637	149	148	S	1TUP	C	A	56	149	149		SER	true	true	exact
+P04637	150	149	T	1TUP	C	A	57	150	150		THR	true	true	exact
+P04637	151	150	P	1TUP	C	A	58	151	151		PRO	true	true	exact
+P04637	152	151	P	1TUP	C	A	59	152	152		PRO	true	true	exact
+P04637	153	152	P	1TUP	C	A	60	153	153		PRO	true	true	exact
+P04637	154	153	G	1TUP	C	A	61	154	154		GLY	true	true	exact
+P04637	155	154	T	1TUP	C	A	62	155	155		THR	true	true	exact
+P04637	156	155	R	1TUP	C	A	63	156	156		ARG	true	true	exact
+P04637	157	156	V	1TUP	C	A	64	157	157		VAL	true	true	exact
+P04637	158	157	R	1TUP	C	A	65	158	158		ARG	true	true	exact
+P04637	159	158	A	1TUP	C	A	66	159	159		ALA	true	true	exact
+P04637	160	159	M	1TUP	C	A	67	160	160		MET	true	true	exact
+P04637	161	160	A	1TUP	C	A	68	161	161		ALA	true	true	exact
+P04637	162	161	I	1TUP	C	A	69	162	162		ILE	true	true	exact
+P04637	163	162	Y	1TUP	C	A	70	163	163		TYR	true	true	exact
+P04637	164	163	K	1TUP	C	A	71	164	164		LYS	true	true	exact
+P04637	165	164	Q	1TUP	C	A	72	165	165		GLN	true	true	exact
+P04637	166	165	S	1TUP	C	A	73	166	166		SER	true	true	exact
+P04637	167	166	Q	1TUP	C	A	74	167	167		GLN	true	true	exact
+P04637	168	167	H	1TUP	C	A	75	168	168		HIS	true	true	exact
+P04637	169	168	M	1TUP	C	A	76	169	169		MET	true	true	exact
+P04637	170	169	T	1TUP	C	A	77	170	170		THR	true	true	exact
+P04637	171	170	E	1TUP	C	A	78	171	171		GLU	true	true	exact
+P04637	172	171	V	1TUP	C	A	79	172	172		VAL	true	true	exact
+P04637	173	172	V	1TUP	C	A	80	173	173		VAL	true	true	exact
+P04637	174	173	R	1TUP	C	A	81	174	174		ARG	true	true	exact
+P04637	175	174	R	1TUP	C	A	82	175	175		ARG	true	true	exact
+P04637	176	175	C	1TUP	C	A	83	176	176		CYS	true	true	exact
+P04637	177	176	P	1TUP	C	A	84	177	177		PRO	true	true	exact
+P04637	178	177	H	1TUP	C	A	85	178	178		HIS	true	true	exact
+P04637	179	178	H	1TUP	C	A	86	179	179		HIS	true	true	exact
+P04637	180	179	E	1TUP	C	A	87	180	180		GLU	true	true	exact
+P04637	181	180	R	1TUP	C	A	88	181	181		ARG	true	true	exact
+P04637	182	181	C	1TUP	C	A	89	182	182		CYS	true	true	exact
+P04637	183	182	S	1TUP	C	A	90	183	183		SER	true	true	exact
+P04637	184	183	D	1TUP	C	A	91	184	184		ASP	true	true	exact
+P04637	185	184	S	1TUP	C	A	92	185	185		SER	true	true	exact
+P04637	186	185	D	1TUP	C	A	93	186	186		ASP	true	true	exact
+P04637	187	186	G	1TUP	C	A	94	187	187		GLY	true	true	exact
+P04637	188	187	L	1TUP	C	A	95	188	188		LEU	true	true	exact
+P04637	189	188	A	1TUP	C	A	96	189	189		ALA	true	true	exact
+P04637	190	189	P	1TUP	C	A	97	190	190		PRO	true	true	exact
+P04637	191	190	P	1TUP	C	A	98	191	191		PRO	true	true	exact
+P04637	192	191	Q	1TUP	C	A	99	192	192		GLN	true	true	exact
+P04637	193	192	H	1TUP	C	A	100	193	193		HIS	true	true	exact
+P04637	194	193	L	1TUP	C	A	101	194	194		LEU	true	true	exact
+P04637	195	194	I	1TUP	C	A	102	195	195		ILE	true	true	exact
+P04637	196	195	R	1TUP	C	A	103	196	196		ARG	true	true	exact
+P04637	197	196	V	1TUP	C	A	104	197	197		VAL	true	true	exact
+P04637	198	197	E	1TUP	C	A	105	198	198		GLU	true	true	exact
+P04637	199	198	G	1TUP	C	A	106	199	199		GLY	true	true	exact
+P04637	200	199	N	1TUP	C	A	107	200	200		ASN	true	true	exact
+P04637	201	200	L	1TUP	C	A	108	201	201		LEU	true	true	exact
+P04637	202	201	R	1TUP	C	A	109	202	202		ARG	true	true	exact
+P04637	203	202	V	1TUP	C	A	110	203	203		VAL	true	true	exact
+P04637	204	203	E	1TUP	C	A	111	204	204		GLU	true	true	exact
+P04637	205	204	Y	1TUP	C	A	112	205	205		TYR	true	true	exact
+P04637	206	205	L	1TUP	C	A	113	206	206		LEU	true	true	exact
+P04637	207	206	D	1TUP	C	A	114	207	207		ASP	true	true	exact
+P04637	208	207	D	1TUP	C	A	115	208	208		ASP	true	true	exact
+P04637	209	208	R	1TUP	C	A	116	209	209		ARG	true	true	exact
+P04637	210	209	N	1TUP	C	A	117	210	210		ASN	true	true	exact
+P04637	211	210	T	1TUP	C	A	118	211	211		THR	true	true	exact
+P04637	212	211	F	1TUP	C	A	119	212	212		PHE	true	true	exact
+P04637	213	212	R	1TUP	C	A	120	213	213		ARG	true	true	exact
+P04637	214	213	H	1TUP	C	A	121	214	214		HIS	true	true	exact
+P04637	215	214	S	1TUP	C	A	122	215	215		SER	true	true	exact
+P04637	216	215	V	1TUP	C	A	123	216	216		VAL	true	true	exact
+P04637	217	216	V	1TUP	C	A	124	217	217		VAL	true	true	exact
+P04637	218	217	V	1TUP	C	A	125	218	218		VAL	true	true	exact
+P04637	219	218	P	1TUP	C	A	126	219	219		PRO	true	true	exact
+P04637	220	219	Y	1TUP	C	A	127	220	220		TYR	true	true	exact
+P04637	221	220	E	1TUP	C	A	128	221	221		GLU	true	true	exact
+P04637	222	221	P	1TUP	C	A	129	222	222		PRO	true	true	exact
+P04637	223	222	P	1TUP	C	A	130	223	223		PRO	true	true	exact
+P04637	224	223	E	1TUP	C	A	131	224	224		GLU	true	true	exact
+P04637	225	224	V	1TUP	C	A	132	225	225		VAL	true	true	exact
+P04637	226	225	G	1TUP	C	A	133	226	226		GLY	true	true	exact
+P04637	227	226	S	1TUP	C	A	134	227	227		SER	true	true	exact
+P04637	228	227	D	1TUP	C	A	135	228	228		ASP	true	true	exact
+P04637	229	228	C	1TUP	C	A	136	229	229		CYS	true	true	exact
+P04637	230	229	T	1TUP	C	A	137	230	230		THR	true	true	exact
+P04637	231	230	T	1TUP	C	A	138	231	231		THR	true	true	exact
+P04637	232	231	I	1TUP	C	A	139	232	232		ILE	true	true	exact
+P04637	233	232	H	1TUP	C	A	140	233	233		HIS	true	true	exact
+P04637	234	233	Y	1TUP	C	A	141	234	234		TYR	true	true	exact
+P04637	235	234	N	1TUP	C	A	142	235	235		ASN	true	true	exact
+P04637	236	235	Y	1TUP	C	A	143	236	236		TYR	true	true	exact
+P04637	237	236	M	1TUP	C	A	144	237	237		MET	true	true	exact
+P04637	238	237	C	1TUP	C	A	145	238	238		CYS	true	true	exact
+P04637	239	238	N	1TUP	C	A	146	239	239		ASN	true	true	exact
+P04637	240	239	S	1TUP	C	A	147	240	240		SER	true	true	exact
+P04637	241	240	S	1TUP	C	A	148	241	241		SER	true	true	exact
+P04637	242	241	C	1TUP	C	A	149	242	242		CYS	true	true	exact
+P04637	243	242	M	1TUP	C	A	150	243	243		MET	true	true	exact
+P04637	244	243	G	1TUP	C	A	151	244	244		GLY	true	true	exact
+P04637	245	244	G	1TUP	C	A	152	245	245		GLY	true	true	exact
+P04637	246	245	M	1TUP	C	A	153	246	246		MET	true	true	exact
+P04637	247	246	N	1TUP	C	A	154	247	247		ASN	true	true	exact
+P04637	248	247	R	1TUP	C	A	155	248	248		ARG	true	true	exact
+P04637	249	248	R	1TUP	C	A	156	249	249		ARG	true	true	exact
+P04637	250	249	P	1TUP	C	A	157	250	250		PRO	true	true	exact
+P04637	251	250	I	1TUP	C	A	158	251	251		ILE	true	true	exact
+P04637	252	251	L	1TUP	C	A	159	252	252		LEU	true	true	exact
+P04637	253	252	T	1TUP	C	A	160	253	253		THR	true	true	exact
+P04637	254	253	I	1TUP	C	A	161	254	254		ILE	true	true	exact
+P04637	255	254	I	1TUP	C	A	162	255	255		ILE	true	true	exact
+P04637	256	255	T	1TUP	C	A	163	256	256		THR	true	true	exact
+P04637	257	256	L	1TUP	C	A	164	257	257		LEU	true	true	exact
+P04637	258	257	E	1TUP	C	A	165	258	258		GLU	true	true	exact
+P04637	259	258	D	1TUP	C	A	166	259	259		ASP	true	true	exact
+P04637	260	259	S	1TUP	C	A	167	260	260		SER	true	true	exact
+P04637	261	260	S	1TUP	C	A	168	261	261		SER	true	true	exact
+P04637	262	261	G	1TUP	C	A	169	262	262		GLY	true	true	exact
+P04637	263	262	N	1TUP	C	A	170	263	263		ASN	true	true	exact
+P04637	264	263	L	1TUP	C	A	171	264	264		LEU	true	true	exact
+P04637	265	264	L	1TUP	C	A	172	265	265		LEU	true	true	exact
+P04637	266	265	G	1TUP	C	A	173	266	266		GLY	true	true	exact
+P04637	267	266	R	1TUP	C	A	174	267	267		ARG	true	true	exact
+P04637	268	267	N	1TUP	C	A	175	268	268		ASN	true	true	exact
+P04637	269	268	S	1TUP	C	A	176	269	269		SER	true	true	exact
+P04637	270	269	F	1TUP	C	A	177	270	270		PHE	true	true	exact
+P04637	271	270	E	1TUP	C	A	178	271	271		GLU	true	true	exact
+P04637	272	271	V	1TUP	C	A	179	272	272		VAL	true	true	exact
+P04637	273	272	R	1TUP	C	A	180	273	273		ARG	true	true	exact
+P04637	274	273	V	1TUP	C	A	181	274	274		VAL	true	true	exact
+P04637	275	274	C	1TUP	C	A	182	275	275		CYS	true	true	exact
+P04637	276	275	A	1TUP	C	A	183	276	276		ALA	true	true	exact
+P04637	277	276	C	1TUP	C	A	184	277	277		CYS	true	true	exact
+P04637	278	277	P	1TUP	C	A	185	278	278		PRO	true	true	exact
+P04637	279	278	G	1TUP	C	A	186	279	279		GLY	true	true	exact
+P04637	280	279	R	1TUP	C	A	187	280	280		ARG	true	true	exact
+P04637	281	280	D	1TUP	C	A	188	281	281		ASP	true	true	exact
+P04637	282	281	R	1TUP	C	A	189	282	282		ARG	true	true	exact
+P04637	283	282	R	1TUP	C	A	190	283	283		ARG	true	true	exact
+P04637	284	283	T	1TUP	C	A	191	284	284		THR	true	true	exact
+P04637	285	284	E	1TUP	C	A	192	285	285		GLU	true	true	exact
+P04637	286	285	E	1TUP	C	A	193	286	286		GLU	true	true	exact
+P04637	287	286	E	1TUP	C	A	194	287	287		GLU	true	true	exact
+P04637	288	287	N	1TUP	C	A	195	288	288		ASN	true	true	exact
+P04637	289	288	L	1TUP	C	A	196	289	289		LEU	true	true	exact
+P04637	290	289	R	1TUP	C	A	197		290		ARG	false	true	missing_coordinate
+P04637	291	290	K	1TUP	C	A	198		291		LYS	false	true	missing_coordinate
+P04637	292	291	K	1TUP	C	A	199		292		LYS	false	true	missing_coordinate
+P04637	293	292	G	1TUP	C	A	200		293		GLY	false	true	missing_coordinate
+P04637	294	293	E	1TUP	C	A	201		294		GLU	false	true	missing_coordinate
+P04637	295	294	P	1TUP	C	A	202		295		PRO	false	true	missing_coordinate
+P04637	296	295	H	1TUP	C	A	203		296		HIS	false	true	missing_coordinate
+P04637	297	296	H	1TUP	C	A	204		297		HIS	false	true	missing_coordinate
+P04637	298	297	E	1TUP	C	A	205		298		GLU	false	true	missing_coordinate
+P04637	299	298	L	1TUP	C	A	206		299		LEU	false	true	missing_coordinate
+P04637	300	299	P	1TUP	C	A	207		300		PRO	false	true	missing_coordinate
+P04637	301	300	P	1TUP	C	A	208		301		PRO	false	true	missing_coordinate
+P04637	302	301	G	1TUP	C	A	209		302		GLY	false	true	missing_coordinate
+P04637	303	302	S	1TUP	C	A	210		303		SER	false	true	missing_coordinate
+P04637	304	303	T	1TUP	C	A	211		304		THR	false	true	missing_coordinate
+P04637	305	304	K	1TUP	C	A	212		305		LYS	false	true	missing_coordinate
+P04637	306	305	R	1TUP	C	A	213		306		ARG	false	true	missing_coordinate
+P04637	307	306	A	1TUP	C	A	214		307		ALA	false	true	missing_coordinate
+P04637	308	307	L	1TUP	C	A	215		308		LEU	false	true	missing_coordinate
+P04637	309	308	P	1TUP	C	A	216		309		PRO	false	true	missing_coordinate
+P04637	310	309	N	1TUP	C	A	217		310		ASN	false	true	missing_coordinate
+P04637	311	310	N	1TUP	C	A	218		311		ASN	false	true	missing_coordinate
+P04637	312	311	T	1TUP	C	A	219		312		THR	false	true	missing_coordinate
+P04637	313	312	S	1TUP	C	A						false		outside_construct
+P04637	314	313	S	1TUP	C	A						false		outside_construct
+P04637	315	314	S	1TUP	C	A						false		outside_construct
+P04637	316	315	P	1TUP	C	A						false		outside_construct
+P04637	317	316	Q	1TUP	C	A						false		outside_construct
+P04637	318	317	P	1TUP	C	A						false		outside_construct
+P04637	319	318	K	1TUP	C	A						false		outside_construct
+P04637	320	319	K	1TUP	C	A						false		outside_construct
+P04637	321	320	K	1TUP	C	A						false		outside_construct
+P04637	322	321	P	1TUP	C	A						false		outside_construct
+P04637	323	322	L	1TUP	C	A						false		outside_construct
+P04637	324	323	D	1TUP	C	A						false		outside_construct
+P04637	325	324	G	1TUP	C	A						false		outside_construct
+P04637	326	325	E	1TUP	C	A						false		outside_construct
+P04637	327	326	Y	1TUP	C	A						false		outside_construct
+P04637	328	327	F	1TUP	C	A						false		outside_construct
+P04637	329	328	T	1TUP	C	A						false		outside_construct
+P04637	330	329	L	1TUP	C	A						false		outside_construct
+P04637	331	330	Q	1TUP	C	A						false		outside_construct
+P04637	332	331	I	1TUP	C	A						false		outside_construct
+P04637	333	332	R	1TUP	C	A						false		outside_construct
+P04637	334	333	G	1TUP	C	A						false		outside_construct
+P04637	335	334	R	1TUP	C	A						false		outside_construct
+P04637	336	335	E	1TUP	C	A						false		outside_construct
+P04637	337	336	R	1TUP	C	A						false		outside_construct
+P04637	338	337	F	1TUP	C	A						false		outside_construct
+P04637	339	338	E	1TUP	C	A						false		outside_construct
+P04637	340	339	M	1TUP	C	A						false		outside_construct
+P04637	341	340	F	1TUP	C	A						false		outside_construct
+P04637	342	341	R	1TUP	C	A						false		outside_construct
+P04637	343	342	E	1TUP	C	A						false		outside_construct
+P04637	344	343	L	1TUP	C	A						false		outside_construct
+P04637	345	344	N	1TUP	C	A						false		outside_construct
+P04637	346	345	E	1TUP	C	A						false		outside_construct
+P04637	347	346	A	1TUP	C	A						false		outside_construct
+P04637	348	347	L	1TUP	C	A						false		outside_construct
+P04637	349	348	E	1TUP	C	A						false		outside_construct
+P04637	350	349	L	1TUP	C	A						false		outside_construct
+P04637	351	350	K	1TUP	C	A						false		outside_construct
+P04637	352	351	D	1TUP	C	A						false		outside_construct
+P04637	353	352	A	1TUP	C	A						false		outside_construct
+P04637	354	353	Q	1TUP	C	A						false		outside_construct
+P04637	355	354	A	1TUP	C	A						false		outside_construct
+P04637	356	355	G	1TUP	C	A						false		outside_construct
+P04637	357	356	K	1TUP	C	A						false		outside_construct
+P04637	358	357	E	1TUP	C	A						false		outside_construct
+P04637	359	358	P	1TUP	C	A						false		outside_construct
+P04637	360	359	G	1TUP	C	A						false		outside_construct
+P04637	361	360	G	1TUP	C	A						false		outside_construct
+P04637	362	361	S	1TUP	C	A						false		outside_construct
+P04637	363	362	R	1TUP	C	A						false		outside_construct
+P04637	364	363	A	1TUP	C	A						false		outside_construct
+P04637	365	364	H	1TUP	C	A						false		outside_construct
+P04637	366	365	S	1TUP	C	A						false		outside_construct
+P04637	367	366	S	1TUP	C	A						false		outside_construct
+P04637	368	367	H	1TUP	C	A						false		outside_construct
+P04637	369	368	L	1TUP	C	A						false		outside_construct
+P04637	370	369	K	1TUP	C	A						false		outside_construct
+P04637	371	370	S	1TUP	C	A						false		outside_construct
+P04637	372	371	K	1TUP	C	A						false		outside_construct
+P04637	373	372	K	1TUP	C	A						false		outside_construct
+P04637	374	373	G	1TUP	C	A						false		outside_construct
+P04637	375	374	Q	1TUP	C	A						false		outside_construct
+P04637	376	375	S	1TUP	C	A						false		outside_construct
+P04637	377	376	T	1TUP	C	A						false		outside_construct
+P04637	378	377	S	1TUP	C	A						false		outside_construct
+P04637	379	378	R	1TUP	C	A						false		outside_construct
+P04637	380	379	H	1TUP	C	A						false		outside_construct
+P04637	381	380	K	1TUP	C	A						false		outside_construct
+P04637	382	381	K	1TUP	C	A						false		outside_construct
+P04637	383	382	L	1TUP	C	A						false		outside_construct
+P04637	384	383	M	1TUP	C	A						false		outside_construct
+P04637	385	384	F	1TUP	C	A						false		outside_construct
+P04637	386	385	K	1TUP	C	A						false		outside_construct
+P04637	387	386	T	1TUP	C	A						false		outside_construct
+P04637	388	387	E	1TUP	C	A						false		outside_construct
+P04637	389	388	G	1TUP	C	A						false		outside_construct
+P04637	390	389	P	1TUP	C	A						false		outside_construct
+P04637	391	390	D	1TUP	C	A						false		outside_construct
+P04637	392	391	S	1TUP	C	A						false		outside_construct
+P04637	393	392	D	1TUP	C	A						false		outside_construct
