@@ -211,6 +211,7 @@ const HEADER = 156,
   GAP = 12,
   NAVIGATION_GAP = 8,
   NAVIGATION_CLEARANCE = 38,
+  NAVIGATION_FOCUS_RADIUS = 20,
   MIN_VISIBLE_COLUMNS = 2;
 const NONE: readonly CoordinateLocus[] = [];
 const names: readonly RepresentationName[] = [
@@ -381,6 +382,9 @@ class CanvasSeqViewer implements SeqViewer {
     this.navigationAxis.addEventListener("pointercancel", this.navigationPointerUp, {
       signal: this.abort.signal,
     });
+    this.navigationAxis.addEventListener("dblclick", this.navigationDoubleClick, {
+      signal: this.abort.signal,
+    });
     this.navigationAxis.addEventListener("wheel", this.wheel, {
       signal: this.abort.signal,
       passive: false,
@@ -426,7 +430,7 @@ class CanvasSeqViewer implements SeqViewer {
     });
     this.navigationAxis.dataset.seqViewerNavigation = "axis";
     this.navigationAxis.title =
-      "Drag the window to pan. Drag handles to zoom. Shift-wheel pans; Ctrl-wheel zooms.";
+      "Drag the window to pan. Drag handles to zoom. Double-click to focus or reset. Shift-wheel pans; Ctrl-wheel zooms.";
     Object.assign(this.navigationAxis.style, {
       position: "relative",
       minWidth: "0",
@@ -1231,6 +1235,35 @@ class CanvasSeqViewer implements SeqViewer {
   private navigationCell(active: Active, width = this.navigationAxisWidth()): number {
     const gaps = Math.max(0, active.view.axis.segments.length - 1) * NAVIGATION_GAP;
     return Math.max(1, (width - gaps) / Math.max(1, active.units));
+  }
+  private navigationOffsetAtClientX(clientX: number): number | undefined {
+    const active = this.active;
+    if (!active) return undefined;
+    const box = this.navigationAxis.getBoundingClientRect(),
+      x = Math.max(0, Math.min(box.width, clientX - box.left)),
+      cell = this.navigationCell(active, box.width);
+    let closest = 0,
+      closestDistance = Number.POSITIVE_INFINITY;
+    for (const [index, segment] of active.view.axis.segments.entries()) {
+      const offset = active.offsets[index];
+      if (offset === undefined) continue;
+      const left = index * NAVIGATION_GAP + offset * cell,
+        length = segment.end - segment.start,
+        right = left + length * cell;
+      if (x >= left && x <= right)
+        return Math.max(0, Math.min(active.units - 1, offset + Math.floor((x - left) / cell)));
+      for (const candidate of [
+        { position: offset, x: left },
+        { position: offset + length - 1, x: right },
+      ]) {
+        const distance = Math.abs(x - candidate.x);
+        if (distance < closestDistance) {
+          closest = candidate.position;
+          closestDistance = distance;
+        }
+      }
+    }
+    return Math.max(0, Math.min(active.units - 1, closest));
   }
   private navigationX(
     active: Active,
@@ -2076,6 +2109,23 @@ class CanvasSeqViewer implements SeqViewer {
       /* pointer capture may already be released */
     }
     if (drag.changed) this.emitViewport(event);
+  };
+  private readonly navigationDoubleClick = (event: MouseEvent): void => {
+    const active = this.active,
+      viewport = this.viewportDescriptor();
+    if (!active || !viewport) return;
+    event.preventDefault();
+    const full = viewport.offsetStart === 0 && viewport.offsetEnd === active.units;
+    const center = this.navigationOffsetAtClientX(event.clientX),
+      span = Math.min(active.units, NAVIGATION_FOCUS_RADIUS * 2 + 1);
+    const changed =
+      !full || center === undefined
+        ? this.resetViewport()
+        : this.setViewport(
+            center - NAVIGATION_FOCUS_RADIUS,
+            center - NAVIGATION_FOCUS_RADIUS + span,
+          );
+    if (changed) this.emitViewport(event);
   };
   private cancelNavigationDrag(): void {
     const drag = this.navigationDrag;

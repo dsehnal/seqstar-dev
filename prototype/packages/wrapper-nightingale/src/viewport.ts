@@ -345,6 +345,7 @@ const clamp = (value: number, minimum: number, maximum: number): number =>
 
 const rounded = (value: unknown, fallback: number): number =>
   typeof value === "number" && Number.isFinite(value) ? Math.round(value) : fallback;
+const FOCUS_RADIUS = 20;
 
 /**
  * Synchronizes the already-vendored native elements without importing
@@ -389,6 +390,7 @@ export class NightingaleViewportController {
     this.overview = document.createElement("div");
     this.overview.className = "seqstar-nightingale-viewport-overview";
     this.overview.dataset.seqstarNightingaleViewport = "overview";
+    this.overview.title = "Drag to pan. Double-click to focus or reset.";
     this.window = document.createElement("div");
     this.window.className = "seqstar-nightingale-viewport-window";
     this.window.dataset.seqstarNightingaleViewport = "window";
@@ -411,6 +413,7 @@ export class NightingaleViewportController {
     this.overview.addEventListener("pointerup", this.onOverviewPointerEnd);
     this.overview.addEventListener("pointercancel", this.onOverviewPointerEnd);
     this.overview.addEventListener("lostpointercapture", this.onOverviewPointerEnd);
+    this.overview.addEventListener("dblclick", this.onOverviewDoubleClick);
     this.publish();
   }
 
@@ -446,6 +449,7 @@ export class NightingaleViewportController {
     this.overview.removeEventListener("pointerup", this.onOverviewPointerEnd);
     this.overview.removeEventListener("pointercancel", this.onOverviewPointerEnd);
     this.overview.removeEventListener("lostpointercapture", this.onOverviewPointerEnd);
+    this.overview.removeEventListener("dblclick", this.onOverviewDoubleClick);
     this.drag = undefined;
     this.elements.clear();
     this.navigation.remove();
@@ -510,6 +514,22 @@ export class NightingaleViewportController {
     this.drag = undefined;
     if (this.overview.hasPointerCapture(event.pointerId))
       this.overview.releasePointerCapture(event.pointerId);
+  };
+
+  private readonly onOverviewDoubleClick = (event: MouseEvent): void => {
+    if (this.disposed) return;
+    event.preventDefault();
+    if (this.span() < this.descriptor.length) {
+      this.setRange(1, this.descriptor.length);
+      return;
+    }
+    const box = this.overview.getBoundingClientRect();
+    if (box.width <= 0) return;
+    const fraction = clamp((event.clientX - box.left) / box.width, 0, 1),
+      center =
+        1 + Math.min(this.descriptor.length - 1, Math.floor(fraction * this.descriptor.length)),
+      span = Math.min(this.descriptor.length, FOCUS_RADIUS * 2 + 1);
+    this.setRange(center - FOCUS_RADIUS, center - FOCUS_RADIUS + span - 1);
   };
 
   /** Keep the rendered window under the pointer for the whole drag. */

@@ -189,6 +189,22 @@ test("keeps native tracks in one pixel-aligned viewport with fixed compact heade
   });
   expect(spacing.maximumRowGap).toBeLessThanOrEqual(3);
   expect(spacing.navigationGap).toBeLessThanOrEqual(3);
+
+  const viewportRoot = page.locator('#viewport [data-seqstar-nightingale="root"]');
+  await overview.dblclick();
+  await expect(viewportRoot).toHaveAttribute("data-seqstar-viewport-start", "1");
+  await expect(viewportRoot).toHaveAttribute("data-seqstar-viewport-end", "240");
+  await overview.dblclick({ position: { x: overviewBox.width * 0.75, y: overviewBox.height / 2 } });
+  const focused = await viewportRoot.evaluate((element) => ({
+    start: Number((element as HTMLElement).dataset.seqstarViewportStart),
+    end: Number((element as HTMLElement).dataset.seqstarViewportEnd),
+  }));
+  expect(focused.end - focused.start + 1).toBe(41);
+  expect(focused.start).toBeLessThanOrEqual(181);
+  expect(focused.end).toBeGreaterThanOrEqual(181);
+  await overview.dblclick();
+  await expect(viewportRoot).toHaveAttribute("data-seqstar-viewport-start", "1");
+  await expect(viewportRoot).toHaveAttribute("data-seqstar-viewport-end", "240");
 });
 
 test("resolves complete semantic loci and toggle leases from native Nightingale identities", async ({

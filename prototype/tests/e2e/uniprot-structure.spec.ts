@@ -261,6 +261,19 @@ test("makes Reference track labels readable and their 3D action state explicit",
   expect(geometry.windowLeft).toBeGreaterThanOrEqual(geometry.axisLeft - 0.5);
   expect(geometry.windowRight).toBeLessThanOrEqual(geometry.axisRight + 0.5);
   expect(geometry.axisRight).toBeLessThanOrEqual(geometry.rootRight + 0.5);
+
+  const axis = navigation.locator('[data-seq-viewer-navigation="axis"]');
+  await axis.dblclick();
+  await expect(viewportWindow).toHaveAttribute("aria-valuetext", "Columns 1 to 393 of 393");
+  const axisBox = await axis.boundingBox();
+  if (axisBox === null) throw new Error("Missing reference navigation axis.");
+  await axis.dblclick({ position: { x: axisBox.width * 0.75, y: axisBox.height / 2 } });
+  const focusedLabel = await viewportWindow.getAttribute("aria-valuetext");
+  const focusedMatch = focusedLabel?.match(/Columns (\d+) to (\d+) of 393/u);
+  expect(focusedMatch).not.toBeNull();
+  expect(Number(focusedMatch?.[2]) - Number(focusedMatch?.[1]) + 1).toBe(41);
+  await axis.dblclick();
+  await expect(viewportWindow).toHaveAttribute("aria-valuetext", "Columns 1 to 393 of 393");
 });
 
 test("rapid normalized activations leave the latest complete request inspected", async ({
