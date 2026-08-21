@@ -174,6 +174,9 @@ test("links a live-shaped tomogram particle to density, representative structure
   });
   await expect(page.getByTestId("cryoet-sequence-host").locator("canvas")).toBeVisible();
   await expect(
+    page.getByTestId("visualizer-panel-cryoet-sequence").getByLabel("Sequence renderer"),
+  ).toHaveCount(1);
+  await expect(
     page.getByTestId("cryoet-sequence-host").locator("[data-seq-viewer-track-action]"),
   ).toHaveCount(5);
   await expect(page.getByTestId("cryoet-structure-host").locator("canvas")).toBeVisible();
@@ -265,7 +268,10 @@ test("links a live-shaped tomogram particle to density, representative structure
   await page.getByTestId("inspect-tab-summary").click();
 
   await page.getByLabel("Sequence renderer").selectOption("nightingale");
-  await expect(page.getByText("nightingale renderer ready")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByTestId("renderer-chooser-status")).toContainText(
+    "nightingale renderer ready",
+    { timeout: 20_000 },
+  );
   await expect(
     page.getByTestId("cryoet-sequence-host").locator('[data-seqstar-nightingale="root"]'),
   ).toBeVisible();

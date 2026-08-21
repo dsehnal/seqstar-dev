@@ -19,14 +19,14 @@ function OverviewPage() {
         particle annotations, and EM densities—to independent spatial, 1D, and 3D renderers through
         a shared interaction harness.
       </p>
+      <p className="mt-6 max-w-2xl text-lg text-slate-600 leading-8">
+        It introduces <strong className="text-slate-900">Seq*</strong>: a renderer-neutral framework
+        for sequence and annotation views—essentially the Mol* idea, but for sequences.
+      </p>
       <p className="mt-6 max-w-2xl rounded-lg border border-amber-300/70 bg-amber-50/80 px-4 py-3 text-amber-950 leading-7">
         This is a vibe-coded prototype, not a product. It is intended to test interaction contracts,
         local fixture pipelines, and presentation ideas—not for production use or scientific
         decision-making.
-      </p>
-      <p className="mt-6 max-w-2xl text-lg text-slate-600 leading-8">
-        It also introduces <strong className="text-slate-900">Seq*</strong>: a renderer-neutral
-        framework for sequence and annotation views—essentially the Mol* idea, but for sequences.
       </p>
     </main>
   );

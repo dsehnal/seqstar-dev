@@ -31,13 +31,19 @@ export function CaseRendererChooser({
     Partial<Record<RendererMode, readonly ComponentInstanceSpec[]>>
   >;
   readonly onModeChange: (mode: RendererMode) => void;
-  readonly children: (state: RendererChooserRenderState) => ReactNode;
+  readonly children: (state: RendererChooserRenderState, control: ReactNode) => ReactNode;
 }) {
   return (
     <RendererChooserHost descriptor={descriptor} modeComponents={modeComponents}>
-      {(state) => (
-        <>
-          <div className="case-renderer-controls">
+      {(state) => {
+        const status =
+          state.state === "ready"
+            ? `${state.mode === "compare" ? "Comparison" : state.mode} renderer ready`
+            : state.state === "failed"
+              ? `Renderer switch failed: ${state.error?.message ?? "unknown error"}`
+              : "Switching renderer…";
+        const control = (
+          <div className="renderer-header-control" data-state={state.state}>
             <RendererChooser
               choices={descriptor.modes.map((value) => ({
                 value,
@@ -49,6 +55,7 @@ export function CaseRendererChooser({
                       : "Nightingale",
               }))}
               disabled={state.state === "pending"}
+              compact
               onChange={(next) => {
                 state.selectMode(next);
                 onModeChange(next);
@@ -57,20 +64,16 @@ export function CaseRendererChooser({
             />
             <p
               aria-live="polite"
-              className="case-renderer-controls__status"
+              className="renderer-header-control__status"
               data-testid="renderer-chooser-status"
               role={state.state === "failed" ? "alert" : "status"}
             >
-              {state.state === "ready"
-                ? `${state.mode === "compare" ? "Comparison" : state.mode} renderer ready`
-                : state.state === "failed"
-                  ? `Renderer switch failed: ${state.error?.message ?? "unknown error"}`
-                  : "Switching renderer…"}
+              {status}
             </p>
           </div>
-          {children(state)}
-        </>
-      )}
+        );
+        return children(state, control);
+      }}
     </RendererChooserHost>
   );
 }

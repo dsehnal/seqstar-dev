@@ -177,15 +177,8 @@ function UniProtStructureContent({
           Harness: {status} · no runtime network required
         </p>
       </section>
-      <section className="case-control-panel">
-        <CaseRendererChooser
-          descriptor={{ caseId: "uniprot-structure", modes: rendererModes, initialMode }}
-          modeComponents={rendererComponents}
-          onModeChange={onModeChange}
-        >
-          {() => null}
-        </CaseRendererChooser>
-        <div className="case-control-panel__dataset">
+      <section className="case-control-panel case-control-panel--dataset-only">
+        <div className="case-control-panel__dataset case-control-panel__dataset--only">
           <label className="grid gap-1 font-medium text-slate-800 text-sm" htmlFor="dataset-select">
             Protein and structure dataset
             <span className="case-dataset-select-wrap">
@@ -222,27 +215,36 @@ function UniProtStructureContent({
       <p className="rounded border border-sky-200 bg-sky-50 p-3 text-slate-700 text-sm">
         Activate any sequence track label to replace the neutral structure with its mapped view.
       </p>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <ViewerPanel
-          id={sequenceComponent}
-          title={
-            transition?.status === "active" && displayedDataset !== undefined
-              ? `${displayedProteinLabel} sequence annotations`
-              : `Sequence tracks — ${transitionLabel}`
-          }
-          hostRef={sequenceHost}
-        />
-        <ViewerPanel
-          id={structureComponent}
-          title={
-            transition?.status === "active" && displayedDataset?.structureId !== undefined
-              ? `${displayedDataset.structureId} annotated structure`
-              : `Mol* / MolViewSpec — ${transitionLabel}`
-          }
-          hostRef={structureHost}
-          kind="structure"
-        />
-      </div>
+      <CaseRendererChooser
+        descriptor={{ caseId: "uniprot-structure", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {(_, rendererControl) => (
+          <div className="grid gap-5 xl:grid-cols-2">
+            <ViewerPanel
+              id={sequenceComponent}
+              title={
+                transition?.status === "active" && displayedDataset !== undefined
+                  ? `${displayedProteinLabel} sequence annotations`
+                  : `Sequence tracks — ${transitionLabel}`
+              }
+              hostRef={sequenceHost}
+              toolbar={rendererControl}
+            />
+            <ViewerPanel
+              id={structureComponent}
+              title={
+                transition?.status === "active" && displayedDataset?.structureId !== undefined
+                  ? `${displayedDataset.structureId} annotated structure`
+                  : `Mol* / MolViewSpec — ${transitionLabel}`
+              }
+              hostRef={structureHost}
+              kind="structure"
+            />
+          </div>
+        )}
+      </CaseRendererChooser>
       <section data-testid="inspect-panel-container">
         <InspectPanel state={inspect} />
       </section>

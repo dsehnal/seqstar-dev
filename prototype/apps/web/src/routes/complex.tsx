@@ -131,32 +131,34 @@ function ComplexContent({
           Harness: {status} · local 1BRS fixture only
         </p>
       </section>
-      <CaseRendererChooser
-        descriptor={{ caseId: "complex", modes: rendererModes, initialMode }}
-        modeComponents={rendererComponents}
-        onModeChange={onModeChange}
-      >
-        {() => null}
-      </CaseRendererChooser>
       <p
         className="rounded border border-amber-300 bg-amber-50 p-3 text-amber-950 text-sm"
         data-testid="p50-synthetic-label"
       >
         Synthetic confidence — deterministic prototype values, not a biological prediction.
       </p>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <ViewerPanel
-          hostRef={sequenceHost}
-          id={sequenceComponent}
-          title="Barnase–barstar sequence tracks"
-        />
-        <ViewerPanel
-          hostRef={structureHost}
-          id={structureComponent}
-          kind="structure"
-          title="1BRS annotated assembly"
-        />
-      </div>
+      <CaseRendererChooser
+        descriptor={{ caseId: "complex", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {(_, rendererControl) => (
+          <div className="grid gap-5 xl:grid-cols-2">
+            <ViewerPanel
+              hostRef={sequenceHost}
+              id={sequenceComponent}
+              title="Barnase–barstar sequence tracks"
+              toolbar={rendererControl}
+            />
+            <ViewerPanel
+              hostRef={structureHost}
+              id={structureComponent}
+              kind="structure"
+              title="1BRS annotated assembly"
+            />
+          </div>
+        )}
+      </CaseRendererChooser>
       <section data-testid="inspect-panel-container">
         <InspectPanel state={inspect} />
       </section>

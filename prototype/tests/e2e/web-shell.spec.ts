@@ -15,6 +15,14 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
     "aria-current",
     "page",
   );
+  await expect(page.getByRole("link", { name: "Renderer comparison" })).toHaveCSS(
+    "border-bottom-left-radius",
+    "0px",
+  );
+  await expect(page.getByRole("link", { name: "Renderer comparison" })).toHaveCSS(
+    "border-bottom-right-radius",
+    "0px",
+  );
   await expect(page.getByTestId("visualizer-panel-base-sequence")).toBeVisible();
   await expect(page.getByTestId("visualizer-panel-nightingale")).toBeVisible();
 
@@ -23,8 +31,17 @@ test("uses hash deep links, accessible navigation, and a responsive case shell",
 
   await page.getByRole("link", { name: "Mol* Harness Prototype" }).click();
   await expect(page.getByText("Vibe-coded research prototype")).toBeVisible();
-  await expect(page.getByText("This is a vibe-coded prototype, not a product.")).toBeVisible();
-  await expect(page.getByText(/introduces Seq\*/u)).toBeVisible();
+  const warning = page.getByText("This is a vibe-coded prototype, not a product.");
+  const seqIntroduction = page.getByText(/It introduces Seq\*/u);
+  await expect(warning).toBeVisible();
+  await expect(seqIntroduction).toBeVisible();
+  await expect(page.getByText(/It also introduces Seq\*/u)).toHaveCount(0);
+  const [seqBox, warningBox] = await Promise.all([
+    seqIntroduction.boundingBox(),
+    warning.boundingBox(),
+  ]);
+  if (seqBox === null || warningBox === null) throw new Error("Landing copy geometry is missing.");
+  expect(seqBox.y).toBeLessThan(warningBox.y);
   await expect(page.getByText(/Mol\* idea, but for sequences/u)).toBeVisible();
   await expect(page.getByRole("link", { name: "Explore case shells" })).toHaveCount(0);
   await expect(page.locator(".app-nav > a")).toHaveCount(5);

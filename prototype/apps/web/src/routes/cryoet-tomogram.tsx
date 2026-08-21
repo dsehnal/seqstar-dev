@@ -201,15 +201,8 @@ function CryoEtContent({
           </>
         }
       />
-      <section className="case-control-panel">
-        <CaseRendererChooser
-          descriptor={{ caseId: "cryoet-tomogram", modes: rendererModes, initialMode }}
-          modeComponents={rendererComponents}
-          onModeChange={onModeChange}
-        >
-          {() => null}
-        </CaseRendererChooser>
-        <div className="case-control-panel__dataset">
+      <section className="case-control-panel case-control-panel--dataset-only">
+        <div className="case-control-panel__dataset case-control-panel__dataset--only">
           <label
             className="grid gap-1 font-medium text-slate-800 text-sm"
             htmlFor="cryoet-dataset-select"
@@ -378,29 +371,38 @@ function CryoEtContent({
           </div>
         </VisualizationCard>
       </div>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <ViewerPanel
-          description="Live P03630 sequence and UniProt features, plus an explicitly synthetic structure-fit quality track."
-          hostRef={sequenceHost}
-          id={sequenceComponent}
-          title="PP7 capsid sequence annotations"
-        />
-        <ViewerPanel
-          description={
-            presentation === "density"
-              ? "Live EMD-77085 BCIF isosurface from PDBe Volume Server."
-              : "Representative 1DWN chain A; residue interactions synchronize with P03630."
-          }
-          hostRef={structureHost}
-          id={structureComponent}
-          kind="structure"
-          title={
-            presentation === "density"
-              ? "EMD-77085 subtomogram average"
-              : "1DWN representative structure"
-          }
-        />
-      </div>
+      <CaseRendererChooser
+        descriptor={{ caseId: "cryoet-tomogram", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {(_, rendererControl) => (
+          <div className="grid gap-5 xl:grid-cols-2">
+            <ViewerPanel
+              description="Live P03630 sequence and UniProt features, plus an explicitly synthetic structure-fit quality track."
+              hostRef={sequenceHost}
+              id={sequenceComponent}
+              title="PP7 capsid sequence annotations"
+              toolbar={rendererControl}
+            />
+            <ViewerPanel
+              description={
+                presentation === "density"
+                  ? "Live EMD-77085 BCIF isosurface from PDBe Volume Server."
+                  : "Representative 1DWN chain A; residue interactions synchronize with P03630."
+              }
+              hostRef={structureHost}
+              id={structureComponent}
+              kind="structure"
+              title={
+                presentation === "density"
+                  ? "EMD-77085 subtomogram average"
+                  : "1DWN representative structure"
+              }
+            />
+          </div>
+        )}
+      </CaseRendererChooser>
       <section data-testid="inspect-panel-container">
         <InspectPanel state={inspect} />
       </section>

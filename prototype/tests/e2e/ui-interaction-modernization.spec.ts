@@ -25,6 +25,12 @@ test("keeps every promised case-study renderer mode offline and singly subscribe
     const chooser = page.getByLabel("Sequence renderer");
     const status = page.getByTestId("renderer-chooser-status");
     await expect(status).toContainText("reference renderer ready", { timeout: 20_000 });
+    await expect(
+      chooser.locator("xpath=ancestor::*[contains(@class, 'visualization-card__header')]"),
+    ).toHaveCount(1);
+    await expect(page.getByTestId("renderer-chooser-trigger")).toHaveCSS("width", "32px");
+    await expect(page.locator(".renderer-chooser__label--hidden")).toHaveCSS("width", "1px");
+    await expect(page.locator(".renderer-chooser__label--hidden")).toHaveCSS("height", "1px");
     expect(
       await chooser
         .locator("option")

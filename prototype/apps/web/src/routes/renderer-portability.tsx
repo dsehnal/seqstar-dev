@@ -169,37 +169,43 @@ function RendererPortabilityContent({
         modeComponents={rendererComponents}
         onModeChange={onModeChange}
       >
-        {(chooser) => (
-          <div className="grid gap-5 xl:grid-cols-2">
-            <ViewerPanel
-              hidden={!chooser.mountedComponentIds.includes(referenceId)}
-              id={referenceId}
-              title="Seq* reference viewer"
-              hostRef={referenceHost}
-            >
-              <p className="mt-3 text-slate-600 text-sm" data-testid="base-sequence-lifecycle">
-                {byComponent.get(referenceId)?.status ?? "awaiting lifecycle"}
-              </p>
-            </ViewerPanel>
-            <ViewerPanel
-              hidden={!chooser.mountedComponentIds.includes(nightingaleId)}
-              id={nightingaleId}
-              title="Vendored Nightingale"
-              hostRef={nightingaleHost}
-            >
-              <p
-                className="mt-3 text-slate-600 text-sm"
-                data-testid="nightingale-sequence-lifecycle"
+        {(chooser, rendererControl) => {
+          const referenceMounted = chooser.mountedComponentIds.includes(referenceId);
+          return (
+            <div className="grid gap-5 xl:grid-cols-2">
+              <ViewerPanel
+                hidden={!referenceMounted}
+                id={referenceId}
+                title="Seq* reference viewer"
+                hostRef={referenceHost}
+                toolbar={referenceMounted ? rendererControl : undefined}
               >
-                {byComponent.get(nightingaleId)?.status ?? "awaiting lifecycle"}
-              </p>
-              <p className="viewer-note" data-testid="nightingale-fallback-status">
-                Some richer track styles are shown with a compatible heatmap or marker treatment in
-                this renderer. Exact compatibility diagnostics are available in the inspect panel.
-              </p>
-            </ViewerPanel>
-          </div>
-        )}
+                <p className="mt-3 text-slate-600 text-sm" data-testid="base-sequence-lifecycle">
+                  {byComponent.get(referenceId)?.status ?? "awaiting lifecycle"}
+                </p>
+              </ViewerPanel>
+              <ViewerPanel
+                hidden={!chooser.mountedComponentIds.includes(nightingaleId)}
+                id={nightingaleId}
+                title="Vendored Nightingale"
+                hostRef={nightingaleHost}
+                toolbar={referenceMounted ? undefined : rendererControl}
+              >
+                <p
+                  className="mt-3 text-slate-600 text-sm"
+                  data-testid="nightingale-sequence-lifecycle"
+                >
+                  {byComponent.get(nightingaleId)?.status ?? "awaiting lifecycle"}
+                </p>
+                <p className="viewer-note" data-testid="nightingale-fallback-status">
+                  Some richer track styles are shown with a compatible heatmap or marker treatment
+                  in this renderer. Exact compatibility diagnostics are available in the inspect
+                  panel.
+                </p>
+              </ViewerPanel>
+            </div>
+          );
+        }}
       </CaseRendererChooser>
       <section
         className="rounded-lg bg-slate-950 p-5 text-slate-100"

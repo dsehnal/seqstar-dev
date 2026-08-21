@@ -99,6 +99,7 @@ export function ViewerPanel({
   hidden = false,
   children,
   hostRef,
+  toolbar,
 }: {
   readonly id: string;
   readonly title: string;
@@ -107,6 +108,7 @@ export function ViewerPanel({
   readonly hidden?: boolean;
   readonly children?: ReactNode;
   readonly hostRef?: Ref<HTMLDivElement>;
+  readonly toolbar?: ReactNode;
 }) {
   const Icon = kind === "structure" ? Box : Layers3;
   const panelTestId = id.includes("nightingale")
@@ -123,6 +125,7 @@ export function ViewerPanel({
       description={description}
       eyebrow={kind === "structure" ? "3D visualization" : "Sequence view"}
       headingIcon={<Icon aria-hidden="true" size={17} strokeWidth={1.8} />}
+      toolbar={toolbar}
     >
       <section
         aria-label={`${title} visualizer`}
@@ -183,17 +186,33 @@ export function RendererChooser({
     { value: "nightingale", label: "Nightingale" },
   ],
   label = "Sequence renderer",
+  compact = false,
 }: {
   readonly value: RendererChoice;
   readonly onChange: (value: RendererChoice) => void;
   readonly disabled?: boolean;
   readonly choices?: readonly { value: RendererChoice; label: string }[];
   readonly label?: string;
+  readonly compact?: boolean;
 }) {
+  const selectedLabel = choices.find((choice) => choice.value === value)?.label ?? value;
   return (
-    <label className="renderer-chooser">
-      <span className="renderer-chooser__label">{label}</span>
-      <span className="renderer-chooser__select-wrap">
+    <label
+      className={`renderer-chooser${compact ? " renderer-chooser--compact" : ""}`}
+      title={`${label}: ${selectedLabel}`}
+    >
+      <span className={compact ? "renderer-chooser__label--hidden" : "renderer-chooser__label"}>
+        {label}
+      </span>
+      <span className="renderer-chooser__select-wrap" data-testid="renderer-chooser-trigger">
+        {compact ? (
+          <SlidersHorizontal
+            aria-hidden="true"
+            className="renderer-chooser__trigger-icon"
+            size={17}
+            strokeWidth={1.9}
+          />
+        ) : null}
         <select
           aria-label={label}
           className="renderer-chooser__select"
@@ -207,7 +226,9 @@ export function RendererChooser({
             </option>
           ))}
         </select>
-        <ChevronDown aria-hidden="true" className="renderer-chooser__icon" size={15} />
+        {compact ? null : (
+          <ChevronDown aria-hidden="true" className="renderer-chooser__icon" size={15} />
+        )}
       </span>
     </label>
   );

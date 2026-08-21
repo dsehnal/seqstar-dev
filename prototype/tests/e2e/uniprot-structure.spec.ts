@@ -59,8 +59,11 @@ test("runs the offline P04637 / 1TUP annotation-to-MVS vertical slice", async ({
   await expect(page.getByTestId("inspect-harness-status")).toContainText("ready");
   const controls = page.locator(".case-control-panel");
   await expect(controls).toBeVisible();
-  await expect(controls.locator(".case-renderer-controls")).toHaveCount(1);
+  await expect(controls.locator(".renderer-chooser")).toHaveCount(0);
   await expect(controls.getByTestId("dataset-selector")).toHaveCount(1);
+  await expect(
+    page.getByTestId("visualizer-panel-uniprot-tracks").getByLabel("Sequence renderer"),
+  ).toHaveCount(1);
   await expect(page.getByTestId("dataset-status")).toHaveCSS("text-align", "center");
   const datasetSelect = page.getByTestId("dataset-selector");
   const datasetChevron = controls.locator(".case-dataset-select-icon");

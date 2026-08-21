@@ -291,13 +291,6 @@ function AlignmentStructureContent({
           Harness: {status} · local checked fixture only
         </p>
       </section>
-      <CaseRendererChooser
-        descriptor={{ caseId: "alignment-structure", modes: rendererModes, initialMode }}
-        modeComponents={rendererComponents}
-        onModeChange={onModeChange}
-      >
-        {() => null}
-      </CaseRendererChooser>
       <section
         className="flex flex-wrap items-center gap-2"
         aria-label="Alignment structure actions"
@@ -311,21 +304,30 @@ function AlignmentStructureContent({
           shows that member alone.
         </span>
       </section>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <ViewerPanel
-          hostRef={alignmentHost}
-          id={alignmentComponent}
-          title="PF00042.29 virtualized alignment"
-          description="32 stable rows · 118 columns · query P69905 positions 27–137"
-        />
-        <ViewerPanel
-          hostRef={structureHost}
-          id={structureComponent}
-          title="Mol* comparative structure view"
-          description="Experimental 1A3N plus clearly labeled local AlphaFold DB v6 predictions"
-          kind="structure"
-        />
-      </div>
+      <CaseRendererChooser
+        descriptor={{ caseId: "alignment-structure", modes: rendererModes, initialMode }}
+        modeComponents={rendererComponents}
+        onModeChange={onModeChange}
+      >
+        {(_, rendererControl) => (
+          <div className="grid gap-5 xl:grid-cols-2">
+            <ViewerPanel
+              hostRef={alignmentHost}
+              id={alignmentComponent}
+              title="PF00042.29 virtualized alignment"
+              description="32 stable rows · 118 columns · query P69905 positions 27–137"
+              toolbar={rendererControl}
+            />
+            <ViewerPanel
+              hostRef={structureHost}
+              id={structureComponent}
+              title="Mol* comparative structure view"
+              description="Experimental 1A3N plus clearly labeled local AlphaFold DB v6 predictions"
+              kind="structure"
+            />
+          </div>
+        )}
+      </CaseRendererChooser>
       <section
         className="rounded-lg bg-slate-950 p-5 text-slate-100"
         data-testid="p60-mapping-summary"

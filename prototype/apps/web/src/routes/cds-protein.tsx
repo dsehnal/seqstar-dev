@@ -9,7 +9,7 @@ import { createCdsProteinPlugin } from "@seq-star/integration-plugins";
 import { createNightingaleWrapperFactory } from "@seq-star/wrapper-nightingale";
 import { createReferenceViewerWrapperFactory } from "@seq-star/wrapper-seq-viewer";
 import { createFileRoute } from "@tanstack/react-router";
-import { useCallback, useRef, useState } from "react";
+import { type ReactNode, useCallback, useRef, useState } from "react";
 import {
   CaseRendererChooser,
   type RendererMode,
@@ -68,10 +68,18 @@ const createPageHarness = (
     },
   );
 
-function Panel({ id, title }: { readonly id: string; readonly title: string }) {
+function Panel({
+  id,
+  title,
+  toolbar,
+}: {
+  readonly id: string;
+  readonly title: string;
+  readonly toolbar?: ReactNode;
+}) {
   const host = useHarnessHost(id);
   return (
-    <VisualizationCard className="visualization-card--flush" title={title}>
+    <VisualizationCard className="visualization-card--flush" title={title} toolbar={toolbar}>
       <section
         aria-label={title}
         className="viewer-host cds-viewer-host"
@@ -120,21 +128,26 @@ function Content({
           Harness: {status} · local synthetic fixture · no runtime network required
         </p>
       </section>
+      <section className="status-card status-card--info" data-testid="p70-coordinate-convention">
+        CDS: nucleotide [3, 21), strand +, phase 0; protein offset 0. Hover a nucleotide or protein
+        letter; select an interval to report partial-codon edges.
+      </section>
       <CaseRendererChooser
         descriptor={{ caseId: "cds-protein", modes: rendererModes, initialMode }}
         modeComponents={rendererComponents}
         onModeChange={onModeChange}
       >
-        {() => null}
+        {(_, rendererControl) => (
+          <div className="grid gap-5 xl:grid-cols-2">
+            <Panel
+              id={nucleotideComponent}
+              title="Synthetic nucleotide / CDS"
+              toolbar={rendererControl}
+            />
+            <Panel id={proteinComponent} title="Translated protein" />
+          </div>
+        )}
       </CaseRendererChooser>
-      <section className="status-card status-card--info" data-testid="p70-coordinate-convention">
-        CDS: nucleotide [3, 21), strand +, phase 0; protein offset 0. Hover a nucleotide or protein
-        letter; select an interval to report partial-codon edges.
-      </section>
-      <div className="grid gap-5 xl:grid-cols-2">
-        <Panel id={nucleotideComponent} title="Synthetic nucleotide / CDS" />
-        <Panel id={proteinComponent} title="Translated protein" />
-      </div>
       <section
         className="rounded-lg bg-slate-950 p-5 text-slate-100"
         data-testid="p70-mapping-status"
